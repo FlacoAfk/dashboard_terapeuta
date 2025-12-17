@@ -39,13 +39,24 @@ router.get('/status', (req, res) => {
  * TODO: Conectar con base de datos
  */
 router.get('/patients', (req, res) => {
-    // Datos de ejemplo (reemplazar con consulta a BD)
-    const patients = [
-        { id: 1, name: 'Juan Pérez', age: 28, email: 'juan@email.com' },
-        { id: 2, name: 'María García', age: 35, email: 'maria@email.com' }
-    ];
+    // TODO: Reemplazar con consulta a base de datos
+    const patients = [];
 
     res.json({ success: true, data: patients });
+});
+
+/**
+ * GET /api/patients/:id
+ * Obtener un paciente por ID
+ */
+router.get('/patients/:id', (req, res) => {
+    const { id } = req.params;
+
+    // TODO: Buscar en base de datos
+    res.status(404).json({
+        success: false,
+        error: 'Paciente no encontrado'
+    });
 });
 
 /**
@@ -67,16 +78,47 @@ router.post('/patients', (req, res) => {
 
     // TODO: Guardar en base de datos
     const newPatient = {
-        id: Date.now(), // ID temporal
+        id: Date.now(),
         name,
         age,
-        email
+        email,
+        createdAt: new Date().toISOString()
     };
 
     res.status(201).json({
         success: true,
         message: 'Paciente creado exitosamente',
         data: newPatient
+    });
+});
+
+/**
+ * PUT /api/patients/:id
+ * Actualizar un paciente
+ */
+router.put('/patients/:id', (req, res) => {
+    const { id } = req.params;
+    const { name, age, email } = req.body;
+
+    // TODO: Actualizar en base de datos
+    res.json({
+        success: true,
+        message: 'Paciente actualizado',
+        data: { id, name, age, email }
+    });
+});
+
+/**
+ * DELETE /api/patients/:id
+ * Eliminar un paciente
+ */
+router.delete('/patients/:id', (req, res) => {
+    const { id } = req.params;
+
+    // TODO: Eliminar de base de datos
+    res.json({
+        success: true,
+        message: 'Paciente eliminado'
     });
 });
 
@@ -87,26 +129,48 @@ router.post('/patients', (req, res) => {
 /**
  * GET /api/sessions
  * Obtener todas las sesiones de terapia
- * 
- * TODO: Conectar con base de datos
  */
 router.get('/sessions', (req, res) => {
-    // Datos de ejemplo
-    const sessions = [
-        { id: 1, patientId: 1, date: '2024-12-17', notes: 'Primera sesión' },
-        { id: 2, patientId: 1, date: '2024-12-24', notes: 'Seguimiento' }
-    ];
+    // TODO: Reemplazar con consulta a base de datos
+    const sessions = [];
 
     res.json({ success: true, data: sessions });
+});
+
+/**
+ * POST /api/sessions
+ * Crear una nueva sesión
+ * 
+ * Body esperado: { patientId: number, date: string, notes: string }
+ */
+router.post('/sessions', (req, res) => {
+    const { patientId, date, notes } = req.body;
+
+    if (!patientId || !date) {
+        return res.status(400).json({
+            success: false,
+            error: 'patientId y date son requeridos'
+        });
+    }
+
+    // TODO: Guardar en base de datos
+    const newSession = {
+        id: Date.now(),
+        patientId,
+        date,
+        notes,
+        createdAt: new Date().toISOString()
+    };
+
+    res.status(201).json({
+        success: true,
+        message: 'Sesión creada exitosamente',
+        data: newSession
+    });
 });
 
 // ========================================
 // AGREGA TUS NUEVAS RUTAS AQUÍ
 // ========================================
-
-// Ejemplo:
-// router.get('/mi-ruta', (req, res) => {
-//   res.json({ success: true, data: [...] });
-// });
 
 module.exports = router;
