@@ -1,0 +1,26 @@
+{
+  "name": "dashboard-terapeuta",
+  "version": "1.0.0",
+  "description": "Dashboard para terapeuta con Express backend y Electron frontend",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev:backend": "npm run dev --workspace=backend",
+    "dev:frontend": "npm run dev --workspace=frontend",
+    "start:backend": "npm start --workspace=backend",
+    "start:frontend": "npm start --workspace=frontend",
+    "build:css": "npm run build:css --workspace=frontend",
+    "install:all": "npm install"
+  },
+  "keywords": [
+    "electron",
+    "express",
+    "dashboard",
+    "terapeuta"
+  ],
+  "author": "",
+  "license": "ISC"
+}
