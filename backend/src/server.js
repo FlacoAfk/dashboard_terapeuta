@@ -11,7 +11,12 @@
 
 const express = require('express');
 const cors = require('cors');
+const swaggerUi = require('swagger-ui-express');
 require('dotenv').config();
+
+// Importar configuración de base de datos y Swagger
+const { testConnection } = require('./config/database');
+const swaggerSpec = require('./config/swagger');
 
 // Importar rutas
 const apiRoutes = require('./routes/api');
@@ -35,6 +40,21 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // ========================================
+// SWAGGER DOCUMENTATION
+// ========================================
+
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+  customCss: '.swagger-ui .topbar { display: none }',
+  customSiteTitle: 'Dashboard Terapeuta - API Docs'
+}));
+
+// Endpoint para obtener el JSON de Swagger
+app.get('/api-docs.json', (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.send(swaggerSpec);
+});
+
+// ========================================
 // RUTAS
 // ========================================
 
@@ -43,7 +63,8 @@ app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
     message: 'Backend funcionando correctamente',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    docs: `http://localhost:${PORT}/api-docs`
   });
 });
 
@@ -65,7 +86,7 @@ app.use((err, req, res, next) => {
 // INICIAR SERVIDOR
 // ========================================
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log('');
   console.log('========================================');
   console.log('🚀 BACKEND INICIADO');
@@ -73,8 +94,14 @@ app.listen(PORT, () => {
   console.log(`📡 Servidor: http://localhost:${PORT}`);
   console.log(`❤️  Health:   http://localhost:${PORT}/health`);
   console.log(`📋 API:      http://localhost:${PORT}/api/status`);
+  console.log(`📚 Docs:     http://localhost:${PORT}/api-docs`);
   console.log('========================================');
+
+  // Verificar conexión a base de datos
+  await testConnection();
+
   console.log('');
 });
 
 module.exports = app;
+
