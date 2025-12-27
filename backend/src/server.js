@@ -20,6 +20,9 @@ const swaggerSpec = require('./config/swagger');
 
 // Importar rutas
 const apiRoutes = require('./routes/api');
+const authRoutes = require('./routes/auth');
+const usuariosRoutes = require('./routes/usuarios');
+const auditRoutes = require('./routes/audit');
 
 // Crear aplicación Express
 const app = express();
@@ -70,6 +73,9 @@ app.get('/health', (req, res) => {
 
 // Rutas de la API (ver archivo routes/api.js)
 app.use('/api', apiRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/usuarios', usuariosRoutes);
+app.use('/api/audit', auditRoutes);
 
 // ========================================
 // MANEJO DE ERRORES

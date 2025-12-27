@@ -41,13 +41,24 @@ Conectada a **Supabase PostgreSQL**
         ],
         tags: [
             { name: 'Health', description: 'Estado del servidor' },
+            { name: 'Autenticación', description: 'Login, setup y sesión' },
+            { name: 'Usuarios', description: 'Gestión de usuarios (solo Superadmin)' },
             { name: 'Pacientes', description: 'Gestión de pacientes' },
             { name: 'Sesiones', description: 'Sesiones de terapia' },
             { name: 'Terapeutas', description: 'Información de terapeutas' },
             { name: 'Actividades', description: 'Actividades del juego' },
-            { name: 'Dashboard', description: 'Estadísticas generales' }
+            { name: 'Dashboard', description: 'Estadísticas generales' },
+            { name: 'Auditoría', description: 'Eventos de auditoría (solo Superadmin)' }
         ],
         components: {
+            securitySchemes: {
+                bearerAuth: {
+                    type: 'http',
+                    scheme: 'bearer',
+                    bearerFormat: 'JWT',
+                    description: 'Token JWT obtenido del endpoint /api/auth/login'
+                }
+            },
             schemas: {
                 Paciente: {
                     type: 'object',

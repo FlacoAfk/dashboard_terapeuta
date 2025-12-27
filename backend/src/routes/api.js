@@ -12,6 +12,8 @@
 const express = require('express');
 const router = express.Router();
 const { query } = require('../config/database');
+const { authenticateToken, requireTerapeuta, requireSuperAdmin, optionalAuth } = require('../middleware/authMiddleware');
+const { auditFromRequest, AUDIT_TYPES } = require('../utils/auditHelper');
 
 // ========================================
 // ESTADO DE LA API
@@ -85,8 +87,24 @@ router.get('/db-status', async (req, res) => {
  * @swagger
  * /api/patients:
  *   get:
- *     summary: Obtener todos los pacientes
+ *     summary: Obtener lista de pacientes
  *     tags: [Pacientes]
+ *     security:
+ *       - bearerAuth: []
+ *     description: |
+ *       RF-SEG-03: Los terapeutas solo ven sus pacientes asignados.
+ *       El Superadministrador ve todos los pacientes.
+ *     parameters:
+ *       - in: query
+ *         name: activo
+ *         schema:
+ *           type: boolean
+ *         description: Filtrar por estado activo/inactivo
+ *       - in: query
+ *         name: nombre
+ *         schema:
+ *           type: string
+ *         description: Buscar por nombre
  *     responses:
  *       200:
  *         description: Lista de pacientes
@@ -101,19 +119,53 @@ router.get('/db-status', async (req, res) => {
  *                   items:
  *                     $ref: '#/components/schemas/Paciente'
  */
-router.get('/patients', async (req, res) => {
+router.get('/patients', authenticateToken, requireTerapeuta, async (req, res) => {
+    const { activo, nombre } = req.query;
+
     try {
-        const result = await query(`
+        let queryStr = `
             SELECT 
                 p.id,
                 p.identificacion,
                 p.nombre,
                 p.edad,
                 p.diagnostico,
-                p.fecha_registro
+                p.activo,
+                p.fecha_registro,
+                tp.id_terapeuta,
+                t.nombre as terapeuta_nombre
             FROM pacientes p
-            ORDER BY p.fecha_registro DESC
-        `);
+            LEFT JOIN terapeuta_paciente tp ON p.id = tp.id_paciente
+            LEFT JOIN terapeutas t ON tp.id_terapeuta = t.id
+            WHERE 1=1
+        `;
+        const params = [];
+        let paramCount = 0;
+
+        // RF-SEG-03: Si es terapeuta, solo ver sus pacientes asignados
+        if (req.user.rol === 'TERAPEUTA' && req.user.id_terapeuta) {
+            paramCount++;
+            queryStr += ` AND tp.id_terapeuta = $${paramCount}`;
+            params.push(req.user.id_terapeuta);
+        }
+
+        // Filtro por estado activo
+        if (activo !== undefined) {
+            paramCount++;
+            queryStr += ` AND p.activo = $${paramCount}`;
+            params.push(activo === 'true');
+        }
+
+        // Filtro por nombre
+        if (nombre) {
+            paramCount++;
+            queryStr += ` AND LOWER(p.nombre) LIKE LOWER($${paramCount})`;
+            params.push(`%${nombre}%`);
+        }
+
+        queryStr += ' ORDER BY p.fecha_registro DESC';
+
+        const result = await query(queryStr, params);
         res.json({ success: true, data: result.rows });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
@@ -143,15 +195,31 @@ router.get('/patients', async (req, res) => {
  *       404:
  *         description: Paciente no encontrado
  */
-router.get('/patients/:id', async (req, res) => {
+router.get('/patients/:id', authenticateToken, requireTerapeuta, async (req, res) => {
     const { id } = req.params;
     try {
-        const result = await query('SELECT * FROM pacientes WHERE id = $1', [id]);
+        // Verificar acceso según rol
+        let queryStr = `
+            SELECT p.*, tp.id_terapeuta, t.nombre as terapeuta_nombre
+            FROM pacientes p
+            LEFT JOIN terapeuta_paciente tp ON p.id = tp.id_paciente
+            LEFT JOIN terapeutas t ON tp.id_terapeuta = t.id
+            WHERE p.id = $1
+        `;
+        const params = [id];
+
+        // RF-SEG-03: Terapeuta solo puede ver su paciente asignado
+        if (req.user.rol === 'TERAPEUTA' && req.user.id_terapeuta) {
+            queryStr += ` AND tp.id_terapeuta = $2`;
+            params.push(req.user.id_terapeuta);
+        }
+
+        const result = await query(queryStr, params);
 
         if (result.rows.length === 0) {
             return res.status(404).json({
                 success: false,
-                error: 'Paciente no encontrado'
+                error: 'Paciente no encontrado o sin acceso'
             });
         }
 
@@ -179,7 +247,7 @@ router.get('/patients/:id', async (req, res) => {
  *       400:
  *         description: Datos inválidos
  */
-router.post('/patients', async (req, res) => {
+router.post('/patients', authenticateToken, requireTerapeuta, async (req, res) => {
     const { identificacion, nombre, edad, diagnostico } = req.body;
 
     if (!nombre) {
@@ -190,17 +258,37 @@ router.post('/patients', async (req, res) => {
     }
 
     try {
+        // Crear paciente
         const result = await query(
-            `INSERT INTO pacientes (identificacion, nombre, edad, diagnostico)
-             VALUES ($1, $2, $3, $4)
+            `INSERT INTO pacientes (identificacion, nombre, edad, diagnostico, activo)
+             VALUES ($1, $2, $3, $4, true)
              RETURNING *`,
             [identificacion, nombre, edad, diagnostico]
         );
 
+        const newPatient = result.rows[0];
+
+        // RF-SEG-03: Si es terapeuta, asignar automáticamente el paciente
+        if (req.user.rol === 'TERAPEUTA' && req.user.id_terapeuta) {
+            await query(
+                `INSERT INTO terapeuta_paciente (id_terapeuta, id_paciente)
+                 VALUES ($1, $2)
+                 ON CONFLICT DO NOTHING`,
+                [req.user.id_terapeuta, newPatient.id]
+            );
+        }
+
+        // Auditoría
+        await auditFromRequest(req, AUDIT_TYPES.PATIENT_CREATED, {
+            id_paciente: newPatient.id,
+            nombre: newPatient.nombre,
+            terapeuta_asignado: req.user.id_terapeuta || null
+        });
+
         res.status(201).json({
             success: true,
             message: 'Paciente creado exitosamente',
-            data: result.rows[0]
+            data: newPatient
         });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
@@ -231,9 +319,9 @@ router.post('/patients', async (req, res) => {
  *       404:
  *         description: Paciente no encontrado
  */
-router.put('/patients/:id', async (req, res) => {
+router.put('/patients/:id', authenticateToken, requireTerapeuta, async (req, res) => {
     const { id } = req.params;
-    const { identificacion, nombre, edad, diagnostico } = req.body;
+    const { identificacion, nombre, edad, diagnostico, activo } = req.body;
 
     try {
         const result = await query(
@@ -241,10 +329,11 @@ router.put('/patients/:id', async (req, res) => {
              SET identificacion = COALESCE($1, identificacion),
                  nombre = COALESCE($2, nombre),
                  edad = COALESCE($3, edad),
-                 diagnostico = COALESCE($4, diagnostico)
-             WHERE id = $5
+                 diagnostico = COALESCE($4, diagnostico),
+                 activo = COALESCE($5, activo)
+             WHERE id = $6
              RETURNING *`,
-            [identificacion, nombre, edad, diagnostico, id]
+            [identificacion, nombre, edad, diagnostico, activo, id]
         );
 
         if (result.rows.length === 0) {
@@ -253,6 +342,12 @@ router.put('/patients/:id', async (req, res) => {
                 error: 'Paciente no encontrado'
             });
         }
+
+        // Auditoría
+        await auditFromRequest(req, AUDIT_TYPES.PATIENT_UPDATED, {
+            id_paciente: id,
+            cambios: { identificacion, nombre, edad, diagnostico, activo }
+        });
 
         res.json({
             success: true,
@@ -282,10 +377,11 @@ router.put('/patients/:id', async (req, res) => {
  *       404:
  *         description: Paciente no encontrado
  */
-router.delete('/patients/:id', async (req, res) => {
+router.delete('/patients/:id', authenticateToken, requireSuperAdmin, async (req, res) => {
     const { id } = req.params;
 
     try {
+        // RF-SEG-02: Solo superadmin puede eliminar pacientes
         const result = await query('DELETE FROM pacientes WHERE id = $1 RETURNING *', [id]);
 
         if (result.rows.length === 0) {
@@ -295,11 +391,126 @@ router.delete('/patients/:id', async (req, res) => {
             });
         }
 
+        // Auditoría
+        await auditFromRequest(req, AUDIT_TYPES.PATIENT_DELETED, {
+            id_paciente: id,
+            nombre: result.rows[0].nombre
+        });
+
         res.json({
             success: true,
             message: 'Paciente eliminado',
             data: result.rows[0]
         });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * @swagger
+ * /api/patients/{id}/assign:
+ *   post:
+ *     summary: Asignar paciente a terapeuta (solo Superadmin)
+ *     tags: [Pacientes]
+ *     security:
+ *       - bearerAuth: []
+ *     description: RF-SEG-02 - Asignar o reasignar pacientes entre terapeutas
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID del paciente
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [id_terapeuta]
+ *             properties:
+ *               id_terapeuta: { type: integer, description: "ID del terapeuta a asignar" }
+ *     responses:
+ *       200:
+ *         description: Paciente asignado exitosamente
+ *       403:
+ *         description: Solo Superadministrador puede reasignar
+ */
+router.post('/patients/:id/assign', authenticateToken, requireSuperAdmin, async (req, res) => {
+    const { id } = req.params;
+    const { id_terapeuta } = req.body;
+
+    if (!id_terapeuta) {
+        return res.status(400).json({
+            success: false,
+            error: 'id_terapeuta es requerido'
+        });
+    }
+
+    try {
+        // Verificar que el paciente existe
+        const patientCheck = await query('SELECT id, nombre FROM pacientes WHERE id = $1', [id]);
+        if (patientCheck.rows.length === 0) {
+            return res.status(404).json({ success: false, error: 'Paciente no encontrado' });
+        }
+
+        // Verificar que el terapeuta existe y está activo
+        const therapistCheck = await query(`
+            SELECT t.id, t.nombre, u.activo
+            FROM terapeutas t
+            JOIN usuarios u ON t.id_usuario = u.id
+            WHERE t.id = $1
+        `, [id_terapeuta]);
+
+        if (therapistCheck.rows.length === 0) {
+            return res.status(404).json({ success: false, error: 'Terapeuta no encontrado' });
+        }
+
+        if (!therapistCheck.rows[0].activo) {
+            return res.status(400).json({
+                success: false,
+                error: 'No se puede asignar a un terapeuta inactivo'
+            });
+        }
+
+        // Obtener asignación anterior (para auditoría)
+        const prevAssignment = await query(
+            'SELECT id_terapeuta FROM terapeuta_paciente WHERE id_paciente = $1',
+            [id]
+        );
+        const prevTerapeuta = prevAssignment.rows.length > 0 ? prevAssignment.rows[0].id_terapeuta : null;
+
+        // Eliminar asignación anterior y crear nueva (upsert)
+        await query('DELETE FROM terapeuta_paciente WHERE id_paciente = $1', [id]);
+        await query(
+            'INSERT INTO terapeuta_paciente (id_terapeuta, id_paciente) VALUES ($1, $2)',
+            [id_terapeuta, id]
+        );
+
+        // Auditoría
+        const auditType = prevTerapeuta ? AUDIT_TYPES.PATIENT_REASSIGNED : AUDIT_TYPES.PATIENT_ASSIGNED;
+        await auditFromRequest(req, auditType, {
+            id_paciente: id,
+            paciente_nombre: patientCheck.rows[0].nombre,
+            terapeuta_anterior: prevTerapeuta,
+            terapeuta_nuevo: id_terapeuta,
+            terapeuta_nombre: therapistCheck.rows[0].nombre
+        });
+
+        res.json({
+            success: true,
+            message: prevTerapeuta
+                ? `Paciente reasignado a ${therapistCheck.rows[0].nombre}`
+                : `Paciente asignado a ${therapistCheck.rows[0].nombre}`,
+            data: {
+                id_paciente: parseInt(id),
+                id_terapeuta: id_terapeuta,
+                terapeuta_nombre: therapistCheck.rows[0].nombre
+            }
+        });
+
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
     }
@@ -313,8 +524,30 @@ router.delete('/patients/:id', async (req, res) => {
  * @swagger
  * /api/sessions:
  *   get:
- *     summary: Obtener todas las sesiones de terapia
+ *     summary: Obtener sesiones de terapia
  *     tags: [Sesiones]
+ *     security:
+ *       - bearerAuth: []
+ *     description: |
+ *       RF-SEG-03: Terapeutas solo ven sesiones de sus pacientes.
+ *       RF-BDD-02: Registro de sesiones clínicas.
+ *     parameters:
+ *       - in: query
+ *         name: id_paciente
+ *         schema:
+ *           type: integer
+ *         description: Filtrar por paciente
+ *       - in: query
+ *         name: estado
+ *         schema:
+ *           type: string
+ *           enum: [INICIADA, COMPLETADA, ABANDONADA]
+ *         description: Filtrar por estado
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 50
  *     responses:
  *       200:
  *         description: Lista de sesiones
@@ -329,29 +562,64 @@ router.delete('/patients/:id', async (req, res) => {
  *                   items:
  *                     $ref: '#/components/schemas/Sesion'
  */
-router.get('/sessions', async (req, res) => {
+router.get('/sessions', authenticateToken, requireTerapeuta, async (req, res) => {
+    const { id_paciente, estado, limit = 50 } = req.query;
+
     try {
-        const result = await query(`
+        let queryStr = `
             SELECT 
                 s.id,
                 s.id_paciente,
                 p.nombre as paciente_nombre,
                 s.id_actividad,
                 a.nombre as actividad_nombre,
+                a.nivel_dificultad,
                 s.fecha_inicio,
                 s.fecha_fin,
                 s.estado,
+                s.num_pausas,
+                s.num_alertas_descanso,
                 rs.total_aciertos,
                 rs.total_errores,
+                rs.total_omisiones,
                 rs.tiempo_total_seg,
-                rs.observaciones
+                rs.observaciones,
+                tp.id_terapeuta
             FROM sesiones s
             LEFT JOIN pacientes p ON s.id_paciente = p.id
             LEFT JOIN actividad_juego a ON s.id_actividad = a.id
             LEFT JOIN resumen_sesion rs ON s.id = rs.id_sesion
-            ORDER BY s.fecha_inicio DESC
-        `);
+            LEFT JOIN terapeuta_paciente tp ON s.id_paciente = tp.id_paciente
+            WHERE 1=1
+        `;
+        const params = [];
+        let paramCount = 0;
 
+        // RF-SEG-03: Terapeuta solo ve sesiones de sus pacientes
+        if (req.user.rol === 'TERAPEUTA' && req.user.id_terapeuta) {
+            paramCount++;
+            queryStr += ` AND tp.id_terapeuta = $${paramCount}`;
+            params.push(req.user.id_terapeuta);
+        }
+
+        if (id_paciente) {
+            paramCount++;
+            queryStr += ` AND s.id_paciente = $${paramCount}`;
+            params.push(parseInt(id_paciente));
+        }
+
+        if (estado) {
+            paramCount++;
+            queryStr += ` AND s.estado = $${paramCount}`;
+            params.push(estado);
+        }
+
+        queryStr += ` ORDER BY s.fecha_inicio DESC`;
+        paramCount++;
+        queryStr += ` LIMIT $${paramCount}`;
+        params.push(parseInt(limit));
+
+        const result = await query(queryStr, params);
         res.json({ success: true, data: result.rows });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
@@ -433,21 +701,30 @@ router.get('/sessions/:id', async (req, res) => {
  * @swagger
  * /api/sessions:
  *   post:
- *     summary: Crear una nueva sesión
+ *     summary: Crear una nueva sesión (desde Unity o dashboard)
  *     tags: [Sesiones]
+ *     security:
+ *       - bearerAuth: []
+ *     description: |
+ *       RF-BDD-02: Registro de sesión clínica con metadatos.
+ *       RF-UNT-09: Pantalla de apertura de sesión.
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/SesionInput'
+ *             type: object
+ *             required: [id_paciente, id_actividad]
+ *             properties:
+ *               id_paciente: { type: integer }
+ *               id_actividad: { type: integer }
  *     responses:
  *       201:
  *         description: Sesión creada
  *       400:
  *         description: Datos inválidos
  */
-router.post('/sessions', async (req, res) => {
+router.post('/sessions', authenticateToken, requireTerapeuta, async (req, res) => {
     const { id_paciente, id_actividad } = req.body;
 
     if (!id_paciente || !id_actividad) {
@@ -458,17 +735,330 @@ router.post('/sessions', async (req, res) => {
     }
 
     try {
+        // Crear sesión con estado INICIADA
         const result = await query(
-            `INSERT INTO sesiones (id_paciente, id_actividad)
-             VALUES ($1, $2)
+            `INSERT INTO sesiones (id_paciente, id_actividad, estado, fecha_inicio)
+             VALUES ($1, $2, 'INICIADA', NOW())
              RETURNING *`,
             [id_paciente, id_actividad]
         );
+
+        // Registrar auditoría
+        await auditFromRequest(req, AUDIT_TYPES.SESSION_STARTED, {
+            id_sesion: result.rows[0].id,
+            id_paciente,
+            id_actividad
+        });
 
         res.status(201).json({
             success: true,
             message: 'Sesión creada exitosamente',
             data: result.rows[0]
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * @swagger
+ * /api/sessions/{id}/finish:
+ *   put:
+ *     summary: Finalizar una sesión con resumen
+ *     tags: [Sesiones]
+ *     security:
+ *       - bearerAuth: []
+ *     description: |
+ *       RF-BDD-02: Registro de fecha_fin, duración y estado.
+ *       RF-BDD-04: Resumen de aciertos, errores, omisiones.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               estado:
+ *                 type: string
+ *                 enum: [COMPLETADA, ABANDONADA]
+ *                 default: COMPLETADA
+ *               total_aciertos: { type: integer }
+ *               total_errores: { type: integer }
+ *               total_omisiones: { type: integer }
+ *               tiempo_total_seg: { type: integer }
+ *               observaciones: { type: string }
+ *               num_pausas: { type: integer, default: 0 }
+ *               num_alertas_descanso: { type: integer, default: 0 }
+ *     responses:
+ *       200:
+ *         description: Sesión finalizada
+ *       404:
+ *         description: Sesión no encontrada
+ */
+router.put('/sessions/:id/finish', authenticateToken, requireTerapeuta, async (req, res) => {
+    const { id } = req.params;
+    const {
+        estado = 'COMPLETADA',
+        total_aciertos = 0,
+        total_errores = 0,
+        total_omisiones = 0,
+        tiempo_total_seg,
+        observaciones,
+        num_pausas = 0,
+        num_alertas_descanso = 0
+    } = req.body;
+
+    try {
+        // Actualizar sesión
+        const sessionResult = await query(
+            `UPDATE sesiones 
+             SET fecha_fin = NOW(),
+                 estado = $1,
+                 num_pausas = $2,
+                 num_alertas_descanso = $3
+             WHERE id = $4 AND estado = 'INICIADA'
+             RETURNING *`,
+            [estado, num_pausas, num_alertas_descanso, id]
+        );
+
+        if (sessionResult.rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                error: 'Sesión no encontrada o ya finalizada'
+            });
+        }
+
+        // Crear o actualizar resumen
+        await query(
+            `INSERT INTO resumen_sesion (id_sesion, total_aciertos, total_errores, total_omisiones, tiempo_total_seg, observaciones)
+             VALUES ($1, $2, $3, $4, $5, $6)
+             ON CONFLICT (id_sesion) DO UPDATE SET
+                total_aciertos = EXCLUDED.total_aciertos,
+                total_errores = EXCLUDED.total_errores,
+                total_omisiones = EXCLUDED.total_omisiones,
+                tiempo_total_seg = EXCLUDED.tiempo_total_seg,
+                observaciones = EXCLUDED.observaciones`,
+            [id, total_aciertos, total_errores, total_omisiones, tiempo_total_seg, observaciones]
+        );
+
+        // Auditoría
+        const auditType = estado === 'COMPLETADA' ? AUDIT_TYPES.SESSION_FINISHED : AUDIT_TYPES.SESSION_ABANDONED;
+        await auditFromRequest(req, auditType, {
+            id_sesion: id,
+            estado,
+            total_aciertos,
+            total_errores,
+            total_omisiones
+        });
+
+        res.json({
+            success: true,
+            message: `Sesión ${estado.toLowerCase()}`,
+            data: sessionResult.rows[0]
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * @swagger
+ * /api/sessions/{id}/events:
+ *   post:
+ *     summary: Registrar evento de interacción desde Unity
+ *     tags: [Sesiones]
+ *     security:
+ *       - bearerAuth: []
+ *     description: |
+ *       RF-BDD-03: Registro detallado de acciones (logging cognitivo).
+ *       RF-UNT-08: Medición de aciertos, errores, omisiones.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID de la sesión
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [tipo_accion]
+ *             properties:
+ *               tipo_accion:
+ *                 type: string
+ *                 enum: [PICK_UP, DROP, POUR, CUT, MOVE, OPEN_DRAWER, TURN_ON_STOVE, TURN_OFF_STOVE, PAUSE, RESUME, ALERT_DESCANSO]
+ *               objeto_id: { type: string, description: "ID del asset en Unity" }
+ *               objeto_descripcion: { type: string }
+ *               posicion_x: { type: number }
+ *               posicion_y: { type: number }
+ *               posicion_z: { type: number }
+ *               cantidad: { type: number, description: "Ej: ml vertidos" }
+ *               metadatos: { type: object, description: "JSON adicional" }
+ *               clasificacion:
+ *                 type: string
+ *                 enum: [ACIERTO, ERROR, OMISION]
+ *     responses:
+ *       201:
+ *         description: Evento registrado
+ */
+router.post('/sessions/:id/events', authenticateToken, async (req, res) => {
+    const { id } = req.params;
+    const {
+        tipo_accion,
+        objeto_id,
+        objeto_descripcion,
+        posicion_x,
+        posicion_y,
+        posicion_z,
+        cantidad,
+        metadatos,
+        clasificacion
+    } = req.body;
+
+    if (!tipo_accion) {
+        return res.status(400).json({
+            success: false,
+            error: 'tipo_accion es requerido'
+        });
+    }
+
+    try {
+        // Verificar que la sesión existe y está activa
+        const sessionCheck = await query(
+            "SELECT id FROM sesiones WHERE id = $1 AND estado = 'INICIADA'",
+            [id]
+        );
+
+        if (sessionCheck.rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                error: 'Sesión no encontrada o no está activa'
+            });
+        }
+
+        // Insertar evento
+        const eventResult = await query(
+            `INSERT INTO eventos_interacciones 
+             (id_sesion, tipo_accion, objeto_id, objeto_descripcion, posicion_x, posicion_y, posicion_z, cantidad, metadatos)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+             RETURNING *`,
+            [id, tipo_accion, objeto_id, objeto_descripcion, posicion_x, posicion_y, posicion_z, cantidad, JSON.stringify(metadatos || {})]
+        );
+
+        const eventId = eventResult.rows[0].id;
+
+        // Si hay clasificación cognitiva, registrarla
+        if (clasificacion) {
+            await query(
+                `INSERT INTO evaluacion_cognitiva (id_evento, clasificacion)
+                 VALUES ($1, $2)`,
+                [eventId, clasificacion]
+            );
+        }
+
+        res.status(201).json({
+            success: true,
+            message: 'Evento registrado',
+            data: eventResult.rows[0]
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * @swagger
+ * /api/patients/{id}/report:
+ *   get:
+ *     summary: Obtener informe completo de un paciente
+ *     tags: [Pacientes]
+ *     security:
+ *       - bearerAuth: []
+ *     description: |
+ *       RF-SEG-04: Ver informe del paciente con sesiones y resultados.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Informe del paciente
+ *       404:
+ *         description: Paciente no encontrado
+ */
+router.get('/patients/:id/report', authenticateToken, requireTerapeuta, async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        // Obtener datos del paciente
+        const patientResult = await query(`
+            SELECT p.*, tp.id_terapeuta, t.nombre as terapeuta_nombre
+            FROM pacientes p
+            LEFT JOIN terapeuta_paciente tp ON p.id = tp.id_paciente
+            LEFT JOIN terapeutas t ON tp.id_terapeuta = t.id
+            WHERE p.id = $1
+        `, [id]);
+
+        if (patientResult.rows.length === 0) {
+            return res.status(404).json({ success: false, error: 'Paciente no encontrado' });
+        }
+
+        // RF-SEG-03: Verificar acceso
+        if (req.user.rol === 'TERAPEUTA' && req.user.id_terapeuta) {
+            if (patientResult.rows[0].id_terapeuta !== req.user.id_terapeuta) {
+                return res.status(403).json({ success: false, error: 'Sin acceso a este paciente' });
+            }
+        }
+
+        // Obtener resumen de sesiones
+        const sessionsResult = await query(`
+            SELECT 
+                s.id,
+                a.nombre as actividad,
+                a.nivel_dificultad,
+                s.fecha_inicio,
+                s.fecha_fin,
+                s.estado,
+                rs.total_aciertos,
+                rs.total_errores,
+                rs.total_omisiones,
+                rs.tiempo_total_seg,
+                rs.observaciones
+            FROM sesiones s
+            LEFT JOIN actividad_juego a ON s.id_actividad = a.id
+            LEFT JOIN resumen_sesion rs ON s.id = rs.id_sesion
+            WHERE s.id_paciente = $1
+            ORDER BY s.fecha_inicio DESC
+        `, [id]);
+
+        // Calcular estadísticas
+        const stats = {
+            total_sesiones: sessionsResult.rows.length,
+            sesiones_completadas: sessionsResult.rows.filter(s => s.estado === 'COMPLETADA').length,
+            total_aciertos: sessionsResult.rows.reduce((sum, s) => sum + (s.total_aciertos || 0), 0),
+            total_errores: sessionsResult.rows.reduce((sum, s) => sum + (s.total_errores || 0), 0),
+            total_omisiones: sessionsResult.rows.reduce((sum, s) => sum + (s.total_omisiones || 0), 0),
+            tiempo_total_minutos: Math.round(sessionsResult.rows.reduce((sum, s) => sum + (s.tiempo_total_seg || 0), 0) / 60)
+        };
+
+        res.json({
+            success: true,
+            data: {
+                patient: patientResult.rows[0],
+                stats,
+                sessions: sessionsResult.rows
+            }
         });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
