@@ -52,7 +52,7 @@ router.post('/login', async (req, res) => {
             `SELECT u.*, t.id as id_terapeuta, t.nombre as terapeuta_nombre
              FROM usuarios u
              LEFT JOIN terapeutas t ON u.id = t.id_usuario
-             WHERE u.username = $1`,
+             WHERE u.email = $1`,
             [username]
         );
 
@@ -86,12 +86,12 @@ router.post('/login', async (req, res) => {
         }
 
         // Actualizar último acceso
-        await query('UPDATE usuarios SET ultimo_acceso = NOW() WHERE id = $1', [user.id]);
+        await query('UPDATE usuarios SET ultimo_login = NOW() WHERE id = $1', [user.id]);
 
         // Generar token
         const token = generateToken({
             id: user.id,
-            username: user.username,
+            username: user.email,
             rol: user.rol,
             id_terapeuta: user.id_terapeuta
         });
@@ -251,7 +251,7 @@ router.post('/setup', async (req, res) => {
 router.get('/me', authenticateToken, async (req, res) => {
     try {
         const result = await query(
-            `SELECT u.id, u.username, u.rol, u.activo, u.ultimo_acceso,
+            `SELECT u.id, u.email, u.rol, u.activo, u.ultimo_login,
                     t.id as id_terapeuta, t.nombre, t.correo, t.especialidad
              FROM usuarios u
              LEFT JOIN terapeutas t ON u.id = t.id_usuario
@@ -271,11 +271,11 @@ router.get('/me', authenticateToken, async (req, res) => {
             success: true,
             data: {
                 id: user.id,
-                username: user.username,
+                username: user.email,
                 rol: user.rol,
                 activo: user.activo,
-                ultimo_acceso: user.ultimo_acceso,
-                nombre: user.nombre || user.username,
+                ultimo_acceso: user.ultimo_login,
+                nombre: user.nombre || user.email,
                 correo: user.correo,
                 especialidad: user.especialidad,
                 id_terapeuta: user.id_terapeuta

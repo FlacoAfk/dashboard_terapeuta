@@ -1,22 +1,62 @@
 /**
  * ========================================
- * CLIENTE API - Base
+ * CLIENTE API BASE
  * ========================================
  * 
- * Este archivo proporciona funciones para hacer peticiones HTTP al backend.
- * Uso: window.api.get('/api/endpoint')
- *      window.api.post('/api/endpoint', { data })
+ * Cliente HTTP para comunicación con el backend.
+ * Maneja tokens de autenticación automáticamente.
  */
 
-const API_URL = 'http://localhost:3001';
+const API_URL = window.env?.apiUrl || 'http://localhost:3001';
 
 /**
  * Cliente API con métodos para GET, POST, PUT, DELETE
  */
 const api = {
     /**
+     * Obtener el token de autenticación
+     */
+    getAuthHeader() {
+        const token = this.getToken();
+        return token ? { 'Authorization': `Bearer ${token}` } : {};
+    },
+
+    /**
+     * Obtener token almacenado
+     */
+    getToken() {
+        // Usar electronAPI si está disponible, sino sessionStorage
+        if (window.electronAPI?.getToken) {
+            return window.electronAPI.getToken();
+        }
+        return sessionStorage.getItem('auth_token');
+    },
+
+    /**
+     * Guardar token
+     */
+    setToken(token) {
+        if (window.electronAPI?.setToken) {
+            window.electronAPI.setToken(token);
+        } else {
+            sessionStorage.setItem('auth_token', token);
+        }
+    },
+
+    /**
+     * Eliminar token
+     */
+    removeToken() {
+        if (window.electronAPI?.removeToken) {
+            window.electronAPI.removeToken();
+        } else {
+            sessionStorage.removeItem('auth_token');
+        }
+    },
+
+    /**
      * Petición GET
-     * @param {string} endpoint - Ruta del endpoint (ej: '/api/patients')
+     * @param {string} endpoint - Ruta del endpoint
      */
     async get(endpoint) {
         return this._request(endpoint, { method: 'GET' });
@@ -56,7 +96,6 @@ const api = {
 
     /**
      * Método interno para hacer peticiones
-     * (No usar directamente, usar get/post/put/delete)
      */
     async _request(endpoint, options = {}) {
         const url = `${API_URL}${endpoint}`;
@@ -68,6 +107,7 @@ const api = {
                 ...options,
                 headers: {
                     'Content-Type': 'application/json',
+                    ...this.getAuthHeader(),
                     ...options.headers,
                 },
             });
@@ -75,7 +115,7 @@ const api = {
             const data = await response.json();
 
             if (!response.ok) {
-                throw new Error(data.error?.message || `Error ${response.status}`);
+                throw new Error(data.error || `Error ${response.status}`);
             }
 
             return data;
@@ -86,5 +126,4 @@ const api = {
     }
 };
 
-// Hacer disponible globalmente
-window.api = api;
+export default api;

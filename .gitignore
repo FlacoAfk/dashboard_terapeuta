@@ -40,3 +40,9 @@ coverage/
 tmp/
 temp/
 *.tmp
+
+# Debug script outputs
+*_result.json
+*_output.txt
+backend/scripts/*.json
+backend/scripts/*.txt

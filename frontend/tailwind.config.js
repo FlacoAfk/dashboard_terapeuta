@@ -1,37 +1,31 @@
 /** @type {import('tailwindcss').Config} */
-module.exports = {
+export default {
     content: [
-        "./src/renderer/**/*.{html,js}"
+        "./src/renderer/**/*.{html,js,jsx,ts,tsx}"
     ],
     theme: {
         extend: {
             colors: {
-                // Custom colors for therapist dashboard
+                // Colores del sistema VR
                 primary: {
-                    50: '#f0f9ff',
-                    100: '#e0f2fe',
-                    200: '#bae6fd',
-                    300: '#7dd3fc',
-                    400: '#38bdf8',
-                    500: '#0ea5e9',
-                    600: '#0284c7',
-                    700: '#0369a1',
-                    800: '#075985',
-                    900: '#0c4a6e',
-                    950: '#082f49',
+                    DEFAULT: '#6366F1',
+                    50: '#EEEEFF',
+                    100: '#E0E1FE',
+                    200: '#C3C5FD',
+                    300: '#A5A8FC',
+                    400: '#888CFB',
+                    500: '#6366F1',
+                    600: '#4F52E9',
+                    700: '#3B3ED8',
+                    800: '#2E31B0',
+                    900: '#252888',
+                    950: '#1C1F60',
                 },
-                accent: {
-                    50: '#fdf4ff',
-                    100: '#fae8ff',
-                    200: '#f5d0fe',
-                    300: '#f0abfc',
-                    400: '#e879f9',
-                    500: '#d946ef',
-                    600: '#c026d3',
-                    700: '#a21caf',
-                    800: '#86198f',
-                    900: '#701a75',
-                    950: '#4a044e',
+                header: {
+                    DEFAULT: '#E85A5A',
+                },
+                login: {
+                    bg: '#C5CDE8',
                 },
                 surface: {
                     50: '#f8fafc',
@@ -53,7 +47,7 @@ module.exports = {
             animation: {
                 'fade-in': 'fadeIn 0.3s ease-out',
                 'slide-up': 'slideUp 0.3s ease-out',
-                'pulse-soft': 'pulseSoft 2s infinite',
+                'spin-slow': 'spin 1.5s linear infinite',
             },
             keyframes: {
                 fadeIn: {
@@ -64,11 +58,12 @@ module.exports = {
                     '0%': { opacity: '0', transform: 'translateY(10px)' },
                     '100%': { opacity: '1', transform: 'translateY(0)' },
                 },
-                pulseSoft: {
-                    '0%, 100%': { opacity: '1' },
-                    '50%': { opacity: '0.7' },
-                },
             },
+            borderRadius: {
+                'xl': '0.75rem',
+                '2xl': '1rem',
+                '3xl': '1.5rem',
+            }
         },
     },
     plugins: [],

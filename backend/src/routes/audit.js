@@ -65,7 +65,7 @@ router.get('/', authenticateToken, requireSuperAdmin, async (req, res) => {
                 a.id,
                 a.tipo_evento,
                 a.id_actor,
-                u.username as actor_username,
+                u.email as actor_username,
                 a.detalle,
                 a.ip_origen,
                 a.timestamp

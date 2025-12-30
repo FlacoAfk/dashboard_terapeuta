@@ -3,8 +3,7 @@
  * PROCESO PRINCIPAL DE ELECTRON
  * ========================================
  * 
- * Este archivo controla la ventana de la aplicación de escritorio.
- * No modificar a menos que necesites cambiar el comportamiento de la ventana.
+ * Controla la ventana de la aplicación de escritorio.
  */
 
 const { app, BrowserWindow, ipcMain } = require('electron');
@@ -21,20 +20,29 @@ const createWindow = () => {
         height: 900,
         minWidth: 1024,
         minHeight: 768,
-        backgroundColor: '#0f172a',
+        backgroundColor: '#C5CDE8',
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
-            preload: path.join(__dirname, 'preload.js'),
+            preload: path.join(__dirname, '../preload/preload.js'),
         },
         autoHideMenuBar: true,
+        show: false, // Mostrar cuando esté listo
     });
 
-    // Cargar la página principal
-    mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
+    // En desarrollo, cargar desde el servidor de Vite
+    if (process.env.NODE_ENV === 'development') {
+        mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL);
+        mainWindow.webContents.openDevTools();
+    } else {
+        // En producción, cargar el archivo HTML compilado
+        mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
+    }
 
-    // Descomentar para abrir DevTools automáticamente:
-    // mainWindow.webContents.openDevTools();
+    // Mostrar ventana cuando esté lista para evitar flash blanco
+    mainWindow.on('ready-to-show', () => {
+        mainWindow.show();
+    });
 };
 
 // Iniciar cuando Electron esté listo
@@ -56,7 +64,7 @@ app.on('window-all-closed', () => {
 });
 
 // ========================================
-// COMUNICACIÓN CON EL RENDERER
+// COMUNICACIÓN CON EL RENDERER (IPC)
 // ========================================
 
 // Obtener versión de la app

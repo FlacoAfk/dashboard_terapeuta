@@ -1,0 +1,85 @@
+@import "tailwindcss";
+
+/* ========================================
+   ESTILOS GLOBALES - Sistema Clínico VR
+   ======================================== */
+
+/* Fuente base */
+body {
+    font-family: 'Inter', system-ui, sans-serif;
+    @apply antialiased;
+}
+
+/* Colores personalizados usando CSS custom properties */
+:root {
+    /* Colores primarios (violeta del botón) */
+    --color-primary: #6366F1;
+    --color-primary-hover: #5558E3;
+    --color-primary-light: #818CF8;
+    
+    /* Colores de fondo */
+    --color-bg-login: #C5CDE8;
+    --color-bg-card: #FFFFFF;
+    
+    /* Colores de texto */
+    --color-text-primary: #1F2937;
+    --color-text-secondary: #6B7280;
+    --color-text-placeholder: #9CA3AF;
+    
+    /* Colores de estado */
+    --color-error: #EF4444;
+    --color-success: #10B981;
+    
+    /* Colores del header (rojo existente) */
+    --color-header: #E85A5A;
+}
+
+/* Utility classes personalizadas */
+.bg-login {
+    background-color: var(--color-bg-login);
+}
+
+.bg-primary {
+    background-color: var(--color-primary);
+}
+
+.bg-primary:hover {
+    background-color: var(--color-primary-hover);
+}
+
+.text-primary {
+    color: var(--color-primary);
+}
+
+/* Animaciones suaves */
+.transition-default {
+    @apply transition-all duration-200 ease-in-out;
+}
+
+/* Input styles */
+.input-icon {
+    @apply absolute left-4 top-1/2 -translate-y-1/2 text-gray-400;
+}
+
+/* Card styles */
+.card {
+    @apply bg-white rounded-2xl shadow-lg;
+}
+
+/* Estilos para scrollbar personalizado */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    @apply bg-gray-100 rounded-full;
+}
+
+::-webkit-scrollbar-thumb {
+    @apply bg-gray-300 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-400;
+}

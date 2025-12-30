@@ -1098,7 +1098,7 @@ router.get('/terapeutas', async (req, res) => {
                 t.especialidad,
                 t.correo,
                 t.telefono,
-                u.username,
+                u.email as username,
                 u.activo
             FROM terapeutas t
             LEFT JOIN usuarios u ON t.id_usuario = u.id

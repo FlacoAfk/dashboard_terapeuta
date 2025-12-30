@@ -1,24 +1,38 @@
 {
-    "name": "frontend",
+    "name": "sistema-clinico-vr-frontend",
     "version": "1.0.0",
-    "description": "Electron desktop app for Dashboard Terapeuta",
-    "main": "src/main/main.js",
+    "description": "Sistema Clínico VR - Dashboard Terapeuta (Electron + React)",
+    "main": "dist-electron/main/main.js",
     "scripts": {
-        "start": "electron .",
-        "dev": "electron .",
-        "build:css": "npx tailwindcss -i ./src/renderer/styles.css -o ./src/renderer/output.css --watch",
-        "build:css:prod": "npx tailwindcss -i ./src/renderer/styles.css -o ./src/renderer/output.css --minify"
+        "dev": "electron-vite dev",
+        "build": "electron-vite build",
+        "preview": "electron-vite preview",
+        "start": "electron-vite preview"
     },
     "dependencies": {
-        "axios": "^1.6.2"
+        "react": "^19.0.0",
+        "react-dom": "^19.0.0",
+        "react-router-dom": "^7.1.1",
+        "axios": "^1.7.9"
     },
     "devDependencies": {
-        "autoprefixer": "^10.4.16",
-        "electron": "^28.0.0",
-        "postcss": "^8.4.32",
-        "tailwindcss": "^3.3.6"
+        "@vitejs/plugin-react": "^4.3.4",
+        "autoprefixer": "^10.4.20",
+        "electron": "^33.3.1",
+        "electron-vite": "^2.3.0",
+        "postcss": "^8.4.49",
+        "tailwindcss": "^4.1.0",
+        "@tailwindcss/vite": "^4.1.0",
+        "vite": "^6.0.6"
     },
-    "keywords": [],
+    "keywords": [
+        "electron",
+        "react",
+        "vite",
+        "tailwindcss",
+        "dashboard",
+        "terapeuta"
+    ],
     "author": "",
     "license": "ISC"
 }

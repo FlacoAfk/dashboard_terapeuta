@@ -62,25 +62,44 @@ dashboard_terapeuta/
 │   │   └── utils/
 │   │       └── auditHelper.js      # Helper para registro de auditoría
 │   ├── scripts/                    # Scripts de utilidad
-│   │   ├── check_db.js             # Verificar conexión y tablas
-│   │   ├── migrate_roles.js        # Migración de roles
-│   │   └── add_activo_column.js    # Agregar columna activo
 │   ├── .env                        # Variables de entorno (no incluido)
 │   └── package.json
 │
-├── frontend/                       # Aplicación Electron
+├── frontend/                       # Aplicación Electron + React
 │   ├── src/
 │   │   ├── main/                   # Proceso principal de Electron
 │   │   │   ├── main.js             # Entry point Electron
 │   │   │   └── preload.js          # Script de preload (seguridad)
-│   │   ├── renderer/               # Interfaz de usuario
-│   │   │   ├── index.html          # HTML principal
-│   │   │   ├── styles.css          # Estilos Tailwind (input)
-│   │   │   └── output.css          # CSS compilado (generado)
-│   │   └── services/
-│   │       └── api.js              # Cliente HTTP para la API
-│   ├── tailwind.config.js          # Configuración de Tailwind CSS
-│   ├── postcss.config.js
+│   │   └── renderer/               # Interfaz de usuario (React)
+│   │       ├── App.jsx             # Router principal
+│   │       ├── main.jsx            # Entry point React
+│   │       ├── index.css           # Estilos globales
+│   │       ├── context/
+│   │       │   └── AuthContext.jsx # Contexto de autenticación
+│   │       ├── components/
+│   │       │   ├── layout/
+│   │       │   │   └── AdminLayout.jsx    # Layout del panel admin
+│   │       │   ├── modals/
+│   │       │   │   ├── CrearTerapeutaModal.jsx
+│   │       │   │   ├── EditarTerapeutaModal.jsx
+│   │       │   │   └── ReasignarPacientesModal.jsx
+│   │       │   └── ui/
+│   │       │       ├── Button.jsx
+│   │       │       ├── Input.jsx
+│   │       │       ├── Logo.jsx
+│   │       │       └── Modal.jsx
+│   │       ├── pages/
+│   │       │   ├── Login.jsx       # Página de login
+│   │       │   ├── Dashboard.jsx   # Dashboard terapeuta
+│   │       │   └── admin/          # Panel de administrador
+│   │       │       ├── GestionTerapeutas.jsx
+│   │       │       ├── Auditoria.jsx
+│   │       │       └── index.js
+│   │       └── services/
+│   │           ├── api.js              # Cliente HTTP base
+│   │           ├── authService.js      # Servicio de autenticación
+│   │           ├── therapistService.js # CRUD de terapeutas
+│   │           └── auditService.js     # Consulta de auditoría
 │   └── package.json
 │
 ├── .gitignore

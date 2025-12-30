@@ -1,155 +1,19 @@
 <!DOCTYPE html>
 <html lang="es">
-
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy"
-    content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' http://localhost:3001">
-  <title>Sistema VR - Dashboard</title>
-  <link rel="stylesheet" href="output.css">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <style>
-    body {
-      font-family: 'Inter', sans-serif;
-    }
-
-    /* Sidebar transition */
-    .sidebar {
-      transition: width 0.3s ease, transform 0.3s ease;
-    }
-
-    .sidebar.collapsed {
-      width: 0;
-      overflow: hidden;
-    }
-
-    .main-content {
-      transition: margin-left 0.3s ease;
-    }
-
-    .main-content.expanded {
-      margin-left: 0;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" 
+          content="default-src 'self'; 
+                   script-src 'self' 'unsafe-inline'; 
+                   style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; 
+                   font-src 'self' https://fonts.gstatic.com; 
+                   connect-src 'self' http://localhost:3001">
+    <title>Sistema Clínico VR - Gestión de Terapias</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
-
-<body class="min-h-screen bg-gray-100">
-
-  <!-- Header -->
-  <header class="fixed top-0 left-0 right-0 h-14 bg-[#E85A5A] flex items-center justify-between px-4 z-50 shadow-md">
-    <div class="flex items-center gap-3">
-      <!-- Hamburger Button -->
-      <button id="toggleSidebar" class="text-white p-2 hover:bg-white/10 rounded-lg transition-colors">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-        </svg>
-      </button>
-      <!-- Logo -->
-      <div class="flex items-center gap-2">
-        <div class="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
-          <span class="text-white font-bold text-sm">VR</span>
-        </div>
-        <span class="text-white font-semibold text-lg">Sistema VR</span>
-      </div>
-    </div>
-
-    <!-- User Profile -->
-    <div class="flex items-center gap-3">
-      <div class="w-8 h-8 bg-white rounded-full flex items-center justify-center">
-        <span class="text-[#E85A5A] font-semibold text-sm">R</span>
-      </div>
-      <span class="text-white font-medium">Admin Root</span>
-      <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-      </svg>
-    </div>
-  </header>
-
-  <!-- Sidebar -->
-  <aside id="sidebar" class="sidebar fixed left-0 top-14 bottom-0 w-56 bg-white border-r border-gray-200 z-40">
-    <nav class="p-4 space-y-1">
-      <!-- Terapeutas -->
-      <a href="#" class="flex items-center gap-3 px-4 py-3 text-[#E85A5A] bg-red-50 rounded-lg font-medium">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-        </svg>
-        <span>Terapeutas</span>
-      </a>
-
-      <!-- Auditoría -->
-      <a href="#" class="flex items-center gap-3 px-4 py-3 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-        </svg>
-        <span>Auditoría</span>
-      </a>
-    </nav>
-
-    <!-- Cerrar Sesión (al fondo) -->
-    <div class="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200">
-      <a href="#" class="flex items-center gap-3 px-4 py-3 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-            d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-        </svg>
-        <span>Cerrar Sesión</span>
-      </a>
-    </div>
-  </aside>
-
-  <!-- Main Content -->
-  <main id="mainContent" class="main-content ml-56 pt-14 min-h-screen">
-    <div id="contentArea" class="p-6">
-      <!-- El contenido de las vistas se cargará aquí -->
-      <div class="bg-white rounded-lg shadow-sm p-8 text-center text-gray-400">
-        <p>Selecciona una opción del menú</p>
-      </div>
-    </div>
-  </main>
-
-  <!-- Scripts -->
-  <script src="../services/api.js"></script>
-  <script src="../services/exampleService.js"></script>
-  <script>
-    // Toggle Sidebar
-    const sidebar = document.getElementById('sidebar');
-    const mainContent = document.getElementById('mainContent');
-    const toggleBtn = document.getElementById('toggleSidebar');
-
-    let sidebarVisible = true;
-
-    toggleBtn.addEventListener('click', () => {
-      sidebarVisible = !sidebarVisible;
-
-      if (sidebarVisible) {
-        sidebar.classList.remove('collapsed');
-        mainContent.classList.remove('expanded');
-      } else {
-        sidebar.classList.add('collapsed');
-        mainContent.classList.add('expanded');
-      }
-    });
-
-    // Navigation active state
-    const navLinks = document.querySelectorAll('nav a');
-    navLinks.forEach(link => {
-      link.addEventListener('click', (e) => {
-        // Remove active from all
-        navLinks.forEach(l => {
-          l.classList.remove('text-[#E85A5A]', 'bg-red-50', 'font-medium');
-          l.classList.add('text-gray-600');
-        });
-        // Add active to clicked
-        link.classList.add('text-[#E85A5A]', 'bg-red-50', 'font-medium');
-        link.classList.remove('text-gray-600');
-      });
-    });
-
-    console.log('🚀 Dashboard Sistema VR iniciado');
-  </script>
+<body>
+    <div id="root"></div>
+    <script type="module" src="./main.jsx"></script>
 </body>
-
 </html>

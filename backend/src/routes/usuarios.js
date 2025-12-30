@@ -33,11 +33,11 @@ router.get('/', authenticateToken, requireSuperAdmin, async (req, res) => {
         const result = await query(`
             SELECT 
                 u.id,
-                u.username,
+                u.email as username,
                 u.rol,
                 u.activo,
                 u.fecha_creacion,
-                u.ultimo_acceso,
+                u.ultimo_login as ultimo_acceso,
                 t.id as id_terapeuta,
                 t.nombre,
                 t.correo,
@@ -107,8 +107,8 @@ router.post('/terapeuta', authenticateToken, requireSuperAdmin, async (req, res)
     }
 
     try {
-        // Verificar username único
-        const existingUser = await query('SELECT id FROM usuarios WHERE username = $1', [username]);
+        // Verificar email/username único
+        const existingUser = await query('SELECT id FROM usuarios WHERE email = $1', [username]);
         if (existingUser.rows.length > 0) {
             return res.status(400).json({
                 success: false,
@@ -122,9 +122,9 @@ router.post('/terapeuta', authenticateToken, requireSuperAdmin, async (req, res)
 
         // Crear usuario
         const userResult = await query(
-            `INSERT INTO usuarios (username, password_hash, rol, activo)
+            `INSERT INTO usuarios (email, password_hash, rol, activo)
              VALUES ($1, $2, 'TERAPEUTA', true)
-             RETURNING id, username, rol`,
+             RETURNING id, email as username, rol`,
             [username, passwordHash]
         );
 
