@@ -140,7 +140,7 @@ router.post('/login', async (req, res) => {
  *               nombre: { type: string, example: "Administrador Principal" }
  *               correo: { type: string, example: "admin@clinica.com" }
  *               username: { type: string, example: "superadmin" }
- *               password: { type: string, example: "Admin2024!" }
+ *               password: { type: string, example: "Contraseña123!@" }
  *     responses:
  *       201:
  *         description: Superadministrador creado

@@ -1,5 +1,8 @@
 /**
- * Script para resetear la contraseña del admin a una conocida
+ * Script para resetear la contraseña del admin
+ * 
+ * USO: Establecer NEW_ADMIN_PASSWORD en .env antes de ejecutar
+ * node scripts/reset_admin_password.js
  */
 require('dotenv').config();
 const bcrypt = require('bcryptjs');
@@ -14,7 +17,14 @@ const pool = new Pool({
     ssl: { rejectUnauthorized: false }
 });
 
-const NEW_PASSWORD = 'Admin2024!@';
+// La contraseña debe establecerse en .env como NEW_ADMIN_PASSWORD
+const NEW_PASSWORD = process.env.NEW_ADMIN_PASSWORD;
+
+if (!NEW_PASSWORD) {
+    console.error('ERROR: Debes establecer NEW_ADMIN_PASSWORD en el archivo .env');
+    console.log('Ejemplo: NEW_ADMIN_PASSWORD=TuNuevaContraseña123!@');
+    process.exit(1);
+}
 
 async function resetPassword() {
     const client = await pool.connect();

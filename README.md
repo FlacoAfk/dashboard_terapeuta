@@ -267,7 +267,7 @@ npm run dev:frontend
   "nombre": "Administrador",
   "correo": "admin@clinica.com",
   "username": "admin",
-  "password": "Admin2024!@"
+  "password": "TuContraseñaSegura123!@"
 }
 ```
 
@@ -447,14 +447,14 @@ POST /api/auth/setup
   "nombre": "Administrador",
   "correo": "admin@clinica.com",
   "username": "admin",
-  "password": "Admin2024!@"
+  "password": "TuContraseñaSegura123!@"
 }
 
 // 3. Login
 POST /api/auth/login
 {
   "username": "admin",
-  "password": "Admin2024!@"
+  "password": "TuContraseñaSegura123!@"
 }
 // Respuesta: { success: true, data: { token: "eyJhbG...", user: {...} } }
 
