@@ -16,15 +16,15 @@ const auditService = {
      * Obtener eventos de auditoría
      * GET /api/audit
      */
-    async getEvents({ limit = 50, offset = 0, tipo, desde, hasta } = {}) {
+    async getEvents({ limit = 50, offset = 0, tipo, desde, hasta, startDate, endDate } = {}) {
         try {
             let endpoint = `/api/audit?limit=${limit}&offset=${offset}`;
             if (tipo) endpoint += `&tipo=${tipo}`;
-            if (desde) endpoint += `&desde=${desde}`;
-            if (hasta) endpoint += `&hasta=${hasta}`;
+            if (desde || startDate) endpoint += `&desde=${desde || startDate}`;
+            if (hasta || endDate) endpoint += `&hasta=${hasta || endDate}`;
 
             const response = await api.get(endpoint);
-            return { success: true, data: response.data, pagination: response.pagination };
+            return { success: true, data: response.data || [], pagination: response.pagination };
         } catch (error) {
             console.error('[AuditService] getEvents error:', error);
             return { success: false, error: error.message };

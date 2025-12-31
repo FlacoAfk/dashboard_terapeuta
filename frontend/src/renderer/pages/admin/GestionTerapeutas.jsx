@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import AdminLayout from '../../components/layout/AdminLayout';
-import { CrearTerapeutaModal, EditarTerapeutaModal, ReasignarPacientesModal } from '../../components/modals';
+import { CrearTerapeutaModal, EditarTerapeutaModal, ReasignarPacientesModal, ResetPasswordModal } from '../../components/modals';
 import therapistService from '../../services/therapistService';
 
 /**
@@ -46,6 +46,11 @@ const Icons = {
     Refresh: () => (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+        </svg>
+    ),
+    Key: () => (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
         </svg>
     )
 };
@@ -101,6 +106,7 @@ const GestionTerapeutas = () => {
     const [showCrearModal, setShowCrearModal] = useState(false);
     const [showEditarModal, setShowEditarModal] = useState(false);
     const [showReasignarModal, setShowReasignarModal] = useState(false);
+    const [showResetModal, setShowResetModal] = useState(false);
     const [selectedTherapist, setSelectedTherapist] = useState(null);
     const [therapistPatients, setTherapistPatients] = useState([]);
 
@@ -390,6 +396,14 @@ const GestionTerapeutas = () => {
                                                     title={therapist.activo ? 'Desactivar' : 'Activar'}
                                                     variant="danger"
                                                 />
+                                                <ActionButton 
+                                                    icon={Icons.Key} 
+                                                    onClick={() => {
+                                                        setSelectedTherapist(therapist);
+                                                        setShowResetModal(true);
+                                                    }}
+                                                    title="Resetear contraseña"
+                                                />
                                             </div>
                                         </td>
                                     </tr>
@@ -464,6 +478,30 @@ const GestionTerapeutas = () => {
                 therapist={selectedTherapist}
                 patients={therapistPatients}
                 availableTherapists={availableTherapists}
+            />
+
+            <ResetPasswordModal
+                isOpen={showResetModal}
+                onClose={() => {
+                    setShowResetModal(false);
+                    setSelectedTherapist(null);
+                }}
+                onSubmit={async (data) => {
+                    setActionLoading(true);
+                    try {
+                        const result = await therapistService.resetPassword(data.therapistId, data.newPassword);
+                        if (result.success) {
+                            alert('Contraseña reseteada exitosamente');
+                        } else {
+                            throw new Error(result.error);
+                        }
+                    } catch (err) {
+                        alert('Error al resetear contraseña: ' + err.message);
+                    } finally {
+                        setActionLoading(false);
+                    }
+                }}
+                therapist={selectedTherapist}
             />
         </AdminLayout>
     );

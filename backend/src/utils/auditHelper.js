@@ -54,14 +54,15 @@ const AUDIT_TYPES = {
  * @param {string} tipo - Tipo de evento (usar AUDIT_TYPES)
  * @param {number|null} idActor - ID del usuario que realiza la acción
  * @param {object} detalle - Detalles adicionales del evento (JSON)
- * @param {string|null} ipOrigen - IP de origen de la petición
+ * @param {string|null} ipOrigen - IP de origen de la petición (no usado en esquema actual)
  */
 const registrarAuditoria = async (tipo, idActor = null, detalle = {}, ipOrigen = null) => {
     try {
+        // Columnas reales de la tabla: tipo_accion, id_usuario, descripcion, fecha
         await query(
-            `INSERT INTO auditoria (tipo_evento, id_actor, detalle, ip_origen)
-             VALUES ($1, $2, $3, $4)`,
-            [tipo, idActor, JSON.stringify(detalle), ipOrigen]
+            `INSERT INTO auditoria (tipo_accion, id_usuario, descripcion, fecha)
+             VALUES ($1, $2, $3, NOW())`,
+            [tipo, idActor, JSON.stringify(detalle)]
         );
         console.log(`📋 Auditoría: ${tipo} por usuario ${idActor || 'sistema'}`);
     } catch (error) {

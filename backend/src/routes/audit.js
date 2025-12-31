@@ -63,14 +63,14 @@ router.get('/', authenticateToken, requireSuperAdmin, async (req, res) => {
         let queryStr = `
             SELECT 
                 a.id,
-                a.tipo_evento,
-                a.id_actor,
+                a.tipo_accion as tipo_evento,
+                a.id_usuario,
                 u.email as actor_username,
-                a.detalle,
-                a.ip_origen,
-                a.timestamp
+                a.descripcion as detalle,
+                '' as ip_origen,
+                a.fecha as timestamp
             FROM auditoria a
-            LEFT JOIN usuarios u ON a.id_actor = u.id
+            LEFT JOIN usuarios u ON a.id_usuario = u.id
             WHERE 1=1
         `;
         const params = [];
@@ -78,23 +78,23 @@ router.get('/', authenticateToken, requireSuperAdmin, async (req, res) => {
 
         if (tipo) {
             paramCount++;
-            queryStr += ` AND a.tipo_evento = $${paramCount}`;
+            queryStr += ` AND a.tipo_accion = $${paramCount}`;
             params.push(tipo);
         }
 
         if (desde) {
             paramCount++;
-            queryStr += ` AND a.timestamp >= $${paramCount}`;
+            queryStr += ` AND a.fecha >= $${paramCount}`;
             params.push(desde);
         }
 
         if (hasta) {
             paramCount++;
-            queryStr += ` AND a.timestamp <= $${paramCount}::date + interval '1 day'`;
+            queryStr += ` AND a.fecha <= $${paramCount}::date + interval '1 day'`;
             params.push(hasta);
         }
 
-        queryStr += ` ORDER BY a.timestamp DESC`;
+        queryStr += ` ORDER BY a.fecha DESC`;
 
         paramCount++;
         queryStr += ` LIMIT $${paramCount}`;
@@ -113,17 +113,17 @@ router.get('/', authenticateToken, requireSuperAdmin, async (req, res) => {
 
         if (tipo) {
             countParamNum++;
-            countQuery += ` AND tipo_evento = $${countParamNum}`;
+            countQuery += ` AND tipo_accion = $${countParamNum}`;
             countParams.push(tipo);
         }
         if (desde) {
             countParamNum++;
-            countQuery += ` AND timestamp >= $${countParamNum}`;
+            countQuery += ` AND fecha >= $${countParamNum}`;
             countParams.push(desde);
         }
         if (hasta) {
             countParamNum++;
-            countQuery += ` AND timestamp <= $${countParamNum}::date + interval '1 day'`;
+            countQuery += ` AND fecha <= $${countParamNum}::date + interval '1 day'`;
             countParams.push(hasta);
         }
 
@@ -170,13 +170,13 @@ router.get('/user/:id', authenticateToken, requireSuperAdmin, async (req, res) =
         const result = await query(
             `SELECT 
                 a.id,
-                a.tipo_evento,
-                a.detalle,
-                a.ip_origen,
-                a.timestamp
+                a.tipo_accion as tipo_evento,
+                a.descripcion as detalle,
+                '' as ip_origen,
+                a.fecha as timestamp
             FROM auditoria a
-            WHERE a.id_actor = $1
-            ORDER BY a.timestamp DESC
+            WHERE a.id_usuario = $1
+            ORDER BY a.fecha DESC
             LIMIT $2`,
             [id, parseInt(limit)]
         );
@@ -203,9 +203,9 @@ router.get('/user/:id', authenticateToken, requireSuperAdmin, async (req, res) =
 router.get('/types', authenticateToken, requireSuperAdmin, async (req, res) => {
     try {
         const result = await query(`
-            SELECT DISTINCT tipo_evento, COUNT(*) as count
+            SELECT DISTINCT tipo_accion as tipo_evento, COUNT(*) as count
             FROM auditoria
-            GROUP BY tipo_evento
+            GROUP BY tipo_accion
             ORDER BY count DESC
         `);
 

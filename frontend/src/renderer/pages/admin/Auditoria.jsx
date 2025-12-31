@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import AdminLayout from '../../components/layout/AdminLayout';
+import auditService from '../../services/auditService';
 
 /**
  * Iconos SVG
@@ -20,46 +21,17 @@ const Icons = {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
         </svg>
     ),
-    Patients: () => (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-        </svg>
-    ),
-    Swap: () => (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-        </svg>
-    ),
-    VR: () => (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-        </svg>
-    ),
-    Info: () => (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-    ),
     ChevronDown: () => (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
+    ),
+    Refresh: () => (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+        </svg>
     )
 };
-
-/**
- * Chip de evento
- */
-const EventChip = ({ icon: Icon, label, active = true }) => (
-    <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${
-        active 
-            ? 'border-gray-300 bg-white text-gray-700' 
-            : 'border-gray-200 bg-gray-50 text-gray-400'
-    }`}>
-        <Icon />
-        <span className="text-sm font-medium">{label}</span>
-    </div>
-);
 
 /**
  * Meses en español
@@ -69,10 +41,44 @@ const MESES = [
     'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
 ];
 
-/**
- * Años disponibles
- */
 const AÑOS = [2023, 2024, 2025, 2026];
+
+/**
+ * Badge de tipo de evento
+ */
+const EventTypeBadge = ({ type }) => {
+    const colors = {
+        LOGIN_SUCCESS: 'bg-green-100 text-green-700',
+        LOGIN_FAILED: 'bg-red-100 text-red-700',
+        LOGOUT: 'bg-gray-100 text-gray-700',
+        TERAPEUTA_CREATED: 'bg-blue-100 text-blue-700',
+        TERAPEUTA_UPDATED: 'bg-blue-100 text-blue-700',
+        TERAPEUTA_STATUS_CHANGED: 'bg-amber-100 text-amber-700',
+        PASSWORD_RESET: 'bg-purple-100 text-purple-700',
+        PASSWORD_CHANGE: 'bg-purple-100 text-purple-700',
+        PATIENT_REASSIGNED: 'bg-teal-100 text-teal-700',
+        default: 'bg-gray-100 text-gray-600'
+    };
+
+    const labels = {
+        LOGIN_SUCCESS: 'Login exitoso',
+        LOGIN_FAILED: 'Login fallido',
+        LOGOUT: 'Logout',
+        TERAPEUTA_CREATED: 'Terapeuta creado',
+        TERAPEUTA_UPDATED: 'Terapeuta actualizado',
+        TERAPEUTA_STATUS_CHANGED: 'Estado cambiado',
+        PASSWORD_RESET: 'Contraseña reseteada',
+        PASSWORD_CHANGE: 'Contraseña cambiada',
+        PATIENT_REASSIGNED: 'Paciente reasignado',
+        SUPERADMIN_CREATED: 'Superadmin creado'
+    };
+
+    return (
+        <span className={`px-2 py-1 rounded-full text-xs font-medium ${colors[type] || colors.default}`}>
+            {labels[type] || type}
+        </span>
+    );
+};
 
 /**
  * Vista de Auditoría del Sistema
@@ -81,18 +87,65 @@ const Auditoria = () => {
     const currentDate = new Date();
     const [selectedMonth, setSelectedMonth] = useState(MESES[currentDate.getMonth()]);
     const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
+    const [events, setEvents] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
     const [isDownloading, setIsDownloading] = useState(false);
+
+    // Cargar eventos al montar y cuando cambian los filtros
+    useEffect(() => {
+        fetchEvents();
+    }, [selectedMonth, selectedYear]);
+
+    const fetchEvents = async () => {
+        setLoading(true);
+        setError('');
+        try {
+            const monthIndex = MESES.indexOf(selectedMonth) + 1;
+            const startDate = `${selectedYear}-${String(monthIndex).padStart(2, '0')}-01`;
+            const endDate = monthIndex === 12 
+                ? `${selectedYear + 1}-01-01`
+                : `${selectedYear}-${String(monthIndex + 1).padStart(2, '0')}-01`;
+
+            const result = await auditService.getEvents({
+                startDate,
+                endDate,
+                limit: 100
+            });
+
+            if (result.success) {
+                setEvents(result.data);
+            } else {
+                setError(result.error || 'Error al cargar eventos');
+            }
+        } catch (err) {
+            setError('Error de conexión con el servidor');
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const handleDownloadReport = async () => {
         setIsDownloading(true);
-        
-        // Simular descarga
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        
-        // TODO: Implementar descarga real del reporte
-        console.log(`Descargando reporte: auditoria_${selectedMonth}_${selectedYear}.csv`);
-        
-        setIsDownloading(false);
+        try {
+            const filename = `auditoria_${selectedMonth}_${selectedYear}.csv`;
+            auditService.downloadCSV(events, filename);
+        } catch (err) {
+            alert('Error al descargar el reporte');
+        } finally {
+            setIsDownloading(false);
+        }
+    };
+
+    const formatDate = (dateString) => {
+        const date = new Date(dateString);
+        return date.toLocaleString('es-ES', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
     };
 
     return (
@@ -104,70 +157,66 @@ const Auditoria = () => {
                         Auditoría del Sistema
                     </h1>
                     <p className="text-gray-500 mt-1">
-                        Consulta y descarga los registros de actividad de la plataforma para control y seguridad.
+                        Registros de actividad de la plataforma para control y seguridad.
                     </p>
                 </div>
 
-                {/* Main Card */}
+                {/* Filtros */}
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                    {/* Período de Reporte */}
-                    <div className="mb-8">
-                        <h2 className="text-lg font-semibold text-gray-900 mb-2">
-                            Período de Reporte
-                        </h2>
-                        <p className="text-gray-500 text-sm mb-4">
-                            Selecciona el mes y año para generar el archivo de auditoría.
-                        </p>
-
-                        <div className="grid grid-cols-2 gap-4 max-w-lg">
-                            {/* Mes */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Mes
-                                </label>
-                                <div className="relative">
-                                    <select
-                                        value={selectedMonth}
-                                        onChange={(e) => setSelectedMonth(e.target.value)}
-                                        className="w-full appearance-none bg-white border border-gray-300 rounded-lg px-4 py-2.5 pr-10 focus:ring-2 focus:ring-[#F76C6C]/20 focus:border-[#F76C6C] transition-colors"
-                                    >
-                                        {MESES.map(mes => (
-                                            <option key={mes} value={mes}>{mes}</option>
-                                        ))}
-                                    </select>
-                                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                                        <Icons.ChevronDown />
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Año */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Año
-                                </label>
-                                <div className="relative">
-                                    <select
-                                        value={selectedYear}
-                                        onChange={(e) => setSelectedYear(Number(e.target.value))}
-                                        className="w-full appearance-none bg-white border border-gray-300 rounded-lg px-4 py-2.5 pr-10 focus:ring-2 focus:ring-[#F76C6C]/20 focus:border-[#F76C6C] transition-colors"
-                                    >
-                                        {AÑOS.map(año => (
-                                            <option key={año} value={año}>{año}</option>
-                                        ))}
-                                    </select>
-                                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                                        <Icons.ChevronDown />
-                                    </div>
+                    <div className="flex flex-wrap items-end gap-4 mb-6">
+                        {/* Mes */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Mes</label>
+                            <div className="relative">
+                                <select
+                                    value={selectedMonth}
+                                    onChange={(e) => setSelectedMonth(e.target.value)}
+                                    className="appearance-none bg-white border border-gray-300 rounded-lg px-4 py-2.5 pr-10 focus:ring-2 focus:ring-[#F76C6C]/20 focus:border-[#F76C6C]"
+                                >
+                                    {MESES.map(mes => (
+                                        <option key={mes} value={mes}>{mes}</option>
+                                    ))}
+                                </select>
+                                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                                    <Icons.ChevronDown />
                                 </div>
                             </div>
                         </div>
 
-                        {/* Download Button */}
+                        {/* Año */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Año</label>
+                            <div className="relative">
+                                <select
+                                    value={selectedYear}
+                                    onChange={(e) => setSelectedYear(Number(e.target.value))}
+                                    className="appearance-none bg-white border border-gray-300 rounded-lg px-4 py-2.5 pr-10 focus:ring-2 focus:ring-[#F76C6C]/20 focus:border-[#F76C6C]"
+                                >
+                                    {AÑOS.map(año => (
+                                        <option key={año} value={año}>{año}</option>
+                                    ))}
+                                </select>
+                                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                                    <Icons.ChevronDown />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Refresh */}
+                        <button
+                            onClick={fetchEvents}
+                            disabled={loading}
+                            className="p-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                            title="Recargar"
+                        >
+                            <Icons.Refresh />
+                        </button>
+
+                        {/* Download */}
                         <button
                             onClick={handleDownloadReport}
-                            disabled={isDownloading}
-                            className="mt-6 flex items-center gap-2 bg-[#F76C6C] hover:bg-[#E55A5A] disabled:bg-gray-300 text-white font-medium px-5 py-2.5 rounded-lg transition-colors shadow-sm"
+                            disabled={isDownloading || events.length === 0}
+                            className="flex items-center gap-2 bg-[#F76C6C] hover:bg-[#E55A5A] disabled:bg-gray-300 text-white font-medium px-5 py-2.5 rounded-lg transition-colors"
                         >
                             {isDownloading ? (
                                 <>
@@ -177,53 +226,74 @@ const Auditoria = () => {
                             ) : (
                                 <>
                                     <Icons.Download />
-                                    Descargar Reporte CSV
+                                    Descargar CSV
                                 </>
                             )}
                         </button>
                     </div>
 
-                    {/* Eventos Incluidos + Info */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        {/* Eventos Incluidos */}
-                        <div>
-                            <h3 className="text-base font-semibold text-gray-900 mb-3">
-                                Eventos Incluidos
-                            </h3>
-                            <div className="flex flex-wrap gap-2">
-                                <EventChip icon={Icons.Login} label="Login / Logout" />
-                                <EventChip icon={Icons.Users} label="Gestión Terapeutas" />
-                                <EventChip icon={Icons.Patients} label="Gestión Pacientes" />
-                                <EventChip icon={Icons.Swap} label="Reasignaciones" />
-                                <EventChip icon={Icons.VR} label="Sesiones VR" />
-                            </div>
+                    {/* Error */}
+                    {error && (
+                        <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg mb-4">
+                            {error}
                         </div>
+                    )}
 
-                        {/* Info Box */}
-                        <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
-                            <div className="flex items-start gap-3">
-                                <div className="text-blue-500 mt-0.5">
-                                    <Icons.Info />
-                                </div>
-                                <div>
-                                    <h4 className="font-semibold text-blue-800 text-sm mb-2">
-                                        Detalles del formato
-                                    </h4>
-                                    <ul className="text-sm text-blue-700 space-y-1">
-                                        <li>
-                                            El archivo se generará en formato <strong>.CSV</strong> (Valores separados por comas).
-                                        </li>
-                                        <li>
-                                            El nombre del archivo seguirá el patrón: <code className="bg-blue-100 px-1 py-0.5 rounded text-xs">auditoria_[Mes]_[Año].csv</code>
-                                        </li>
-                                        <li>
-                                            Si el mes seleccionado es el actual, se incluirán registros hasta el momento de la descarga.
-                                        </li>
-                                    </ul>
-                                </div>
-                            </div>
+                    {/* Loading */}
+                    {loading ? (
+                        <div className="flex items-center justify-center py-12">
+                            <div className="animate-spin rounded-full h-10 w-10 border-4 border-[#F76C6C] border-t-transparent"></div>
                         </div>
-                    </div>
+                    ) : events.length === 0 ? (
+                        <div className="text-center py-12 text-gray-500">
+                            No hay eventos para el período seleccionado.
+                        </div>
+                    ) : (
+                        /* Events Table */
+                        <div className="overflow-x-auto">
+                            <table className="w-full">
+                                <thead>
+                                    <tr className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                                        <th className="pb-3 pr-4">Fecha</th>
+                                        <th className="pb-3 pr-4">Tipo</th>
+                                        <th className="pb-3 pr-4">Usuario</th>
+                                        <th className="pb-3 pr-4">IP</th>
+                                        <th className="pb-3">Detalles</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                    {events.map((event, index) => (
+                                        <tr key={event.id || index} className="hover:bg-gray-50">
+                                            <td className="py-3 pr-4 text-sm text-gray-600">
+                                                {formatDate(event.timestamp || event.fecha || event.created_at)}
+                                            </td>
+                                            <td className="py-3 pr-4">
+                                                <EventTypeBadge type={event.tipo_evento || event.event_type} />
+                                            </td>
+                                            <td className="py-3 pr-4 text-sm text-gray-900">
+                                                {event.usuario || event.user_email || '-'}
+                                            </td>
+                                            <td className="py-3 pr-4 text-sm text-gray-500 font-mono">
+                                                {event.ip_address || event.ip || '-'}
+                                            </td>
+                                            <td className="py-3 text-sm text-gray-500 max-w-xs truncate">
+                                                {typeof event.detalles === 'object' 
+                                                    ? JSON.stringify(event.detalles).substring(0, 50) + '...'
+                                                    : event.detalles || '-'}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+
+                    {/* Total */}
+                    {!loading && events.length > 0 && (
+                        <div className="mt-4 pt-4 border-t border-gray-200 text-sm text-gray-500">
+                            Total: {events.length} eventos
+                        </div>
+                    )}
                 </div>
             </div>
         </AdminLayout>
