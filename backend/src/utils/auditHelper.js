@@ -7,7 +7,7 @@
  * Requerimiento: RF-BDD-08
  */
 
-const { query } = require('../config/database');
+const { supabase } = require('../config/supabase');
 
 /**
  * Tipos de eventos de auditoría
@@ -50,25 +50,30 @@ const AUDIT_TYPES = {
 };
 
 /**
- * Registrar evento de auditoría
- * @param {string} tipo - Tipo de evento (usar AUDIT_TYPES)
- * @param {number|null} idActor - ID del usuario que realiza la acción
- * @param {object} detalle - Detalles adicionales del evento (JSON)
- * @param {string|null} ipOrigen - IP de origen de la petición (no usado en esquema actual)
+ * Mapeo de tipos de evento a nombres legibles en español
  */
-const registrarAuditoria = async (tipo, idActor = null, detalle = {}, ipOrigen = null) => {
-    try {
-        // Columnas reales de la tabla: tipo_accion, id_usuario, descripcion, fecha
-        await query(
-            `INSERT INTO auditoria (tipo_accion, id_usuario, descripcion, fecha)
-             VALUES ($1, $2, $3, NOW())`,
-            [tipo, idActor, JSON.stringify(detalle)]
-        );
-        console.log(`📋 Auditoría: ${tipo} por usuario ${idActor || 'sistema'}`);
-    } catch (error) {
-        // No fallar si la auditoría falla, solo loguear
-        console.error('❌ Error registrando auditoría:', error.message);
-    }
+const AUDIT_TYPE_LABELS = {
+    LOGIN_SUCCESS: 'Login exitoso',
+    LOGIN_FAILED: 'Login fallido',
+    LOGOUT: 'Cierre de sesión',
+    PASSWORD_CHANGE: 'Cambio de contraseña',
+    USER_CREATED: 'Usuario creado',
+    USER_UPDATED: 'Usuario actualizado',
+    USER_ACTIVATED: 'Usuario activado',
+    USER_DEACTIVATED: 'Usuario desactivado',
+    SUPERADMIN_CREATED: 'Superadmin creado',
+    TERAPEUTA_CREATED: 'Terapeuta creado',
+    TERAPEUTA_UPDATED: 'Terapeuta actualizado',
+    PATIENT_CREATED: 'Paciente creado',
+    PATIENT_UPDATED: 'Paciente actualizado',
+    PATIENT_DELETED: 'Paciente eliminado',
+    PATIENT_ASSIGNED: 'Paciente asignado',
+    PATIENT_REASSIGNED: 'Paciente reasignado',
+    SESSION_STARTED: 'Sesión iniciada',
+    SESSION_FINISHED: 'Sesión finalizada',
+    SESSION_ABANDONED: 'Sesión abandonada',
+    CONFIG_UPDATED: 'Configuración actualizada',
+    DATA_EXPORTED: 'Datos exportados'
 };
 
 /**
@@ -78,21 +83,81 @@ const getClientIP = (req) => {
     return req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
         req.connection?.remoteAddress ||
         req.socket?.remoteAddress ||
-        'unknown';
+        req.ip ||
+        'localhost';
+};
+
+/**
+ * Registrar evento de auditoría con todos los campos
+ * @param {string} tipo - Tipo de evento (usar AUDIT_TYPES)
+ * @param {number|null} idActor - ID del usuario que realiza la acción
+ * @param {string|null} actorUsername - Username del actor
+ * @param {object} detalle - Detalles adicionales del evento
+ * @param {string|null} ipOrigen - IP de origen
+ */
+const registrarAuditoria = async (tipo, idActor = null, actorUsername = null, detalle = {}, ipOrigen = null) => {
+    try {
+        // Crear objeto de descripción completo
+        const descripcionCompleta = {
+            ...detalle,
+            _actor_username: actorUsername || 'sistema',
+            _ip_origen: ipOrigen || 'localhost',
+            _tipo_label: AUDIT_TYPE_LABELS[tipo] || tipo
+        };
+
+        const { error } = await supabase
+            .from('auditoria')
+            .insert({
+                tipo_accion: tipo,
+                id_usuario: idActor,
+                descripcion: JSON.stringify(descripcionCompleta),
+                fecha: new Date().toISOString()
+            });
+
+        if (error) {
+            throw error;
+        }
+
+        console.log(`📋 Auditoría: ${AUDIT_TYPE_LABELS[tipo] || tipo} por ${actorUsername || 'sistema'} desde ${ipOrigen || 'localhost'}`);
+    } catch (error) {
+        // No fallar si la auditoría falla, solo loguear
+        console.error('❌ Error registrando auditoría:', error.message);
+    }
 };
 
 /**
  * Helper para registrar auditoría desde un request
+ * Extrae automáticamente usuario e IP del request
  */
 const auditFromRequest = async (req, tipo, detalle = {}) => {
     const idActor = req.user?.id || null;
+    const actorUsername = req.user?.email || req.user?.username || null;
     const ip = getClientIP(req);
-    await registrarAuditoria(tipo, idActor, detalle, ip);
+    await registrarAuditoria(tipo, idActor, actorUsername, detalle, ip);
+};
+
+/**
+ * Helper para registrar login (incluye username del intento)
+ */
+const auditLogin = async (req, tipo, username, detalle = {}) => {
+    const ip = getClientIP(req);
+    await registrarAuditoria(tipo, null, username, detalle, ip);
+};
+
+/**
+ * Helper para registrar evento con usuario autenticado
+ */
+const auditWithUser = async (req, tipo, user, detalle = {}) => {
+    const ip = getClientIP(req);
+    await registrarAuditoria(tipo, user.id, user.email || user.username, detalle, ip);
 };
 
 module.exports = {
     AUDIT_TYPES,
+    AUDIT_TYPE_LABELS,
     registrarAuditoria,
     getClientIP,
-    auditFromRequest
+    auditFromRequest,
+    auditLogin,
+    auditWithUser
 };

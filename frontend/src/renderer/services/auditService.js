@@ -16,12 +16,12 @@ const auditService = {
      * Obtener eventos de auditoría
      * GET /api/audit
      */
-    async getEvents({ limit = 50, offset = 0, tipo, desde, hasta, startDate, endDate } = {}) {
+    async getEvents({ limit = 50, offset = 0, tipo, mes, anio } = {}) {
         try {
             let endpoint = `/api/audit?limit=${limit}&offset=${offset}`;
             if (tipo) endpoint += `&tipo=${tipo}`;
-            if (desde || startDate) endpoint += `&desde=${desde || startDate}`;
-            if (hasta || endDate) endpoint += `&hasta=${hasta || endDate}`;
+            if (mes) endpoint += `&mes=${mes}`;
+            if (anio) endpoint += `&anio=${anio}`;
 
             const response = await api.get(endpoint);
             return { success: true, data: response.data || [], pagination: response.pagination };
@@ -63,37 +63,92 @@ const auditService = {
      * Generar CSV de eventos de auditoría
      */
     generateCSV(events) {
-        const headers = ['Fecha', 'Tipo de Evento', 'Usuario', 'IP', 'Detalle'];
-        const rows = events.map(e => [
-            new Date(e.timestamp).toLocaleString(),
-            e.tipo_evento,
-            e.actor_username || 'Sistema',
-            e.ip_origen || 'N/A',
-            JSON.stringify(e.detalle || {}).replace(/"/g, '""')
-        ]);
+        if (!events || events.length === 0) {
+            return 'No hay datos para exportar';
+        }
 
-        const csvContent = [
-            headers.join(','),
-            ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
-        ].join('\n');
+        const headers = ['ID', 'Fecha', 'Tipo', 'Usuario', 'IP', 'Detalles'];
 
-        return csvContent;
+        const escapeCSV = (value) => {
+            if (value === null || value === undefined) return '';
+            const str = String(value);
+            // Escape quotes and wrap in quotes if contains comma, newline or quote
+            if (str.includes(',') || str.includes('\n') || str.includes('"')) {
+                return `"${str.replace(/"/g, '""')}"`;
+            }
+            return str;
+        };
+
+        const rows = events.map(e => {
+            const fecha = e.timestamp ? new Date(e.timestamp).toLocaleString('es-CO') : '';
+            const tipo = e.tipo_label || e.tipo_evento || '';
+            const usuario = e.actor_username || 'sistema';
+            const ip = e.ip_origen || 'localhost';
+            const detalles = e.detalle_texto || '';
+
+            return [
+                e.id || '',
+                fecha,
+                tipo,
+                usuario,
+                ip,
+                detalles
+            ].map(escapeCSV).join(',');
+        });
+
+        // BOM + headers + rows
+        return '\uFEFF' + headers.join(',') + '\n' + rows.join('\n');
     },
 
     /**
-     * Descargar reporte CSV
+     * Descargar reporte CSV - Compatible con Electron
      */
     downloadCSV(events, filename = 'auditoria') {
-        const csv = this.generateCSV(events);
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.setAttribute('href', url);
-        link.setAttribute('download', `${filename}_${new Date().toISOString().split('T')[0]}.csv`);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
+        try {
+            const csvContent = this.generateCSV(events);
+
+            // Create blob
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+
+            // Create download URL
+            const url = window.URL.createObjectURL(blob);
+
+            // Create hidden link element
+            const link = document.createElement('a');
+            link.style.display = 'none';
+            link.href = url;
+            link.download = `${filename}.csv`;
+
+            // Append to body, click, and cleanup
+            document.body.appendChild(link);
+
+            // Use setTimeout to ensure the click happens
+            setTimeout(() => {
+                link.click();
+
+                // Cleanup after a delay
+                setTimeout(() => {
+                    document.body.removeChild(link);
+                    window.URL.revokeObjectURL(url);
+                }, 100);
+            }, 0);
+
+            console.log('[AuditService] CSV download initiated:', filename);
+            return true;
+        } catch (error) {
+            console.error('[AuditService] Error downloading CSV:', error);
+
+            // Fallback: Try opening in new window
+            try {
+                const csvContent = this.generateCSV(events);
+                const dataUri = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvContent);
+                window.open(dataUri);
+                return true;
+            } catch (fallbackError) {
+                console.error('[AuditService] Fallback also failed:', fallbackError);
+                throw error;
+            }
+        }
     }
 };
 

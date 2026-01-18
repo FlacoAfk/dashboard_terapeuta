@@ -14,15 +14,21 @@ const cors = require('cors');
 const swaggerUi = require('swagger-ui-express');
 require('dotenv').config();
 
-// Importar configuración de base de datos y Swagger
-const { testConnection } = require('./config/database');
+// Importar configuración de Supabase y Swagger
+const { testConnection } = require('./config/supabase');
 const swaggerSpec = require('./config/swagger');
 
-// Importar rutas
+// Importar rutas existentes
 const apiRoutes = require('./routes/api');
 const authRoutes = require('./routes/auth');
 const usuariosRoutes = require('./routes/usuarios');
 const auditRoutes = require('./routes/audit');
+
+// Importar nuevas rutas (sesiones VR, eventos, evaluaciones, métricas)
+const sesionesRoutes = require('./routes/sesiones');
+const eventosRoutes = require('./routes/eventos');
+const evaluacionRoutes = require('./routes/evaluacion');
+const metricasRoutes = require('./routes/metricas');
 
 // Crear aplicación Express
 const app = express();
@@ -71,11 +77,17 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Rutas de la API (ver archivo routes/api.js)
+// Rutas de la API
 app.use('/api', apiRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/usuarios', usuariosRoutes);
 app.use('/api/audit', auditRoutes);
+
+// Nuevas rutas para Unity/VR (RF-BDD-02, RF-BDD-03, RF-BDD-04, RF-BDD-09)
+app.use('/api/sesiones', sesionesRoutes);
+app.use('/api/eventos', eventosRoutes);
+app.use('/api/evaluacion', evaluacionRoutes);
+app.use('/api/metricas', metricasRoutes);
 
 // ========================================
 // MANEJO DE ERRORES
@@ -95,19 +107,26 @@ app.use((err, req, res, next) => {
 app.listen(PORT, async () => {
   console.log('');
   console.log('========================================');
-  console.log('🚀 BACKEND INICIADO');
+  console.log('🚀 BACKEND INICIADO (Supabase)');
   console.log('========================================');
-  console.log(`📡 Servidor: http://localhost:${PORT}`);
-  console.log(`❤️  Health:   http://localhost:${PORT}/health`);
-  console.log(`📋 API:      http://localhost:${PORT}/api/status`);
-  console.log(`📚 Docs:     http://localhost:${PORT}/api-docs`);
+  console.log(`📡 Servidor:  http://localhost:${PORT}`);
+  console.log(`❤️  Health:    http://localhost:${PORT}/health`);
+  console.log(`📋 API:       http://localhost:${PORT}/api/status`);
+  console.log(`📚 Docs:      http://localhost:${PORT}/api-docs`);
+  console.log('----------------------------------------');
+  console.log('📁 Nuevas rutas Unity/VR:');
+  console.log(`   - Sesiones:   /api/sesiones`);
+  console.log(`   - Eventos:    /api/eventos`);
+  console.log(`   - Evaluación: /api/evaluacion`);
+  console.log(`   - Métricas:   /api/metricas`);
   console.log('========================================');
 
-  // Verificar conexión a base de datos
+  // Verificar conexión a Supabase
   await testConnection();
 
   console.log('');
 });
 
 module.exports = app;
+
 

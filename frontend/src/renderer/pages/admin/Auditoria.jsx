@@ -11,24 +11,14 @@ const Icons = {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
         </svg>
     ),
-    Login: () => (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
-        </svg>
-    ),
-    Users: () => (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+    Refresh: () => (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
         </svg>
     ),
     ChevronDown: () => (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
-    ),
-    Refresh: () => (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
         </svg>
     )
 };
@@ -41,41 +31,37 @@ const MESES = [
     'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
 ];
 
-const AÑOS = [2023, 2024, 2025, 2026];
+const AÑOS = [2024, 2025, 2026];
 
 /**
  * Badge de tipo de evento
  */
-const EventTypeBadge = ({ type }) => {
+const EventTypeBadge = ({ type, label }) => {
     const colors = {
         LOGIN_SUCCESS: 'bg-green-100 text-green-700',
         LOGIN_FAILED: 'bg-red-100 text-red-700',
         LOGOUT: 'bg-gray-100 text-gray-700',
         TERAPEUTA_CREATED: 'bg-blue-100 text-blue-700',
         TERAPEUTA_UPDATED: 'bg-blue-100 text-blue-700',
-        TERAPEUTA_STATUS_CHANGED: 'bg-amber-100 text-amber-700',
+        USER_CREATED: 'bg-blue-100 text-blue-700',
+        USER_UPDATED: 'bg-blue-100 text-blue-700',
+        USER_ACTIVATED: 'bg-green-100 text-green-700',
+        USER_DEACTIVATED: 'bg-amber-100 text-amber-700',
         PASSWORD_RESET: 'bg-purple-100 text-purple-700',
         PASSWORD_CHANGE: 'bg-purple-100 text-purple-700',
-        PATIENT_REASSIGNED: 'bg-teal-100 text-teal-700',
+        PATIENT_CREATED: 'bg-teal-100 text-teal-700',
+        PATIENT_UPDATED: 'bg-teal-100 text-teal-700',
+        PATIENT_ASSIGNED: 'bg-indigo-100 text-indigo-700',
+        PATIENT_REASSIGNED: 'bg-indigo-100 text-indigo-700',
+        SESSION_STARTED: 'bg-cyan-100 text-cyan-700',
+        SESSION_FINISHED: 'bg-cyan-100 text-cyan-700',
+        SUPERADMIN_CREATED: 'bg-purple-100 text-purple-700',
         default: 'bg-gray-100 text-gray-600'
-    };
-
-    const labels = {
-        LOGIN_SUCCESS: 'Login exitoso',
-        LOGIN_FAILED: 'Login fallido',
-        LOGOUT: 'Logout',
-        TERAPEUTA_CREATED: 'Terapeuta creado',
-        TERAPEUTA_UPDATED: 'Terapeuta actualizado',
-        TERAPEUTA_STATUS_CHANGED: 'Estado cambiado',
-        PASSWORD_RESET: 'Contraseña reseteada',
-        PASSWORD_CHANGE: 'Contraseña cambiada',
-        PATIENT_REASSIGNED: 'Paciente reasignado',
-        SUPERADMIN_CREATED: 'Superadmin creado'
     };
 
     return (
         <span className={`px-2 py-1 rounded-full text-xs font-medium ${colors[type] || colors.default}`}>
-            {labels[type] || type}
+            {label || type}
         </span>
     );
 };
@@ -85,7 +71,7 @@ const EventTypeBadge = ({ type }) => {
  */
 const Auditoria = () => {
     const currentDate = new Date();
-    const [selectedMonth, setSelectedMonth] = useState(MESES[currentDate.getMonth()]);
+    const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth() + 1); // 1-12
     const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
     const [events, setEvents] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -101,15 +87,9 @@ const Auditoria = () => {
         setLoading(true);
         setError('');
         try {
-            const monthIndex = MESES.indexOf(selectedMonth) + 1;
-            const startDate = `${selectedYear}-${String(monthIndex).padStart(2, '0')}-01`;
-            const endDate = monthIndex === 12 
-                ? `${selectedYear + 1}-01-01`
-                : `${selectedYear}-${String(monthIndex + 1).padStart(2, '0')}-01`;
-
             const result = await auditService.getEvents({
-                startDate,
-                endDate,
+                mes: selectedMonth,
+                anio: selectedYear,
                 limit: 100
             });
 
@@ -128,7 +108,7 @@ const Auditoria = () => {
     const handleDownloadReport = async () => {
         setIsDownloading(true);
         try {
-            const filename = `auditoria_${selectedMonth}_${selectedYear}.csv`;
+            const filename = `auditoria_${MESES[selectedMonth - 1]}_${selectedYear}`;
             auditService.downloadCSV(events, filename);
         } catch (err) {
             alert('Error al descargar el reporte');
@@ -139,7 +119,7 @@ const Auditoria = () => {
 
     const formatDate = (dateString) => {
         const date = new Date(dateString);
-        return date.toLocaleString('es-ES', {
+        return date.toLocaleString('es-CO', {
             day: '2-digit',
             month: '2-digit',
             year: 'numeric',
@@ -170,11 +150,11 @@ const Auditoria = () => {
                             <div className="relative">
                                 <select
                                     value={selectedMonth}
-                                    onChange={(e) => setSelectedMonth(e.target.value)}
+                                    onChange={(e) => setSelectedMonth(Number(e.target.value))}
                                     className="appearance-none bg-white border border-gray-300 rounded-lg px-4 py-2.5 pr-10 focus:ring-2 focus:ring-[#F76C6C]/20 focus:border-[#F76C6C]"
                                 >
-                                    {MESES.map(mes => (
-                                        <option key={mes} value={mes}>{mes}</option>
+                                    {MESES.map((mes, idx) => (
+                                        <option key={idx} value={idx + 1}>{mes}</option>
                                     ))}
                                 </select>
                                 <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
@@ -265,21 +245,22 @@ const Auditoria = () => {
                                     {events.map((event, index) => (
                                         <tr key={event.id || index} className="hover:bg-gray-50">
                                             <td className="py-3 pr-4 text-sm text-gray-600">
-                                                {formatDate(event.timestamp || event.fecha || event.created_at)}
+                                                {formatDate(event.timestamp)}
                                             </td>
                                             <td className="py-3 pr-4">
-                                                <EventTypeBadge type={event.tipo_evento || event.event_type} />
+                                                <EventTypeBadge
+                                                    type={event.tipo_evento}
+                                                    label={event.tipo_label}
+                                                />
                                             </td>
                                             <td className="py-3 pr-4 text-sm text-gray-900">
-                                                {event.usuario || event.user_email || '-'}
+                                                {event.actor_username || 'sistema'}
                                             </td>
                                             <td className="py-3 pr-4 text-sm text-gray-500 font-mono">
-                                                {event.ip_address || event.ip || '-'}
+                                                {event.ip_origen || 'localhost'}
                                             </td>
                                             <td className="py-3 text-sm text-gray-500 max-w-xs truncate">
-                                                {typeof event.detalles === 'object' 
-                                                    ? JSON.stringify(event.detalles).substring(0, 50) + '...'
-                                                    : event.detalles || '-'}
+                                                {event.detalle_texto || '-'}
                                             </td>
                                         </tr>
                                     ))}

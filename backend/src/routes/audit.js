@@ -9,8 +9,22 @@
 
 const express = require('express');
 const router = express.Router();
-const { query } = require('../config/database');
+const { supabase } = require('../config/supabase');
 const { authenticateToken, requireSuperAdmin } = require('../middleware/authMiddleware');
+const { AUDIT_TYPE_LABELS } = require('../utils/auditHelper');
+
+/**
+ * Parsear la descripción JSON de forma segura
+ */
+const parseDescripcion = (descripcion) => {
+    try {
+        if (!descripcion) return {};
+        if (typeof descripcion === 'object') return descripcion;
+        return JSON.parse(descripcion);
+    } catch {
+        return { raw: descripcion };
+    }
+};
 
 /**
  * @swagger
@@ -26,114 +40,132 @@ const { authenticateToken, requireSuperAdmin } = require('../middleware/authMidd
  *         schema:
  *           type: integer
  *           default: 50
- *         description: Número máximo de registros
  *       - in: query
  *         name: offset
  *         schema:
  *           type: integer
  *           default: 0
- *         description: Offset para paginación
  *       - in: query
  *         name: tipo
  *         schema:
  *           type: string
- *         description: Filtrar por tipo de evento
  *       - in: query
- *         name: desde
+ *         name: mes
  *         schema:
- *           type: string
- *           format: date
- *         description: Fecha inicial (YYYY-MM-DD)
+ *           type: integer
+ *         description: Mes (1-12)
  *       - in: query
- *         name: hasta
+ *         name: anio
  *         schema:
- *           type: string
- *           format: date
- *         description: Fecha final (YYYY-MM-DD)
+ *           type: integer
+ *         description: Año
  *     responses:
  *       200:
  *         description: Lista de eventos de auditoría
- *       403:
- *         description: Acceso denegado
  */
 router.get('/', authenticateToken, requireSuperAdmin, async (req, res) => {
-    const { limit = 50, offset = 0, tipo, desde, hasta } = req.query;
+    const { limit = 50, offset = 0, tipo, mes, anio } = req.query;
 
     try {
-        let queryStr = `
-            SELECT 
-                a.id,
-                a.tipo_accion as tipo_evento,
-                a.id_usuario,
-                u.email as actor_username,
-                a.descripcion as detalle,
-                '' as ip_origen,
-                a.fecha as timestamp
-            FROM auditoria a
-            LEFT JOIN usuarios u ON a.id_usuario = u.id
-            WHERE 1=1
-        `;
-        const params = [];
-        let paramCount = 0;
+        // Construir query
+        let query = supabase
+            .from('auditoria')
+            .select('id, tipo_accion, id_usuario, descripcion, fecha');
 
         if (tipo) {
-            paramCount++;
-            queryStr += ` AND a.tipo_accion = $${paramCount}`;
-            params.push(tipo);
+            query = query.eq('tipo_accion', tipo);
         }
 
-        if (desde) {
-            paramCount++;
-            queryStr += ` AND a.fecha >= $${paramCount}`;
-            params.push(desde);
+        // Filtrar por mes y año
+        if (mes && anio) {
+            const startDate = new Date(parseInt(anio), parseInt(mes) - 1, 1);
+            const endDate = new Date(parseInt(anio), parseInt(mes), 0, 23, 59, 59);
+            query = query.gte('fecha', startDate.toISOString());
+            query = query.lte('fecha', endDate.toISOString());
+        } else if (anio) {
+            const startDate = new Date(parseInt(anio), 0, 1);
+            const endDate = new Date(parseInt(anio), 11, 31, 23, 59, 59);
+            query = query.gte('fecha', startDate.toISOString());
+            query = query.lte('fecha', endDate.toISOString());
         }
 
-        if (hasta) {
-            paramCount++;
-            queryStr += ` AND a.fecha <= $${paramCount}::date + interval '1 day'`;
-            params.push(hasta);
+        query = query
+            .order('fecha', { ascending: false })
+            .range(parseInt(offset), parseInt(offset) + parseInt(limit) - 1);
+
+        const { data: auditData, error: auditError } = await query;
+
+        if (auditError) throw auditError;
+
+        // Obtener usuarios para mostrar nombres
+        const userIds = [...new Set(auditData.filter(a => a.id_usuario).map(a => a.id_usuario))];
+        let usersMap = {};
+
+        if (userIds.length > 0) {
+            const { data: users } = await supabase
+                .from('usuarios')
+                .select('id, email, nombre')
+                .in('id', userIds);
+
+            if (users) {
+                usersMap = users.reduce((acc, u) => {
+                    acc[u.id] = { email: u.email, nombre: u.nombre };
+                    return acc;
+                }, {});
+            }
         }
 
-        queryStr += ` ORDER BY a.fecha DESC`;
+        // Formatear respuesta con todos los campos
+        const formattedData = auditData.map(a => {
+            const descripcionObj = parseDescripcion(a.descripcion);
+            const userInfo = usersMap[a.id_usuario] || {};
 
-        paramCount++;
-        queryStr += ` LIMIT $${paramCount}`;
-        params.push(parseInt(limit));
+            // Extraer campos especiales de la descripción
+            const { _actor_username, _ip_origen, _tipo_label, ...detalleClean } = descripcionObj;
 
-        paramCount++;
-        queryStr += ` OFFSET $${paramCount}`;
-        params.push(parseInt(offset));
-
-        const result = await query(queryStr, params);
+            return {
+                id: a.id,
+                tipo_evento: a.tipo_accion,
+                tipo_label: _tipo_label || AUDIT_TYPE_LABELS[a.tipo_accion] || a.tipo_accion,
+                id_usuario: a.id_usuario,
+                actor_username: _actor_username || userInfo.email || 'sistema',
+                actor_nombre: userInfo.nombre || null,
+                ip_origen: _ip_origen || 'localhost',
+                detalle: Object.keys(detalleClean).length > 0 ? detalleClean : null,
+                detalle_texto: Object.keys(detalleClean).length > 0
+                    ? Object.entries(detalleClean).map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`).join(', ')
+                    : null,
+                timestamp: a.fecha
+            };
+        });
 
         // Contar total
-        let countQuery = 'SELECT COUNT(*) as total FROM auditoria WHERE 1=1';
-        const countParams = [];
-        let countParamNum = 0;
+        let countQuery = supabase
+            .from('auditoria')
+            .select('id', { count: 'exact', head: true });
 
         if (tipo) {
-            countParamNum++;
-            countQuery += ` AND tipo_accion = $${countParamNum}`;
-            countParams.push(tipo);
+            countQuery = countQuery.eq('tipo_accion', tipo);
         }
-        if (desde) {
-            countParamNum++;
-            countQuery += ` AND fecha >= $${countParamNum}`;
-            countParams.push(desde);
-        }
-        if (hasta) {
-            countParamNum++;
-            countQuery += ` AND fecha <= $${countParamNum}::date + interval '1 day'`;
-            countParams.push(hasta);
+        if (mes && anio) {
+            const startDate = new Date(parseInt(anio), parseInt(mes) - 1, 1);
+            const endDate = new Date(parseInt(anio), parseInt(mes), 0, 23, 59, 59);
+            countQuery = countQuery.gte('fecha', startDate.toISOString());
+            countQuery = countQuery.lte('fecha', endDate.toISOString());
+        } else if (anio) {
+            const startDate = new Date(parseInt(anio), 0, 1);
+            const endDate = new Date(parseInt(anio), 11, 31, 23, 59, 59);
+            countQuery = countQuery.gte('fecha', startDate.toISOString());
+            countQuery = countQuery.lte('fecha', endDate.toISOString());
         }
 
-        const countResult = await query(countQuery, countParams);
+        const { count } = await countQuery;
 
         res.json({
             success: true,
-            data: result.rows,
+            data: formattedData,
             pagination: {
-                total: parseInt(countResult.rows[0].total),
+                total: count || 0,
                 limit: parseInt(limit),
                 offset: parseInt(offset)
             }
@@ -150,38 +182,36 @@ router.get('/', authenticateToken, requireSuperAdmin, async (req, res) => {
  *   get:
  *     summary: Obtener eventos de un usuario específico
  *     tags: [Auditoría]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *     responses:
- *       200:
- *         description: Eventos del usuario
  */
 router.get('/user/:id', authenticateToken, requireSuperAdmin, async (req, res) => {
     const { id } = req.params;
     const { limit = 50 } = req.query;
 
     try {
-        const result = await query(
-            `SELECT 
-                a.id,
-                a.tipo_accion as tipo_evento,
-                a.descripcion as detalle,
-                '' as ip_origen,
-                a.fecha as timestamp
-            FROM auditoria a
-            WHERE a.id_usuario = $1
-            ORDER BY a.fecha DESC
-            LIMIT $2`,
-            [id, parseInt(limit)]
-        );
+        const { data, error } = await supabase
+            .from('auditoria')
+            .select('id, tipo_accion, descripcion, fecha')
+            .eq('id_usuario', id)
+            .order('fecha', { ascending: false })
+            .limit(parseInt(limit));
 
-        res.json({ success: true, data: result.rows });
+        if (error) throw error;
+
+        const formattedData = data.map(a => {
+            const descripcionObj = parseDescripcion(a.descripcion);
+            const { _actor_username, _ip_origen, _tipo_label, ...detalleClean } = descripcionObj;
+
+            return {
+                id: a.id,
+                tipo_evento: a.tipo_accion,
+                tipo_label: _tipo_label || AUDIT_TYPE_LABELS[a.tipo_accion] || a.tipo_accion,
+                ip_origen: _ip_origen || 'localhost',
+                detalle: Object.keys(detalleClean).length > 0 ? detalleClean : null,
+                timestamp: a.fecha
+            };
+        });
+
+        res.json({ success: true, data: formattedData });
 
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
@@ -194,22 +224,113 @@ router.get('/user/:id', authenticateToken, requireSuperAdmin, async (req, res) =
  *   get:
  *     summary: Obtener tipos de eventos disponibles
  *     tags: [Auditoría]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Lista de tipos de eventos
  */
 router.get('/types', authenticateToken, requireSuperAdmin, async (req, res) => {
     try {
-        const result = await query(`
-            SELECT DISTINCT tipo_accion as tipo_evento, COUNT(*) as count
-            FROM auditoria
-            GROUP BY tipo_accion
-            ORDER BY count DESC
-        `);
+        const { data, error } = await supabase
+            .from('auditoria')
+            .select('tipo_accion');
 
-        res.json({ success: true, data: result.rows });
+        if (error) throw error;
+
+        // Agrupar y contar
+        const counts = data.reduce((acc, row) => {
+            acc[row.tipo_accion] = (acc[row.tipo_accion] || 0) + 1;
+            return acc;
+        }, {});
+
+        const result = Object.entries(counts)
+            .map(([tipo_evento, count]) => ({
+                tipo_evento,
+                tipo_label: AUDIT_TYPE_LABELS[tipo_evento] || tipo_evento,
+                count
+            }))
+            .sort((a, b) => b.count - a.count);
+
+        res.json({ success: true, data: result });
+
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * @swagger
+ * /api/audit/export:
+ *   get:
+ *     summary: Exportar auditoría a CSV
+ *     tags: [Auditoría]
+ */
+router.get('/export', authenticateToken, requireSuperAdmin, async (req, res) => {
+    const { mes, anio } = req.query;
+
+    try {
+        let query = supabase
+            .from('auditoria')
+            .select('id, tipo_accion, id_usuario, descripcion, fecha');
+
+        // Filtrar por mes y año
+        if (mes && anio) {
+            const startDate = new Date(parseInt(anio), parseInt(mes) - 1, 1);
+            const endDate = new Date(parseInt(anio), parseInt(mes), 0, 23, 59, 59);
+            query = query.gte('fecha', startDate.toISOString());
+            query = query.lte('fecha', endDate.toISOString());
+        } else if (anio) {
+            const startDate = new Date(parseInt(anio), 0, 1);
+            const endDate = new Date(parseInt(anio), 11, 31, 23, 59, 59);
+            query = query.gte('fecha', startDate.toISOString());
+            query = query.lte('fecha', endDate.toISOString());
+        }
+
+        query = query.order('fecha', { ascending: false });
+
+        const { data: auditData, error } = await query;
+        if (error) throw error;
+
+        // Obtener usuarios
+        const userIds = [...new Set(auditData.filter(a => a.id_usuario).map(a => a.id_usuario))];
+        let usersMap = {};
+
+        if (userIds.length > 0) {
+            const { data: users } = await supabase
+                .from('usuarios')
+                .select('id, email')
+                .in('id', userIds);
+
+            if (users) {
+                usersMap = users.reduce((acc, u) => {
+                    acc[u.id] = u.email;
+                    return acc;
+                }, {});
+            }
+        }
+
+        // Generar CSV
+        const headers = ['ID', 'Fecha', 'Tipo', 'Usuario', 'IP', 'Detalles'];
+        const rows = auditData.map(a => {
+            const descripcionObj = parseDescripcion(a.descripcion);
+            const { _actor_username, _ip_origen, _tipo_label, ...detalleClean } = descripcionObj;
+
+            return [
+                a.id,
+                new Date(a.fecha).toLocaleString('es-CO'),
+                _tipo_label || AUDIT_TYPE_LABELS[a.tipo_accion] || a.tipo_accion,
+                _actor_username || usersMap[a.id_usuario] || 'sistema',
+                _ip_origen || 'localhost',
+                Object.keys(detalleClean).length > 0 ? JSON.stringify(detalleClean) : ''
+            ];
+        });
+
+        const csvContent = [
+            headers.join(','),
+            ...rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(','))
+        ].join('\n');
+
+        const filename = `auditoria_${mes || 'all'}_${anio || 'all'}.csv`;
+
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.send('\uFEFF' + csvContent); // BOM for Excel UTF-8
 
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });

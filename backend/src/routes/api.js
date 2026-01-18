@@ -1,17 +1,15 @@
 /**
  * ========================================
- * RUTAS DE LA API
+ * RUTAS DE LA API - SUPABASE SDK
  * ========================================
  * 
- * Aquí se definen todos los endpoints de la API.
- * Todas las rutas empiezan con /api/
- * 
- * Ejemplo: GET /api/patients
+ * Todas las consultas usan Supabase SDK exclusivamente.
+ * NO se usa pg Pool.
  */
 
 const express = require('express');
 const router = express.Router();
-const { query } = require('../config/database');
+const { supabase } = require('../config/supabase');
 const { authenticateToken, requireTerapeuta, requireSuperAdmin, optionalAuth } = require('../middleware/authMiddleware');
 const { auditFromRequest, AUDIT_TYPES } = require('../utils/auditHelper');
 
@@ -28,15 +26,6 @@ const { auditFromRequest, AUDIT_TYPES } = require('../utils/auditHelper');
  *     responses:
  *       200:
  *         description: API funcionando correctamente
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success: { type: boolean }
- *                 message: { type: string }
- *                 version: { type: string }
- *                 database: { type: string }
  */
 router.get('/status', (req, res) => {
     res.json({
@@ -53,27 +42,28 @@ router.get('/status', (req, res) => {
  *   get:
  *     summary: Verificar conexión a base de datos
  *     tags: [Health]
- *     responses:
- *       200:
- *         description: Conexión exitosa
- *       500:
- *         description: Error de conexión
  */
 router.get('/db-status', async (req, res) => {
     try {
-        const result = await query('SELECT NOW() as current_time, current_database() as database');
+        const { data, error } = await supabase
+            .from('usuarios')
+            .select('id')
+            .limit(1);
+
+        if (error) throw error;
+
         res.json({
             success: true,
-            message: 'Conexión a base de datos exitosa',
+            message: 'Conexión a Supabase exitosa',
             data: {
-                currentTime: result.rows[0].current_time,
-                database: result.rows[0].database
+                currentTime: new Date().toISOString(),
+                database: 'Supabase PostgreSQL'
             }
         });
     } catch (error) {
         res.status(500).json({
             success: false,
-            error: 'Error conectando a la base de datos',
+            error: 'Error conectando a Supabase',
             details: error.message
         });
     }
@@ -91,82 +81,71 @@ router.get('/db-status', async (req, res) => {
  *     tags: [Pacientes]
  *     security:
  *       - bearerAuth: []
- *     description: |
- *       RF-SEG-03: Los terapeutas solo ven sus pacientes asignados.
- *       El Superadministrador ve todos los pacientes.
- *     parameters:
- *       - in: query
- *         name: activo
- *         schema:
- *           type: boolean
- *         description: Filtrar por estado activo/inactivo
- *       - in: query
- *         name: nombre
- *         schema:
- *           type: string
- *         description: Buscar por nombre
- *     responses:
- *       200:
- *         description: Lista de pacientes
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success: { type: boolean }
- *                 data:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/Paciente'
+ *     description: RF-SEG-03 - Los terapeutas solo ven sus pacientes asignados.
  */
 router.get('/patients', authenticateToken, requireTerapeuta, async (req, res) => {
     const { activo, nombre } = req.query;
 
     try {
-        let queryStr = `
-            SELECT 
-                p.id,
-                p.identificacion,
-                p.nombre,
-                p.edad,
-                p.diagnostico,
-                p.activo,
-                p.fecha_registro,
-                tp.id_terapeuta,
-                t.nombre as terapeuta_nombre
-            FROM pacientes p
-            LEFT JOIN terapeuta_paciente tp ON p.id = tp.id_paciente
-            LEFT JOIN terapeutas t ON tp.id_terapeuta = t.id
-            WHERE 1=1
-        `;
-        const params = [];
-        let paramCount = 0;
-
-        // RF-SEG-03: Si es terapeuta, solo ver sus pacientes asignados
+        // Para terapeutas, primero obtener sus pacientes asignados
+        let patientIds = null;
         if (req.user.rol === 'TERAPEUTA' && req.user.id_terapeuta) {
-            paramCount++;
-            queryStr += ` AND tp.id_terapeuta = $${paramCount}`;
-            params.push(req.user.id_terapeuta);
+            const { data: assignments, error: assignError } = await supabase
+                .from('terapeuta_paciente')
+                .select('id_paciente')
+                .eq('id_terapeuta', req.user.id_terapeuta);
+            
+            if (assignError) throw assignError;
+            patientIds = assignments.map(a => a.id_paciente);
+            
+            // Si no tiene pacientes, devolver array vacío
+            if (patientIds.length === 0) {
+                return res.json({ success: true, data: [] });
+            }
+        }
+
+        // Construir query de pacientes
+        let query = supabase
+            .from('pacientes')
+            .select('*')
+            .order('fecha_registro', { ascending: false });
+
+        // Filtrar por pacientes asignados si es terapeuta
+        if (patientIds) {
+            query = query.in('id', patientIds);
         }
 
         // Filtro por estado activo
         if (activo !== undefined) {
-            paramCount++;
-            queryStr += ` AND p.activo = $${paramCount}`;
-            params.push(activo === 'true');
+            query = query.eq('activo', activo === 'true');
         }
 
         // Filtro por nombre
         if (nombre) {
-            paramCount++;
-            queryStr += ` AND LOWER(p.nombre) LIKE LOWER($${paramCount})`;
-            params.push(`%${nombre}%`);
+            query = query.ilike('nombre', `%${nombre}%`);
         }
 
-        queryStr += ' ORDER BY p.fecha_registro DESC';
+        const { data: patients, error } = await query;
+        if (error) throw error;
 
-        const result = await query(queryStr, params);
-        res.json({ success: true, data: result.rows });
+        // Obtener asignaciones de terapeutas
+        const { data: allAssignments, error: assigError } = await supabase
+            .from('terapeuta_paciente')
+            .select('id_paciente, id_terapeuta, terapeutas(nombre)');
+        
+        if (assigError) throw assigError;
+
+        // Mapear terapeutas a pacientes
+        const patientsWithTherapist = patients.map(p => {
+            const assignment = allAssignments.find(a => a.id_paciente === p.id);
+            return {
+                ...p,
+                id_terapeuta: assignment?.id_terapeuta || null,
+                terapeuta_nombre: assignment?.terapeutas?.nombre || null
+            };
+        });
+
+        res.json({ success: true, data: patientsWithTherapist });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
     }
@@ -178,52 +157,57 @@ router.get('/patients', authenticateToken, requireTerapeuta, async (req, res) =>
  *   get:
  *     summary: Obtener un paciente por ID
  *     tags: [Pacientes]
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *         description: ID del paciente
- *     responses:
- *       200:
- *         description: Datos del paciente
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Paciente'
- *       404:
- *         description: Paciente no encontrado
  */
 router.get('/patients/:id', authenticateToken, requireTerapeuta, async (req, res) => {
     const { id } = req.params;
+
     try {
-        // Verificar acceso según rol
-        let queryStr = `
-            SELECT p.*, tp.id_terapeuta, t.nombre as terapeuta_nombre
-            FROM pacientes p
-            LEFT JOIN terapeuta_paciente tp ON p.id = tp.id_paciente
-            LEFT JOIN terapeutas t ON tp.id_terapeuta = t.id
-            WHERE p.id = $1
-        `;
-        const params = [id];
+        // Obtener paciente
+        const { data: patient, error } = await supabase
+            .from('pacientes')
+            .select('*')
+            .eq('id', id)
+            .single();
 
-        // RF-SEG-03: Terapeuta solo puede ver su paciente asignado
-        if (req.user.rol === 'TERAPEUTA' && req.user.id_terapeuta) {
-            queryStr += ` AND tp.id_terapeuta = $2`;
-            params.push(req.user.id_terapeuta);
-        }
-
-        const result = await query(queryStr, params);
-
-        if (result.rows.length === 0) {
+        if (error || !patient) {
             return res.status(404).json({
                 success: false,
-                error: 'Paciente no encontrado o sin acceso'
+                error: 'Paciente no encontrado'
             });
         }
 
-        res.json({ success: true, data: result.rows[0] });
+        // Verificar acceso para terapeutas
+        if (req.user.rol === 'TERAPEUTA' && req.user.id_terapeuta) {
+            const { data: assignment } = await supabase
+                .from('terapeuta_paciente')
+                .select('id_terapeuta')
+                .eq('id_paciente', id)
+                .eq('id_terapeuta', req.user.id_terapeuta)
+                .single();
+            
+            if (!assignment) {
+                return res.status(403).json({
+                    success: false,
+                    error: 'Sin acceso a este paciente'
+                });
+            }
+        }
+
+        // Obtener terapeuta asignado
+        const { data: assignment } = await supabase
+            .from('terapeuta_paciente')
+            .select('id_terapeuta, terapeutas(nombre)')
+            .eq('id_paciente', id)
+            .single();
+
+        res.json({
+            success: true,
+            data: {
+                ...patient,
+                id_terapeuta: assignment?.id_terapeuta || null,
+                terapeuta_nombre: assignment?.terapeutas?.nombre || null
+            }
+        });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
     }
@@ -235,17 +219,6 @@ router.get('/patients/:id', authenticateToken, requireTerapeuta, async (req, res
  *   post:
  *     summary: Crear un nuevo paciente
  *     tags: [Pacientes]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/PacienteInput'
- *     responses:
- *       201:
- *         description: Paciente creado exitosamente
- *       400:
- *         description: Datos inválidos
  */
 router.post('/patients', authenticateToken, requireTerapeuta, async (req, res) => {
     const { identificacion, nombre, edad, diagnostico } = req.body;
@@ -259,23 +232,28 @@ router.post('/patients', authenticateToken, requireTerapeuta, async (req, res) =
 
     try {
         // Crear paciente
-        const result = await query(
-            `INSERT INTO pacientes (identificacion, nombre, edad, diagnostico, activo)
-             VALUES ($1, $2, $3, $4, true)
-             RETURNING *`,
-            [identificacion, nombre, edad, diagnostico]
-        );
+        const { data: newPatient, error } = await supabase
+            .from('pacientes')
+            .insert({
+                identificacion,
+                nombre,
+                edad,
+                diagnostico,
+                activo: true
+            })
+            .select()
+            .single();
 
-        const newPatient = result.rows[0];
+        if (error) throw error;
 
-        // RF-SEG-03: Si es terapeuta, asignar automáticamente el paciente
+        // RF-SEG-03: Si es terapeuta, asignar automáticamente
         if (req.user.rol === 'TERAPEUTA' && req.user.id_terapeuta) {
-            await query(
-                `INSERT INTO terapeuta_paciente (id_terapeuta, id_paciente)
-                 VALUES ($1, $2)
-                 ON CONFLICT DO NOTHING`,
-                [req.user.id_terapeuta, newPatient.id]
-            );
+            await supabase
+                .from('terapeuta_paciente')
+                .insert({
+                    id_terapeuta: req.user.id_terapeuta,
+                    id_paciente: newPatient.id
+                });
         }
 
         // Auditoría
@@ -301,42 +279,27 @@ router.post('/patients', authenticateToken, requireTerapeuta, async (req, res) =
  *   put:
  *     summary: Actualizar un paciente
  *     tags: [Pacientes]
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/PacienteInput'
- *     responses:
- *       200:
- *         description: Paciente actualizado
- *       404:
- *         description: Paciente no encontrado
  */
 router.put('/patients/:id', authenticateToken, requireTerapeuta, async (req, res) => {
     const { id } = req.params;
     const { identificacion, nombre, edad, diagnostico, activo } = req.body;
 
     try {
-        const result = await query(
-            `UPDATE pacientes 
-             SET identificacion = COALESCE($1, identificacion),
-                 nombre = COALESCE($2, nombre),
-                 edad = COALESCE($3, edad),
-                 diagnostico = COALESCE($4, diagnostico),
-                 activo = COALESCE($5, activo)
-             WHERE id = $6
-             RETURNING *`,
-            [identificacion, nombre, edad, diagnostico, activo, id]
-        );
+        const updateData = {};
+        if (identificacion !== undefined) updateData.identificacion = identificacion;
+        if (nombre !== undefined) updateData.nombre = nombre;
+        if (edad !== undefined) updateData.edad = edad;
+        if (diagnostico !== undefined) updateData.diagnostico = diagnostico;
+        if (activo !== undefined) updateData.activo = activo;
 
-        if (result.rows.length === 0) {
+        const { data: updated, error } = await supabase
+            .from('pacientes')
+            .update(updateData)
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error || !updated) {
             return res.status(404).json({
                 success: false,
                 error: 'Paciente no encontrado'
@@ -346,13 +309,13 @@ router.put('/patients/:id', authenticateToken, requireTerapeuta, async (req, res
         // Auditoría
         await auditFromRequest(req, AUDIT_TYPES.PATIENT_UPDATED, {
             id_paciente: id,
-            cambios: { identificacion, nombre, edad, diagnostico, activo }
+            cambios: updateData
         });
 
         res.json({
             success: true,
             message: 'Paciente actualizado',
-            data: result.rows[0]
+            data: updated
         });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
@@ -363,28 +326,28 @@ router.put('/patients/:id', authenticateToken, requireTerapeuta, async (req, res
  * @swagger
  * /api/patients/{id}:
  *   delete:
- *     summary: Eliminar un paciente
+ *     summary: Eliminar un paciente (solo Superadmin)
  *     tags: [Pacientes]
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *     responses:
- *       200:
- *         description: Paciente eliminado
- *       404:
- *         description: Paciente no encontrado
  */
 router.delete('/patients/:id', authenticateToken, requireSuperAdmin, async (req, res) => {
     const { id } = req.params;
 
     try {
-        // RF-SEG-02: Solo superadmin puede eliminar pacientes
-        const result = await query('DELETE FROM pacientes WHERE id = $1 RETURNING *', [id]);
+        // Primero eliminar asignaciones
+        await supabase
+            .from('terapeuta_paciente')
+            .delete()
+            .eq('id_paciente', id);
 
-        if (result.rows.length === 0) {
+        // Luego eliminar paciente
+        const { data: deleted, error } = await supabase
+            .from('pacientes')
+            .delete()
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error || !deleted) {
             return res.status(404).json({
                 success: false,
                 error: 'Paciente no encontrado'
@@ -394,13 +357,13 @@ router.delete('/patients/:id', authenticateToken, requireSuperAdmin, async (req,
         // Auditoría
         await auditFromRequest(req, AUDIT_TYPES.PATIENT_DELETED, {
             id_paciente: id,
-            nombre: result.rows[0].nombre
+            nombre: deleted.nombre
         });
 
         res.json({
             success: true,
             message: 'Paciente eliminado',
-            data: result.rows[0]
+            data: deleted
         });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
@@ -413,30 +376,6 @@ router.delete('/patients/:id', authenticateToken, requireSuperAdmin, async (req,
  *   post:
  *     summary: Asignar paciente a terapeuta (solo Superadmin)
  *     tags: [Pacientes]
- *     security:
- *       - bearerAuth: []
- *     description: RF-SEG-02 - Asignar o reasignar pacientes entre terapeutas
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *         description: ID del paciente
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [id_terapeuta]
- *             properties:
- *               id_terapeuta: { type: integer, description: "ID del terapeuta a asignar" }
- *     responses:
- *       200:
- *         description: Paciente asignado exitosamente
- *       403:
- *         description: Solo Superadministrador puede reasignar
  */
 router.post('/patients/:id/assign', authenticateToken, requireSuperAdmin, async (req, res) => {
     const { id } = req.params;
@@ -451,66 +390,75 @@ router.post('/patients/:id/assign', authenticateToken, requireSuperAdmin, async 
 
     try {
         // Verificar que el paciente existe
-        const patientCheck = await query('SELECT id, nombre FROM pacientes WHERE id = $1', [id]);
-        if (patientCheck.rows.length === 0) {
+        const { data: patient, error: patientError } = await supabase
+            .from('pacientes')
+            .select('id, nombre')
+            .eq('id', id)
+            .single();
+
+        if (patientError || !patient) {
             return res.status(404).json({ success: false, error: 'Paciente no encontrado' });
         }
 
         // Verificar que el terapeuta existe y está activo
-        const therapistCheck = await query(`
-            SELECT t.id, t.nombre, u.activo
-            FROM terapeutas t
-            JOIN usuarios u ON t.id_usuario = u.id
-            WHERE t.id = $1
-        `, [id_terapeuta]);
+        const { data: therapist, error: therapistError } = await supabase
+            .from('terapeutas')
+            .select('id, nombre, id_usuario, usuarios(activo)')
+            .eq('id', id_terapeuta)
+            .single();
 
-        if (therapistCheck.rows.length === 0) {
+        if (therapistError || !therapist) {
             return res.status(404).json({ success: false, error: 'Terapeuta no encontrado' });
         }
 
-        if (!therapistCheck.rows[0].activo) {
+        if (!therapist.usuarios?.activo) {
             return res.status(400).json({
                 success: false,
                 error: 'No se puede asignar a un terapeuta inactivo'
             });
         }
 
-        // Obtener asignación anterior (para auditoría)
-        const prevAssignment = await query(
-            'SELECT id_terapeuta FROM terapeuta_paciente WHERE id_paciente = $1',
-            [id]
-        );
-        const prevTerapeuta = prevAssignment.rows.length > 0 ? prevAssignment.rows[0].id_terapeuta : null;
+        // Obtener asignación anterior
+        const { data: prevAssign } = await supabase
+            .from('terapeuta_paciente')
+            .select('id_terapeuta')
+            .eq('id_paciente', id)
+            .single();
 
-        // Eliminar asignación anterior y crear nueva (upsert)
-        await query('DELETE FROM terapeuta_paciente WHERE id_paciente = $1', [id]);
-        await query(
-            'INSERT INTO terapeuta_paciente (id_terapeuta, id_paciente) VALUES ($1, $2)',
-            [id_terapeuta, id]
-        );
+        const prevTerapeuta = prevAssign?.id_terapeuta || null;
+
+        // Eliminar asignación anterior
+        await supabase
+            .from('terapeuta_paciente')
+            .delete()
+            .eq('id_paciente', id);
+
+        // Crear nueva asignación
+        await supabase
+            .from('terapeuta_paciente')
+            .insert({ id_terapeuta, id_paciente: parseInt(id) });
 
         // Auditoría
         const auditType = prevTerapeuta ? AUDIT_TYPES.PATIENT_REASSIGNED : AUDIT_TYPES.PATIENT_ASSIGNED;
         await auditFromRequest(req, auditType, {
             id_paciente: id,
-            paciente_nombre: patientCheck.rows[0].nombre,
+            paciente_nombre: patient.nombre,
             terapeuta_anterior: prevTerapeuta,
             terapeuta_nuevo: id_terapeuta,
-            terapeuta_nombre: therapistCheck.rows[0].nombre
+            terapeuta_nombre: therapist.nombre
         });
 
         res.json({
             success: true,
             message: prevTerapeuta
-                ? `Paciente reasignado a ${therapistCheck.rows[0].nombre}`
-                : `Paciente asignado a ${therapistCheck.rows[0].nombre}`,
+                ? `Paciente reasignado a ${therapist.nombre}`
+                : `Paciente asignado a ${therapist.nombre}`,
             data: {
                 id_paciente: parseInt(id),
                 id_terapeuta: id_terapeuta,
-                terapeuta_nombre: therapistCheck.rows[0].nombre
+                terapeuta_nombre: therapist.nombre
             }
         });
-
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
     }
@@ -526,101 +474,72 @@ router.post('/patients/:id/assign', authenticateToken, requireSuperAdmin, async 
  *   get:
  *     summary: Obtener sesiones de terapia
  *     tags: [Sesiones]
- *     security:
- *       - bearerAuth: []
- *     description: |
- *       RF-SEG-03: Terapeutas solo ven sesiones de sus pacientes.
- *       RF-BDD-02: Registro de sesiones clínicas.
- *     parameters:
- *       - in: query
- *         name: id_paciente
- *         schema:
- *           type: integer
- *         description: Filtrar por paciente
- *       - in: query
- *         name: estado
- *         schema:
- *           type: string
- *           enum: [INICIADA, COMPLETADA, ABANDONADA]
- *         description: Filtrar por estado
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           default: 50
- *     responses:
- *       200:
- *         description: Lista de sesiones
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success: { type: boolean }
- *                 data:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/Sesion'
  */
 router.get('/sessions', authenticateToken, requireTerapeuta, async (req, res) => {
     const { id_paciente, estado, limit = 50 } = req.query;
 
     try {
-        let queryStr = `
-            SELECT 
-                s.id,
-                s.id_paciente,
-                p.nombre as paciente_nombre,
-                s.id_actividad,
-                a.nombre as actividad_nombre,
-                a.nivel_dificultad,
-                s.fecha_inicio,
-                s.fecha_fin,
-                s.estado,
-                s.num_pausas,
-                s.num_alertas_descanso,
-                rs.total_aciertos,
-                rs.total_errores,
-                rs.total_omisiones,
-                rs.tiempo_total_seg,
-                rs.observaciones,
-                tp.id_terapeuta
-            FROM sesiones s
-            LEFT JOIN pacientes p ON s.id_paciente = p.id
-            LEFT JOIN actividad_juego a ON s.id_actividad = a.id
-            LEFT JOIN resumen_sesion rs ON s.id = rs.id_sesion
-            LEFT JOIN terapeuta_paciente tp ON s.id_paciente = tp.id_paciente
-            WHERE 1=1
-        `;
-        const params = [];
-        let paramCount = 0;
-
-        // RF-SEG-03: Terapeuta solo ve sesiones de sus pacientes
+        // Para terapeutas, obtener IDs de pacientes asignados
+        let patientIds = null;
         if (req.user.rol === 'TERAPEUTA' && req.user.id_terapeuta) {
-            paramCount++;
-            queryStr += ` AND tp.id_terapeuta = $${paramCount}`;
-            params.push(req.user.id_terapeuta);
+            const { data: assignments } = await supabase
+                .from('terapeuta_paciente')
+                .select('id_paciente')
+                .eq('id_terapeuta', req.user.id_terapeuta);
+            
+            patientIds = assignments?.map(a => a.id_paciente) || [];
+            if (patientIds.length === 0) {
+                return res.json({ success: true, data: [] });
+            }
+        }
+
+        let query = supabase
+            .from('sesiones')
+            .select(`
+                *,
+                pacientes(nombre),
+                actividad_juego(nombre, nivel_dificultad),
+                resumen_sesion(total_aciertos, total_errores, total_omisiones, tiempo_total_seg, observaciones)
+            `)
+            .order('fecha_inicio', { ascending: false })
+            .limit(parseInt(limit));
+
+        if (patientIds) {
+            query = query.in('id_paciente', patientIds);
         }
 
         if (id_paciente) {
-            paramCount++;
-            queryStr += ` AND s.id_paciente = $${paramCount}`;
-            params.push(parseInt(id_paciente));
+            query = query.eq('id_paciente', parseInt(id_paciente));
         }
 
         if (estado) {
-            paramCount++;
-            queryStr += ` AND s.estado = $${paramCount}`;
-            params.push(estado);
+            query = query.eq('estado', estado);
         }
 
-        queryStr += ` ORDER BY s.fecha_inicio DESC`;
-        paramCount++;
-        queryStr += ` LIMIT $${paramCount}`;
-        params.push(parseInt(limit));
+        const { data: sessions, error } = await query;
+        if (error) throw error;
 
-        const result = await query(queryStr, params);
-        res.json({ success: true, data: result.rows });
+        // Reformatear datos
+        const formattedSessions = sessions.map(s => ({
+            id: s.id,
+            id_paciente: s.id_paciente,
+            paciente_nombre: s.pacientes?.nombre,
+            id_actividad: s.id_actividad,
+            actividad_nombre: s.actividad_juego?.nombre,
+            nivel_dificultad: s.actividad_juego?.nivel_dificultad,
+            fecha_inicio: s.fecha_inicio,
+            fecha_fin: s.fecha_fin,
+            estado: s.estado,
+            num_pausas: s.num_pausas,
+            num_alertas_descanso: s.num_alertas_descanso,
+            total_aciertos: s.resumen_sesion?.total_aciertos,
+            total_errores: s.resumen_sesion?.total_errores,
+            total_omisiones: s.resumen_sesion?.total_omisiones,
+            tiempo_total_seg: s.resumen_sesion?.tiempo_total_seg,
+            observaciones: s.resumen_sesion?.observaciones
+        }));
+
+        res.json({ success: true, data: formattedSessions });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
     }
@@ -632,64 +551,60 @@ router.get('/sessions', authenticateToken, requireTerapeuta, async (req, res) =>
  *   get:
  *     summary: Obtener una sesión con eventos detallados
  *     tags: [Sesiones]
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *     responses:
- *       200:
- *         description: Sesión con detalles y eventos
- *       404:
- *         description: Sesión no encontrada
  */
 router.get('/sessions/:id', async (req, res) => {
     const { id } = req.params;
 
     try {
-        const sessionResult = await query(`
-            SELECT 
-                s.*,
-                p.nombre as paciente_nombre,
-                p.diagnostico as paciente_diagnostico,
-                a.nombre as actividad_nombre,
-                a.nivel_dificultad,
-                a.tiempo_max_seg,
-                rs.total_aciertos,
-                rs.total_errores,
-                rs.tiempo_total_seg,
-                rs.observaciones
-            FROM sesiones s
-            LEFT JOIN pacientes p ON s.id_paciente = p.id
-            LEFT JOIN actividad_juego a ON s.id_actividad = a.id
-            LEFT JOIN resumen_sesion rs ON s.id = rs.id_sesion
-            WHERE s.id = $1
-        `, [id]);
+        const { data: session, error: sessionError } = await supabase
+            .from('sesiones')
+            .select(`
+                *,
+                pacientes(nombre, diagnostico),
+                actividad_juego(nombre, nivel_dificultad, tiempo_max_seg),
+                resumen_sesion(total_aciertos, total_errores, tiempo_total_seg, observaciones)
+            `)
+            .eq('id', id)
+            .single();
 
-        if (sessionResult.rows.length === 0) {
+        if (sessionError || !session) {
             return res.status(404).json({
                 success: false,
                 error: 'Sesión no encontrada'
             });
         }
 
-        const eventsResult = await query(`
-            SELECT 
-                ei.*,
-                ec.clasificacion,
-                ec.puntaje
-            FROM eventos_interacciones ei
-            LEFT JOIN evaluacion_cognitiva ec ON ei.id = ec.id_evento
-            WHERE ei.id_sesion = $1
-            ORDER BY ei.timestamp_evento
-        `, [id]);
+        const { data: events, error: eventsError } = await supabase
+            .from('eventos_interacciones')
+            .select(`
+                *,
+                evaluacion_cognitiva(clasificacion, puntaje)
+            `)
+            .eq('id_sesion', id)
+            .order('timestamp_evento', { ascending: true });
+
+        if (eventsError) throw eventsError;
 
         res.json({
             success: true,
             data: {
-                session: sessionResult.rows[0],
-                events: eventsResult.rows
+                session: {
+                    ...session,
+                    paciente_nombre: session.pacientes?.nombre,
+                    paciente_diagnostico: session.pacientes?.diagnostico,
+                    actividad_nombre: session.actividad_juego?.nombre,
+                    nivel_dificultad: session.actividad_juego?.nivel_dificultad,
+                    tiempo_max_seg: session.actividad_juego?.tiempo_max_seg,
+                    total_aciertos: session.resumen_sesion?.total_aciertos,
+                    total_errores: session.resumen_sesion?.total_errores,
+                    tiempo_total_seg: session.resumen_sesion?.tiempo_total_seg,
+                    observaciones: session.resumen_sesion?.observaciones
+                },
+                events: events.map(e => ({
+                    ...e,
+                    clasificacion: e.evaluacion_cognitiva?.clasificacion,
+                    puntaje: e.evaluacion_cognitiva?.puntaje
+                }))
             }
         });
     } catch (error) {
@@ -701,28 +616,8 @@ router.get('/sessions/:id', async (req, res) => {
  * @swagger
  * /api/sessions:
  *   post:
- *     summary: Crear una nueva sesión (desde Unity o dashboard)
+ *     summary: Crear una nueva sesión
  *     tags: [Sesiones]
- *     security:
- *       - bearerAuth: []
- *     description: |
- *       RF-BDD-02: Registro de sesión clínica con metadatos.
- *       RF-UNT-09: Pantalla de apertura de sesión.
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [id_paciente, id_actividad]
- *             properties:
- *               id_paciente: { type: integer }
- *               id_actividad: { type: integer }
- *     responses:
- *       201:
- *         description: Sesión creada
- *       400:
- *         description: Datos inválidos
  */
 router.post('/sessions', authenticateToken, requireTerapeuta, async (req, res) => {
     const { id_paciente, id_actividad } = req.body;
@@ -735,17 +630,21 @@ router.post('/sessions', authenticateToken, requireTerapeuta, async (req, res) =
     }
 
     try {
-        // Crear sesión con estado INICIADA
-        const result = await query(
-            `INSERT INTO sesiones (id_paciente, id_actividad, estado, fecha_inicio)
-             VALUES ($1, $2, 'INICIADA', NOW())
-             RETURNING *`,
-            [id_paciente, id_actividad]
-        );
+        const { data: newSession, error } = await supabase
+            .from('sesiones')
+            .insert({
+                id_paciente,
+                id_actividad,
+                estado: 'INICIADA',
+                fecha_inicio: new Date().toISOString()
+            })
+            .select()
+            .single();
 
-        // Registrar auditoría
+        if (error) throw error;
+
         await auditFromRequest(req, AUDIT_TYPES.SESSION_STARTED, {
-            id_sesion: result.rows[0].id,
+            id_sesion: newSession.id,
             id_paciente,
             id_actividad
         });
@@ -753,7 +652,7 @@ router.post('/sessions', authenticateToken, requireTerapeuta, async (req, res) =
         res.status(201).json({
             success: true,
             message: 'Sesión creada exitosamente',
-            data: result.rows[0]
+            data: newSession
         });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
@@ -764,42 +663,8 @@ router.post('/sessions', authenticateToken, requireTerapeuta, async (req, res) =
  * @swagger
  * /api/sessions/{id}/finish:
  *   put:
- *     summary: Finalizar una sesión con resumen
+ *     summary: Finalizar una sesión
  *     tags: [Sesiones]
- *     security:
- *       - bearerAuth: []
- *     description: |
- *       RF-BDD-02: Registro de fecha_fin, duración y estado.
- *       RF-BDD-04: Resumen de aciertos, errores, omisiones.
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               estado:
- *                 type: string
- *                 enum: [COMPLETADA, ABANDONADA]
- *                 default: COMPLETADA
- *               total_aciertos: { type: integer }
- *               total_errores: { type: integer }
- *               total_omisiones: { type: integer }
- *               tiempo_total_seg: { type: integer }
- *               observaciones: { type: string }
- *               num_pausas: { type: integer, default: 0 }
- *               num_alertas_descanso: { type: integer, default: 0 }
- *     responses:
- *       200:
- *         description: Sesión finalizada
- *       404:
- *         description: Sesión no encontrada
  */
 router.put('/sessions/:id/finish', authenticateToken, requireTerapeuta, async (req, res) => {
     const { id } = req.params;
@@ -816,18 +681,20 @@ router.put('/sessions/:id/finish', authenticateToken, requireTerapeuta, async (r
 
     try {
         // Actualizar sesión
-        const sessionResult = await query(
-            `UPDATE sesiones 
-             SET fecha_fin = NOW(),
-                 estado = $1,
-                 num_pausas = $2,
-                 num_alertas_descanso = $3
-             WHERE id = $4 AND estado = 'INICIADA'
-             RETURNING *`,
-            [estado, num_pausas, num_alertas_descanso, id]
-        );
+        const { data: updated, error: updateError } = await supabase
+            .from('sesiones')
+            .update({
+                fecha_fin: new Date().toISOString(),
+                estado,
+                num_pausas,
+                num_alertas_descanso
+            })
+            .eq('id', id)
+            .eq('estado', 'INICIADA')
+            .select()
+            .single();
 
-        if (sessionResult.rows.length === 0) {
+        if (updateError || !updated) {
             return res.status(404).json({
                 success: false,
                 error: 'Sesión no encontrada o ya finalizada'
@@ -835,19 +702,17 @@ router.put('/sessions/:id/finish', authenticateToken, requireTerapeuta, async (r
         }
 
         // Crear o actualizar resumen
-        await query(
-            `INSERT INTO resumen_sesion (id_sesion, total_aciertos, total_errores, total_omisiones, tiempo_total_seg, observaciones)
-             VALUES ($1, $2, $3, $4, $5, $6)
-             ON CONFLICT (id_sesion) DO UPDATE SET
-                total_aciertos = EXCLUDED.total_aciertos,
-                total_errores = EXCLUDED.total_errores,
-                total_omisiones = EXCLUDED.total_omisiones,
-                tiempo_total_seg = EXCLUDED.tiempo_total_seg,
-                observaciones = EXCLUDED.observaciones`,
-            [id, total_aciertos, total_errores, total_omisiones, tiempo_total_seg, observaciones]
-        );
+        await supabase
+            .from('resumen_sesion')
+            .upsert({
+                id_sesion: parseInt(id),
+                total_aciertos,
+                total_errores,
+                total_omisiones,
+                tiempo_total_seg,
+                observaciones
+            }, { onConflict: 'id_sesion' });
 
-        // Auditoría
         const auditType = estado === 'COMPLETADA' ? AUDIT_TYPES.SESSION_FINISHED : AUDIT_TYPES.SESSION_ABANDONED;
         await auditFromRequest(req, auditType, {
             id_sesion: id,
@@ -860,7 +725,7 @@ router.put('/sessions/:id/finish', authenticateToken, requireTerapeuta, async (r
         res.json({
             success: true,
             message: `Sesión ${estado.toLowerCase()}`,
-            data: sessionResult.rows[0]
+            data: updated
         });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
@@ -871,44 +736,8 @@ router.put('/sessions/:id/finish', authenticateToken, requireTerapeuta, async (r
  * @swagger
  * /api/sessions/{id}/events:
  *   post:
- *     summary: Registrar evento de interacción desde Unity
+ *     summary: Registrar evento de interacción
  *     tags: [Sesiones]
- *     security:
- *       - bearerAuth: []
- *     description: |
- *       RF-BDD-03: Registro detallado de acciones (logging cognitivo).
- *       RF-UNT-08: Medición de aciertos, errores, omisiones.
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *         description: ID de la sesión
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [tipo_accion]
- *             properties:
- *               tipo_accion:
- *                 type: string
- *                 enum: [PICK_UP, DROP, POUR, CUT, MOVE, OPEN_DRAWER, TURN_ON_STOVE, TURN_OFF_STOVE, PAUSE, RESUME, ALERT_DESCANSO]
- *               objeto_id: { type: string, description: "ID del asset en Unity" }
- *               objeto_descripcion: { type: string }
- *               posicion_x: { type: number }
- *               posicion_y: { type: number }
- *               posicion_z: { type: number }
- *               cantidad: { type: number, description: "Ej: ml vertidos" }
- *               metadatos: { type: object, description: "JSON adicional" }
- *               clasificacion:
- *                 type: string
- *                 enum: [ACIERTO, ERROR, OMISION]
- *     responses:
- *       201:
- *         description: Evento registrado
  */
 router.post('/sessions/:id/events', authenticateToken, async (req, res) => {
     const { id } = req.params;
@@ -932,13 +761,15 @@ router.post('/sessions/:id/events', authenticateToken, async (req, res) => {
     }
 
     try {
-        // Verificar que la sesión existe y está activa
-        const sessionCheck = await query(
-            "SELECT id FROM sesiones WHERE id = $1 AND estado = 'INICIADA'",
-            [id]
-        );
+        // Verificar sesión activa
+        const { data: session } = await supabase
+            .from('sesiones')
+            .select('id')
+            .eq('id', id)
+            .eq('estado', 'INICIADA')
+            .single();
 
-        if (sessionCheck.rows.length === 0) {
+        if (!session) {
             return res.status(404).json({
                 success: false,
                 error: 'Sesión no encontrada o no está activa'
@@ -946,34 +777,47 @@ router.post('/sessions/:id/events', authenticateToken, async (req, res) => {
         }
 
         // Insertar evento
-        const eventResult = await query(
-            `INSERT INTO eventos_interacciones 
-             (id_sesion, tipo_accion, objeto_id, objeto_descripcion, posicion_x, posicion_y, posicion_z, cantidad, metadatos)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-             RETURNING *`,
-            [id, tipo_accion, objeto_id, objeto_descripcion, posicion_x, posicion_y, posicion_z, cantidad, JSON.stringify(metadatos || {})]
-        );
+        const { data: event, error: eventError } = await supabase
+            .from('eventos_interacciones')
+            .insert({
+                id_sesion: parseInt(id),
+                tipo_accion,
+                objeto_id,
+                objeto_descripcion,
+                posicion_x,
+                posicion_y,
+                posicion_z,
+                cantidad,
+                metadatos: metadatos || {}
+            })
+            .select()
+            .single();
 
-        const eventId = eventResult.rows[0].id;
+        if (eventError) throw eventError;
 
-        // Si hay clasificación cognitiva, registrarla
+        // Si hay clasificación, registrarla
         if (clasificacion) {
-            await query(
-                `INSERT INTO evaluacion_cognitiva (id_evento, clasificacion)
-                 VALUES ($1, $2)`,
-                [eventId, clasificacion]
-            );
+            await supabase
+                .from('evaluacion_cognitiva')
+                .insert({
+                    id_evento: event.id,
+                    clasificacion
+                });
         }
 
         res.status(201).json({
             success: true,
             message: 'Evento registrado',
-            data: eventResult.rows[0]
+            data: event
         });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
     }
 });
+
+// ========================================
+// INFORME DE PACIENTE
+// ========================================
 
 /**
  * @swagger
@@ -981,83 +825,94 @@ router.post('/sessions/:id/events', authenticateToken, async (req, res) => {
  *   get:
  *     summary: Obtener informe completo de un paciente
  *     tags: [Pacientes]
- *     security:
- *       - bearerAuth: []
- *     description: |
- *       RF-SEG-04: Ver informe del paciente con sesiones y resultados.
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *     responses:
- *       200:
- *         description: Informe del paciente
- *       404:
- *         description: Paciente no encontrado
  */
 router.get('/patients/:id/report', authenticateToken, requireTerapeuta, async (req, res) => {
     const { id } = req.params;
 
     try {
-        // Obtener datos del paciente
-        const patientResult = await query(`
-            SELECT p.*, tp.id_terapeuta, t.nombre as terapeuta_nombre
-            FROM pacientes p
-            LEFT JOIN terapeuta_paciente tp ON p.id = tp.id_paciente
-            LEFT JOIN terapeutas t ON tp.id_terapeuta = t.id
-            WHERE p.id = $1
-        `, [id]);
+        // Obtener paciente
+        const { data: patient, error: patientError } = await supabase
+            .from('pacientes')
+            .select('*')
+            .eq('id', id)
+            .single();
 
-        if (patientResult.rows.length === 0) {
+        if (patientError || !patient) {
             return res.status(404).json({ success: false, error: 'Paciente no encontrado' });
         }
 
-        // RF-SEG-03: Verificar acceso
+        // Verificar acceso para terapeutas
         if (req.user.rol === 'TERAPEUTA' && req.user.id_terapeuta) {
-            if (patientResult.rows[0].id_terapeuta !== req.user.id_terapeuta) {
+            const { data: assignment } = await supabase
+                .from('terapeuta_paciente')
+                .select('id_terapeuta')
+                .eq('id_paciente', id)
+                .eq('id_terapeuta', req.user.id_terapeuta)
+                .single();
+            
+            if (!assignment) {
                 return res.status(403).json({ success: false, error: 'Sin acceso a este paciente' });
             }
         }
 
-        // Obtener resumen de sesiones
-        const sessionsResult = await query(`
-            SELECT 
-                s.id,
-                a.nombre as actividad,
-                a.nivel_dificultad,
-                s.fecha_inicio,
-                s.fecha_fin,
-                s.estado,
-                rs.total_aciertos,
-                rs.total_errores,
-                rs.total_omisiones,
-                rs.tiempo_total_seg,
-                rs.observaciones
-            FROM sesiones s
-            LEFT JOIN actividad_juego a ON s.id_actividad = a.id
-            LEFT JOIN resumen_sesion rs ON s.id = rs.id_sesion
-            WHERE s.id_paciente = $1
-            ORDER BY s.fecha_inicio DESC
-        `, [id]);
+        // Obtener terapeuta asignado
+        const { data: therapistAssign } = await supabase
+            .from('terapeuta_paciente')
+            .select('terapeutas(id, nombre)')
+            .eq('id_paciente', id)
+            .single();
+
+        // Obtener sesiones
+        const { data: sessions, error: sessionsError } = await supabase
+            .from('sesiones')
+            .select(`
+                id,
+                fecha_inicio,
+                fecha_fin,
+                estado,
+                actividad_juego(nombre, nivel_dificultad),
+                resumen_sesion(total_aciertos, total_errores, total_omisiones, tiempo_total_seg, observaciones)
+            `)
+            .eq('id_paciente', id)
+            .order('fecha_inicio', { ascending: false });
+
+        if (sessionsError) throw sessionsError;
+
+        // Formatear sesiones
+        const formattedSessions = sessions.map(s => ({
+            id: s.id,
+            actividad: s.actividad_juego?.nombre,
+            nivel_dificultad: s.actividad_juego?.nivel_dificultad,
+            fecha_inicio: s.fecha_inicio,
+            fecha_fin: s.fecha_fin,
+            estado: s.estado,
+            total_aciertos: s.resumen_sesion?.total_aciertos || 0,
+            total_errores: s.resumen_sesion?.total_errores || 0,
+            total_omisiones: s.resumen_sesion?.total_omisiones || 0,
+            tiempo_total_seg: s.resumen_sesion?.tiempo_total_seg || 0,
+            observaciones: s.resumen_sesion?.observaciones
+        }));
 
         // Calcular estadísticas
         const stats = {
-            total_sesiones: sessionsResult.rows.length,
-            sesiones_completadas: sessionsResult.rows.filter(s => s.estado === 'COMPLETADA').length,
-            total_aciertos: sessionsResult.rows.reduce((sum, s) => sum + (s.total_aciertos || 0), 0),
-            total_errores: sessionsResult.rows.reduce((sum, s) => sum + (s.total_errores || 0), 0),
-            total_omisiones: sessionsResult.rows.reduce((sum, s) => sum + (s.total_omisiones || 0), 0),
-            tiempo_total_minutos: Math.round(sessionsResult.rows.reduce((sum, s) => sum + (s.tiempo_total_seg || 0), 0) / 60)
+            total_sesiones: formattedSessions.length,
+            sesiones_completadas: formattedSessions.filter(s => s.estado === 'COMPLETADA').length,
+            total_aciertos: formattedSessions.reduce((sum, s) => sum + s.total_aciertos, 0),
+            total_errores: formattedSessions.reduce((sum, s) => sum + s.total_errores, 0),
+            total_omisiones: formattedSessions.reduce((sum, s) => sum + s.total_omisiones, 0),
+            tiempo_total_minutos: Math.round(formattedSessions.reduce((sum, s) => sum + s.tiempo_total_seg, 0) / 60)
         };
 
         res.json({
             success: true,
             data: {
-                patient: patientResult.rows[0],
+                patient: {
+                    ...patient,
+                    id_terapeuta: therapistAssign?.terapeutas?.id,
+                    terapeuta_nombre: therapistAssign?.terapeutas?.nombre
+                },
                 stats,
-                sessions: sessionsResult.rows
+                sessions: formattedSessions
             }
         });
     } catch (error) {
@@ -1075,36 +930,35 @@ router.get('/patients/:id/report', authenticateToken, requireTerapeuta, async (r
  *   get:
  *     summary: Obtener todos los terapeutas
  *     tags: [Terapeutas]
- *     responses:
- *       200:
- *         description: Lista de terapeutas
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success: { type: boolean }
- *                 data:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/Terapeuta'
  */
 router.get('/terapeutas', async (req, res) => {
     try {
-        const result = await query(`
-            SELECT 
-                t.id,
-                t.nombre,
-                t.especialidad,
-                t.correo,
-                t.telefono,
-                u.email as username,
-                u.activo
-            FROM terapeutas t
-            LEFT JOIN usuarios u ON t.id_usuario = u.id
-            ORDER BY t.nombre
-        `);
-        res.json({ success: true, data: result.rows });
+        const { data: therapists, error } = await supabase
+            .from('terapeutas')
+            .select(`
+                id,
+                nombre,
+                especialidad,
+                correo,
+                telefono,
+                id_usuario,
+                usuarios(email, activo)
+            `)
+            .order('nombre');
+
+        if (error) throw error;
+
+        const formatted = therapists.map(t => ({
+            id: t.id,
+            nombre: t.nombre,
+            especialidad: t.especialidad,
+            correo: t.correo,
+            telefono: t.telefono,
+            username: t.usuarios?.email,
+            activo: t.usuarios?.activo
+        }));
+
+        res.json({ success: true, data: formatted });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
     }
@@ -1120,34 +974,17 @@ router.get('/terapeutas', async (req, res) => {
  *   get:
  *     summary: Obtener todas las actividades del juego
  *     tags: [Actividades]
- *     responses:
- *       200:
- *         description: Lista de actividades
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success: { type: boolean }
- *                 data:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/Actividad'
  */
 router.get('/actividades', async (req, res) => {
     try {
-        const result = await query(`
-            SELECT 
-                id,
-                nombre,
-                descripcion,
-                nivel_dificultad,
-                tiempo_max_seg,
-                unity_id
-            FROM actividad_juego
-            ORDER BY nivel_dificultad, nombre
-        `);
-        res.json({ success: true, data: result.rows });
+        const { data: activities, error } = await supabase
+            .from('actividad_juego')
+            .select('id, nombre, descripcion, nivel_dificultad, tiempo_max_seg, unity_id')
+            .order('nivel_dificultad')
+            .order('nombre');
+
+        if (error) throw error;
+        res.json({ success: true, data: activities });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
     }
@@ -1157,62 +994,49 @@ router.get('/actividades', async (req, res) => {
  * @swagger
  * /api/actividades/{id}:
  *   get:
- *     summary: Obtener actividad con ingredientes, utensilios y acciones
+ *     summary: Obtener actividad con ingredientes y utensilios
  *     tags: [Actividades]
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *     responses:
- *       200:
- *         description: Actividad con detalles completos
- *       404:
- *         description: Actividad no encontrada
  */
 router.get('/actividades/:id', async (req, res) => {
     const { id } = req.params;
 
     try {
-        const activityResult = await query('SELECT * FROM actividad_juego WHERE id = $1', [id]);
+        const { data: activity, error: actError } = await supabase
+            .from('actividad_juego')
+            .select('*')
+            .eq('id', id)
+            .single();
 
-        if (activityResult.rows.length === 0) {
+        if (actError || !activity) {
             return res.status(404).json({
                 success: false,
                 error: 'Actividad no encontrada'
             });
         }
 
-        const ingredientsResult = await query(`
-            SELECT i.*, ia.cantidad_requerida
-            FROM ingrediente_actividad ia
-            JOIN ingrediente i ON ia.id_ingrediente = i.id
-            WHERE ia.id_actividad = $1
-        `, [id]);
+        const { data: ingredients } = await supabase
+            .from('ingrediente_actividad')
+            .select('cantidad_requerida, ingrediente(*)')
+            .eq('id_actividad', id);
 
-        const toolsResult = await query(`
-            SELECT u.*
-            FROM utensilio_actividad ua
-            JOIN utensilio u ON ua.id_utensilio = u.id
-            WHERE ua.id_actividad = $1
-        `, [id]);
+        const { data: tools } = await supabase
+            .from('utensilio_actividad')
+            .select('utensilio(*)')
+            .eq('id_actividad', id);
 
-        const actionsResult = await query(`
-            SELECT a.*, aa.orden
-            FROM accion_actividad aa
-            JOIN accion a ON aa.id_accion = a.id
-            WHERE aa.id_actividad = $1
-            ORDER BY aa.orden
-        `, [id]);
+        const { data: actions } = await supabase
+            .from('accion_actividad')
+            .select('orden, accion(*)')
+            .eq('id_actividad', id)
+            .order('orden');
 
         res.json({
             success: true,
             data: {
-                activity: activityResult.rows[0],
-                ingredients: ingredientsResult.rows,
-                tools: toolsResult.rows,
-                actions: actionsResult.rows
+                activity,
+                ingredients: ingredients?.map(i => ({ ...i.ingrediente, cantidad_requerida: i.cantidad_requerida })) || [],
+                tools: tools?.map(t => t.utensilio) || [],
+                actions: actions?.map(a => ({ ...a.accion, orden: a.orden })) || []
             }
         });
     } catch (error) {
@@ -1228,46 +1052,67 @@ router.get('/actividades/:id', async (req, res) => {
  * @swagger
  * /api/dashboard/stats:
  *   get:
- *     summary: Obtener estadísticas generales del dashboard
+ *     summary: Obtener estadísticas generales
  *     tags: [Dashboard]
- *     responses:
- *       200:
- *         description: Estadísticas del sistema
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/DashboardStats'
  */
 router.get('/dashboard/stats', async (req, res) => {
     try {
-        const statsResult = await query(`
-            SELECT
-                (SELECT COUNT(*) FROM pacientes) as total_pacientes,
-                (SELECT COUNT(*) FROM sesiones) as total_sesiones,
-                (SELECT COUNT(*) FROM sesiones WHERE estado = 'COMPLETADA') as sesiones_completadas,
-                (SELECT COUNT(*) FROM terapeutas) as total_terapeutas,
-                (SELECT COUNT(*) FROM actividad_juego) as total_actividades
-        `);
+        // Contar pacientes
+        const { count: totalPacientes } = await supabase
+            .from('pacientes')
+            .select('id', { count: 'exact', head: true });
 
-        const recentSessions = await query(`
-            SELECT 
-                s.id,
-                p.nombre as paciente,
-                a.nombre as actividad,
-                s.estado,
-                s.fecha_inicio
-            FROM sesiones s
-            JOIN pacientes p ON s.id_paciente = p.id
-            JOIN actividad_juego a ON s.id_actividad = a.id
-            ORDER BY s.fecha_inicio DESC
-            LIMIT 5
-        `);
+        // Contar sesiones
+        const { count: totalSesiones } = await supabase
+            .from('sesiones')
+            .select('id', { count: 'exact', head: true });
+
+        // Contar sesiones completadas
+        const { count: sesionesCompletadas } = await supabase
+            .from('sesiones')
+            .select('id', { count: 'exact', head: true })
+            .eq('estado', 'COMPLETADA');
+
+        // Contar terapeutas
+        const { count: totalTerapeutas } = await supabase
+            .from('terapeutas')
+            .select('id', { count: 'exact', head: true });
+
+        // Contar actividades
+        const { count: totalActividades } = await supabase
+            .from('actividad_juego')
+            .select('id', { count: 'exact', head: true });
+
+        // Sesiones recientes
+        const { data: recentSessions } = await supabase
+            .from('sesiones')
+            .select(`
+                id,
+                estado,
+                fecha_inicio,
+                pacientes(nombre),
+                actividad_juego(nombre)
+            `)
+            .order('fecha_inicio', { ascending: false })
+            .limit(5);
 
         res.json({
             success: true,
             data: {
-                stats: statsResult.rows[0],
-                recentSessions: recentSessions.rows
+                stats: {
+                    total_pacientes: totalPacientes || 0,
+                    total_sesiones: totalSesiones || 0,
+                    sesiones_completadas: sesionesCompletadas || 0,
+                    total_terapeutas: totalTerapeutas || 0,
+                    total_actividades: totalActividades || 0
+                },
+                recentSessions: recentSessions?.map(s => ({
+                    id: s.id,
+                    paciente: s.pacientes?.nombre,
+                    actividad: s.actividad_juego?.nombre,
+                    estado: s.estado,
+                    fecha_inicio: s.fecha_inicio
+                })) || []
             }
         });
     } catch (error) {

@@ -10,7 +10,7 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const router = express.Router();
-const { query } = require('../config/database');
+const { supabase } = require('../config/supabase');
 const { authenticateToken, requireSuperAdmin } = require('../middleware/authMiddleware');
 const { auditFromRequest, AUDIT_TYPES } = require('../utils/auditHelper');
 
@@ -30,25 +30,40 @@ const { auditFromRequest, AUDIT_TYPES } = require('../utils/auditHelper');
  */
 router.get('/', authenticateToken, requireSuperAdmin, async (req, res) => {
     try {
-        const result = await query(`
-            SELECT 
-                u.id,
-                u.email as username,
-                u.rol,
-                u.activo,
-                u.fecha_creacion,
-                u.ultimo_login as ultimo_acceso,
-                t.id as id_terapeuta,
-                t.nombre,
-                t.correo,
-                t.especialidad,
-                t.telefono
-            FROM usuarios u
-            LEFT JOIN terapeutas t ON u.id = t.id_usuario
-            ORDER BY u.fecha_creacion DESC
-        `);
+        // Obtener usuarios
+        const { data: usuarios, error: userError } = await supabase
+            .from('usuarios')
+            .select('id, email, rol, activo, fecha_creacion, ultimo_login')
+            .order('fecha_creacion', { ascending: false });
 
-        res.json({ success: true, data: result.rows });
+        if (userError) throw userError;
+
+        // Obtener terapeutas para hacer join manual
+        const { data: terapeutas, error: terapError } = await supabase
+            .from('terapeutas')
+            .select('id, nombre, correo, especialidad, telefono, id_usuario');
+
+        if (terapError) throw terapError;
+
+        // Combinar datos
+        const result = usuarios.map(user => {
+            const terapeuta = terapeutas.find(t => t.id_usuario === user.id);
+            return {
+                id: user.id,
+                username: user.email,
+                rol: user.rol,
+                activo: user.activo,
+                fecha_creacion: user.fecha_creacion,
+                ultimo_acceso: user.ultimo_login,
+                id_terapeuta: terapeuta?.id || null,
+                nombre: terapeuta?.nombre || null,
+                correo: terapeuta?.correo || null,
+                especialidad: terapeuta?.especialidad || null,
+                telefono: terapeuta?.telefono || null
+            };
+        });
+
+        res.json({ success: true, data: result });
 
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
@@ -75,7 +90,7 @@ router.get('/', authenticateToken, requireSuperAdmin, async (req, res) => {
  *               nombre: { type: string, example: "Dr. Juan García" }
  *               correo: { type: string, example: "juan@clinica.com" }
  *               username: { type: string, example: "terapeuta_juan" }
- *               password: { type: string, example: "Terapeuta2024!" }
+ *               password: { type: string, example: "Terapeuta2024!@" }
  *               especialidad: { type: string, example: "Neuropsicología" }
  *               telefono: { type: string, example: "3001234567" }
  *     responses:
@@ -108,8 +123,13 @@ router.post('/terapeuta', authenticateToken, requireSuperAdmin, async (req, res)
 
     try {
         // Verificar email/username único
-        const existingUser = await query('SELECT id FROM usuarios WHERE email = $1', [username]);
-        if (existingUser.rows.length > 0) {
+        const { data: existingUser } = await supabase
+            .from('usuarios')
+            .select('id')
+            .eq('email', username)
+            .single();
+
+        if (existingUser) {
             return res.status(400).json({
                 success: false,
                 error: 'El username ya existe'
@@ -121,22 +141,33 @@ router.post('/terapeuta', authenticateToken, requireSuperAdmin, async (req, res)
         const passwordHash = await bcrypt.hash(password, salt);
 
         // Crear usuario
-        const userResult = await query(
-            `INSERT INTO usuarios (email, password_hash, rol, activo)
-             VALUES ($1, $2, 'TERAPEUTA', true)
-             RETURNING id, email as username, rol`,
-            [username, passwordHash]
-        );
+        const { data: newUser, error: userError } = await supabase
+            .from('usuarios')
+            .insert({
+                email: username,
+                password_hash: passwordHash,
+                rol: 'TERAPEUTA',
+                activo: true
+            })
+            .select('id, email, rol')
+            .single();
 
-        const newUser = userResult.rows[0];
+        if (userError) throw userError;
 
         // Crear terapeuta
-        const terapeutaResult = await query(
-            `INSERT INTO terapeutas (nombre, correo, especialidad, telefono, id_usuario)
-             VALUES ($1, $2, $3, $4, $5)
-             RETURNING *`,
-            [nombre, correo, especialidad, telefono || null, newUser.id]
-        );
+        const { data: terapeuta, error: terapError } = await supabase
+            .from('terapeutas')
+            .insert({
+                nombre,
+                correo,
+                especialidad,
+                telefono: telefono || null,
+                id_usuario: newUser.id
+            })
+            .select()
+            .single();
+
+        if (terapError) throw terapError;
 
         // Auditoría
         await auditFromRequest(req, AUDIT_TYPES.TERAPEUTA_CREATED, {
@@ -150,8 +181,8 @@ router.post('/terapeuta', authenticateToken, requireSuperAdmin, async (req, res)
             success: true,
             message: 'Terapeuta creado exitosamente',
             data: {
-                usuario: newUser,
-                terapeuta: terapeutaResult.rows[0]
+                usuario: { ...newUser, username: newUser.email },
+                terapeuta
             }
         });
 
@@ -194,24 +225,34 @@ router.put('/:id', authenticateToken, requireSuperAdmin, async (req, res) => {
     const { nombre, correo, especialidad, telefono } = req.body;
 
     try {
-        // Actualizar terapeuta
-        const result = await query(
-            `UPDATE terapeutas 
-             SET nombre = COALESCE($1, nombre),
-                 correo = COALESCE($2, correo),
-                 especialidad = COALESCE($3, especialidad),
-                 telefono = COALESCE($4, telefono)
-             WHERE id_usuario = $5
-             RETURNING *`,
-            [nombre, correo, especialidad, telefono, id]
-        );
+        // Buscar terapeuta existente
+        const { data: existing } = await supabase
+            .from('terapeutas')
+            .select('*')
+            .eq('id_usuario', id)
+            .single();
 
-        if (result.rows.length === 0) {
+        if (!existing) {
             return res.status(404).json({
                 success: false,
                 error: 'Usuario no encontrado'
             });
         }
+
+        // Actualizar terapeuta
+        const { data: updated, error } = await supabase
+            .from('terapeutas')
+            .update({
+                nombre: nombre || existing.nombre,
+                correo: correo || existing.correo,
+                especialidad: especialidad || existing.especialidad,
+                telefono: telefono || existing.telefono
+            })
+            .eq('id_usuario', id)
+            .select()
+            .single();
+
+        if (error) throw error;
 
         // Auditoría
         await auditFromRequest(req, AUDIT_TYPES.USER_UPDATED, {
@@ -222,7 +263,7 @@ router.put('/:id', authenticateToken, requireSuperAdmin, async (req, res) => {
         res.json({
             success: true,
             message: 'Usuario actualizado',
-            data: result.rows[0]
+            data: updated
         });
 
     } catch (error) {
@@ -261,14 +302,19 @@ router.put('/:id/toggle-estado', authenticateToken, requireSuperAdmin, async (re
             });
         }
 
-        // Verificar que el usuario que se va a desactivar no sea superadmin
-        const userCheck = await query('SELECT rol FROM usuarios WHERE id = $1', [id]);
-        if (userCheck.rows.length === 0) {
+        // Verificar que el usuario existe y obtener su estado actual
+        const { data: user, error: userError } = await supabase
+            .from('usuarios')
+            .select('id, email, rol, activo')
+            .eq('id', id)
+            .single();
+
+        if (userError || !user) {
             return res.status(404).json({ success: false, error: 'Usuario no encontrado' });
         }
 
         // RF-SEG-01: La eliminación/desactivación del superusuario está prohibida
-        if (userCheck.rows[0].rol === 'SUPERADMIN') {
+        if (user.rol === 'SUPERADMIN') {
             return res.status(403).json({
                 success: false,
                 error: 'No se puede desactivar al Superadministrador'
@@ -276,27 +322,28 @@ router.put('/:id/toggle-estado', authenticateToken, requireSuperAdmin, async (re
         }
 
         // Toggle estado
-        const result = await query(
-            `UPDATE usuarios 
-             SET activo = NOT activo 
-             WHERE id = $1 
-             RETURNING id, username, activo`,
-            [id]
-        );
+        const newState = !user.activo;
+        const { data: updated, error } = await supabase
+            .from('usuarios')
+            .update({ activo: newState })
+            .eq('id', id)
+            .select('id, email, activo')
+            .single();
 
-        const newState = result.rows[0].activo;
+        if (error) throw error;
+
         const auditType = newState ? AUDIT_TYPES.USER_ACTIVATED : AUDIT_TYPES.USER_DEACTIVATED;
 
         // Auditoría
         await auditFromRequest(req, auditType, {
             id_usuario: id,
-            username: result.rows[0].username
+            username: updated.email
         });
 
         res.json({
             success: true,
             message: `Usuario ${newState ? 'activado' : 'desactivado'}`,
-            data: result.rows[0]
+            data: { ...updated, username: updated.email }
         });
 
     } catch (error) {
@@ -356,19 +403,23 @@ router.post('/:id/reset-password', authenticateToken, requireSuperAdmin, async (
         const salt = await bcrypt.genSalt(12);
         const passwordHash = await bcrypt.hash(newPassword, salt);
 
-        const result = await query(
-            'UPDATE usuarios SET password_hash = $1 WHERE id = $2 RETURNING id, username',
-            [passwordHash, id]
-        );
+        const { data: updated, error } = await supabase
+            .from('usuarios')
+            .update({ password_hash: passwordHash })
+            .eq('id', id)
+            .select('id, email')
+            .single();
 
-        if (result.rows.length === 0) {
+        if (error) throw error;
+
+        if (!updated) {
             return res.status(404).json({ success: false, error: 'Usuario no encontrado' });
         }
 
         // Auditoría
         await auditFromRequest(req, AUDIT_TYPES.PASSWORD_CHANGE, {
             id_usuario: id,
-            username: result.rows[0].username,
+            username: updated.email,
             accion: 'reset_by_admin'
         });
 
