@@ -49,10 +49,10 @@ const FormField = ({ label, required, hint, error, children }) => (
 /**
  * Modal para crear nuevo terapeuta
  * Cumple con RF-SEG-02: Crear credenciales de nuevos terapeutas
+ * El login es solo por correo electrónico + contraseña
  */
 const CrearTerapeutaModal = ({ isOpen, onClose, onSubmit }) => {
     const [formData, setFormData] = useState({
-        usuario: '',
         password: '',
         nombre: '',
         apellido: '',
@@ -74,15 +74,14 @@ const CrearTerapeutaModal = ({ isOpen, onClose, onSubmit }) => {
     const validateForm = () => {
         const newErrors = {};
 
-        // Usuario: solo letras minúsculas y números
-        if (!formData.usuario) {
-            newErrors.usuario = 'El usuario es requerido';
-        } else if (!/^[a-z0-9]+$/.test(formData.usuario)) {
-            newErrors.usuario = 'Solo letras minúsculas y números';
+        // Correo electrónico (ahora es el identificador principal)
+        if (!formData.correo) {
+            newErrors.correo = 'El correo es requerido';
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.correo)) {
+            newErrors.correo = 'Correo electrónico inválido';
         }
 
-        // Contraseña: mínimo 8 dígitos y 1 mayúscula (según mockup)
-        // Nota: RF-SEG-01 requiere 10 caracteres, mayúsculas, minúsculas, número, símbolo
+        // Contraseña: mínimo 8 caracteres y 1 mayúscula
         if (!formData.password) {
             newErrors.password = 'La contraseña es requerida';
         } else if (formData.password.length < 8) {
@@ -101,29 +100,21 @@ const CrearTerapeutaModal = ({ isOpen, onClose, onSubmit }) => {
             newErrors.apellido = 'El apellido es requerido';
         }
 
-        // Correo
-        if (!formData.correo) {
-            newErrors.correo = 'El correo es requerido';
-        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.correo)) {
-            newErrors.correo = 'Correo electrónico inválido';
-        }
-
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        
+
         if (!validateForm()) return;
 
         setIsSubmitting(true);
         try {
             await onSubmit({
-                username: formData.usuario,
+                correo: formData.correo,
                 password: formData.password,
-                nombre: `${formData.nombre} ${formData.apellido}`,
-                correo: formData.correo
+                nombre: `${formData.nombre} ${formData.apellido}`
             });
             handleClose();
         } catch (error) {
@@ -134,7 +125,7 @@ const CrearTerapeutaModal = ({ isOpen, onClose, onSubmit }) => {
     };
 
     const handleClose = () => {
-        setFormData({ usuario: '', password: '', nombre: '', apellido: '', correo: '' });
+        setFormData({ password: '', nombre: '', apellido: '', correo: '' });
         setErrors({});
         setShowPassword(false);
         onClose();
@@ -153,53 +144,6 @@ const CrearTerapeutaModal = ({ isOpen, onClose, onSubmit }) => {
                             Información del Terapeuta
                         </p>
 
-                        {/* Usuario */}
-                        <FormField 
-                            label="Usuario" 
-                            required 
-                            hint="Solo letras minúsculas y números"
-                            error={errors.usuario}
-                        >
-                            <input
-                                type="text"
-                                name="usuario"
-                                value={formData.usuario}
-                                onChange={handleChange}
-                                placeholder="jperez"
-                                className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-colors ${
-                                    errors.usuario ? 'border-red-300' : 'border-gray-300'
-                                }`}
-                            />
-                        </FormField>
-
-                        {/* Contraseña */}
-                        <FormField 
-                            label="Contraseña" 
-                            required 
-                            hint="Mín. 1 mayúscula y 8 dígitos"
-                            error={errors.password}
-                        >
-                            <div className="relative">
-                                <input
-                                    type={showPassword ? 'text' : 'password'}
-                                    name="password"
-                                    value={formData.password}
-                                    onChange={handleChange}
-                                    placeholder="P@ssw0rd123"
-                                    className={`w-full px-4 py-2.5 pr-12 border rounded-lg focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-colors ${
-                                        errors.password ? 'border-red-300' : 'border-gray-300'
-                                    }`}
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                                >
-                                    {showPassword ? <Icons.EyeOff /> : <Icons.Eye />}
-                                </button>
-                            </div>
-                        </FormField>
-
                         {/* Nombre y Apellido en grid */}
                         <div className="grid grid-cols-2 gap-4">
                             <FormField label="Nombre" required error={errors.nombre}>
@@ -209,9 +153,8 @@ const CrearTerapeutaModal = ({ isOpen, onClose, onSubmit }) => {
                                     value={formData.nombre}
                                     onChange={handleChange}
                                     placeholder="Juan"
-                                    className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-colors ${
-                                        errors.nombre ? 'border-red-300' : 'border-gray-300'
-                                    }`}
+                                    className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-colors ${errors.nombre ? 'border-red-300' : 'border-gray-300'
+                                        }`}
                                 />
                             </FormField>
 
@@ -222,25 +165,55 @@ const CrearTerapeutaModal = ({ isOpen, onClose, onSubmit }) => {
                                     value={formData.apellido}
                                     onChange={handleChange}
                                     placeholder="Pérez García"
-                                    className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-colors ${
-                                        errors.apellido ? 'border-red-300' : 'border-gray-300'
-                                    }`}
+                                    className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-colors ${errors.apellido ? 'border-red-300' : 'border-gray-300'
+                                        }`}
                                 />
                             </FormField>
                         </div>
 
-                        {/* Correo Electrónico */}
-                        <FormField label="Correo Electrónico" required error={errors.correo}>
+                        {/* Correo Electrónico - Ahora es el campo principal de login */}
+                        <FormField
+                            label="Correo Electrónico"
+                            required
+                            hint="Este será el identificador para iniciar sesión"
+                            error={errors.correo}
+                        >
                             <input
                                 type="email"
                                 name="correo"
                                 value={formData.correo}
                                 onChange={handleChange}
-                                placeholder="juan.perez@mail.com"
-                                className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-colors ${
-                                    errors.correo ? 'border-red-300' : 'border-gray-300'
-                                }`}
+                                placeholder="juan.perez@clinica.com"
+                                className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-colors ${errors.correo ? 'border-red-300' : 'border-gray-300'
+                                    }`}
                             />
+                        </FormField>
+
+                        {/* Contraseña */}
+                        <FormField
+                            label="Contraseña"
+                            required
+                            hint="Mín. 1 mayúscula y 8 caracteres"
+                            error={errors.password}
+                        >
+                            <div className="relative">
+                                <input
+                                    type={showPassword ? 'text' : 'password'}
+                                    name="password"
+                                    value={formData.password}
+                                    onChange={handleChange}
+                                    placeholder="••••••••"
+                                    className={`w-full px-4 py-2.5 pr-12 border rounded-lg focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-colors ${errors.password ? 'border-red-300' : 'border-gray-300'
+                                        }`}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                >
+                                    {showPassword ? <Icons.EyeOff /> : <Icons.Eye />}
+                                </button>
+                            </div>
                         </FormField>
 
                         <p className="text-xs text-gray-400">* Campos obligatorios</p>

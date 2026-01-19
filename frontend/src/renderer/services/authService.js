@@ -12,14 +12,14 @@ import api from './api';
 const authService = {
     /**
      * Iniciar sesión
-     * @param {string} username - Nombre de usuario
+     * @param {string} email - Correo electrónico
      * @param {string} password - Contraseña
      * @returns {Promise<{success: boolean, data?: object, error?: string}>}
      */
-    async login(username, password) {
+    async login(email, password) {
         try {
             const response = await api.post('/api/auth/login', {
-                username,
+                email,
                 password
             });
 

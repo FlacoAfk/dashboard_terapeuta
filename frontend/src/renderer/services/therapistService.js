@@ -25,13 +25,13 @@ const therapistService = {
                 .map(u => ({
                     id: u.id,
                     id_terapeuta: u.id_terapeuta,
-                    usuario: u.username,
+                    email: u.email,
                     nombre: u.nombre || 'Sin nombre',
-                    correo: u.correo || u.username,
+                    correo: u.correo || u.email,
                     especialidad: u.especialidad || '',
                     telefono: u.telefono || '',
                     activo: u.activo,
-                    pacientes: 0, // TODO: Obtener conteo real
+                    pacientes: u.pacientes_count || 0,
                     fecha_creacion: u.fecha_creacion
                 }));
             return { success: true, data: therapists };
@@ -50,7 +50,6 @@ const therapistService = {
             const response = await api.post('/api/usuarios/terapeuta', {
                 nombre: data.nombre,
                 correo: data.correo,
-                username: data.username,
                 password: data.password,
                 especialidad: data.especialidad || 'General'
             });

@@ -91,16 +91,16 @@ const getClientIP = (req) => {
  * Registrar evento de auditoría con todos los campos
  * @param {string} tipo - Tipo de evento (usar AUDIT_TYPES)
  * @param {number|null} idActor - ID del usuario que realiza la acción
- * @param {string|null} actorUsername - Username del actor
+ * @param {string|null} actorEmail - Email del actor
  * @param {object} detalle - Detalles adicionales del evento
  * @param {string|null} ipOrigen - IP de origen
  */
-const registrarAuditoria = async (tipo, idActor = null, actorUsername = null, detalle = {}, ipOrigen = null) => {
+const registrarAuditoria = async (tipo, idActor = null, actorEmail = null, detalle = {}, ipOrigen = null) => {
     try {
         // Crear objeto de descripción completo
         const descripcionCompleta = {
             ...detalle,
-            _actor_username: actorUsername || 'sistema',
+            _actor_email: actorEmail || 'sistema',
             _ip_origen: ipOrigen || 'localhost',
             _tipo_label: AUDIT_TYPE_LABELS[tipo] || tipo
         };
@@ -118,7 +118,7 @@ const registrarAuditoria = async (tipo, idActor = null, actorUsername = null, de
             throw error;
         }
 
-        console.log(`📋 Auditoría: ${AUDIT_TYPE_LABELS[tipo] || tipo} por ${actorUsername || 'sistema'} desde ${ipOrigen || 'localhost'}`);
+        console.log(`📋 Auditoría: ${AUDIT_TYPE_LABELS[tipo] || tipo} por ${actorEmail || 'sistema'} desde ${ipOrigen || 'localhost'}`);
     } catch (error) {
         // No fallar si la auditoría falla, solo loguear
         console.error('❌ Error registrando auditoría:', error.message);
@@ -131,17 +131,17 @@ const registrarAuditoria = async (tipo, idActor = null, actorUsername = null, de
  */
 const auditFromRequest = async (req, tipo, detalle = {}) => {
     const idActor = req.user?.id || null;
-    const actorUsername = req.user?.email || req.user?.username || null;
+    const actorEmail = req.user?.email || null;
     const ip = getClientIP(req);
-    await registrarAuditoria(tipo, idActor, actorUsername, detalle, ip);
+    await registrarAuditoria(tipo, idActor, actorEmail, detalle, ip);
 };
 
 /**
- * Helper para registrar login (incluye username del intento)
+ * Helper para registrar login (incluye email del intento)
  */
-const auditLogin = async (req, tipo, username, detalle = {}) => {
+const auditLogin = async (req, tipo, email, detalle = {}) => {
     const ip = getClientIP(req);
-    await registrarAuditoria(tipo, null, username, detalle, ip);
+    await registrarAuditoria(tipo, null, email, detalle, ip);
 };
 
 /**
@@ -149,7 +149,7 @@ const auditLogin = async (req, tipo, username, detalle = {}) => {
  */
 const auditWithUser = async (req, tipo, user, detalle = {}) => {
     const ip = getClientIP(req);
-    await registrarAuditoria(tipo, user.id, user.email || user.username, detalle, ip);
+    await registrarAuditoria(tipo, user.id, user.email, detalle, ip);
 };
 
 module.exports = {

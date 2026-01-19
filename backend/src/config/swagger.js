@@ -114,7 +114,7 @@ Conectada a **Supabase PostgreSQL**
                         especialidad: { type: 'string' },
                         correo: { type: 'string' },
                         telefono: { type: 'string' },
-                        username: { type: 'string' },
+                        email: { type: 'string' },
                         activo: { type: 'boolean' }
                     }
                 },

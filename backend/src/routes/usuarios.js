@@ -45,6 +45,18 @@ router.get('/', authenticateToken, requireSuperAdmin, async (req, res) => {
 
         if (terapError) throw terapError;
 
+        // Obtener conteo de pacientes
+        const { data: assignments, error: aggError } = await supabase
+            .from('terapeuta_paciente')
+            .select('id_terapeuta, id_paciente');
+
+        const counts = {};
+        if (assignments) {
+            assignments.forEach(a => {
+                counts[a.id_terapeuta] = (counts[a.id_terapeuta] || 0) + 1;
+            });
+        }
+
         // Combinar datos
         const result = usuarios.map(user => {
             const terapeuta = terapeutas.find(t => t.id_usuario === user.id);
@@ -59,7 +71,8 @@ router.get('/', authenticateToken, requireSuperAdmin, async (req, res) => {
                 nombre: terapeuta?.nombre || null,
                 correo: terapeuta?.correo || null,
                 especialidad: terapeuta?.especialidad || null,
-                telefono: terapeuta?.telefono || null
+                telefono: terapeuta?.telefono || null,
+                pacientes_count: terapeuta ? (counts[terapeuta.id] || 0) : 0
             };
         });
 
@@ -102,37 +115,36 @@ router.get('/', authenticateToken, requireSuperAdmin, async (req, res) => {
  *         description: Acceso denegado
  */
 router.post('/terapeuta', authenticateToken, requireSuperAdmin, async (req, res) => {
-    const { nombre, correo, username, password, especialidad, telefono } = req.body;
+    const { nombre, correo, password, especialidad, telefono } = req.body;
 
-    // Validar campos requeridos
-    if (!nombre || !correo || !username || !password || !especialidad) {
+    // Validar campos requeridos (correo es el identificador de login)
+    if (!nombre || !correo || !password) {
         return res.status(400).json({
             success: false,
-            error: 'Campos requeridos: nombre, correo, username, password, especialidad'
+            error: 'Campos requeridos: nombre, correo, password'
         });
     }
 
-    // Validar contraseña (mínimo 10 caracteres con complejidad)
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{10,}$/;
-    if (!passwordRegex.test(password)) {
+    // Validar contraseña (mínimo 8 caracteres con una mayúscula)
+    if (password.length < 8 || !/[A-Z]/.test(password)) {
         return res.status(400).json({
             success: false,
-            error: 'La contraseña debe tener mínimo 10 caracteres, mayúsculas, minúsculas, números y símbolos'
+            error: 'La contraseña debe tener mínimo 8 caracteres y al menos 1 mayúscula'
         });
     }
 
     try {
-        // Verificar email/username único
+        // Verificar email único
         const { data: existingUser } = await supabase
             .from('usuarios')
             .select('id')
-            .eq('email', username)
+            .eq('email', correo)
             .single();
 
         if (existingUser) {
             return res.status(400).json({
                 success: false,
-                error: 'El username ya existe'
+                error: 'El correo electrónico ya está registrado'
             });
         }
 
@@ -140,11 +152,11 @@ router.post('/terapeuta', authenticateToken, requireSuperAdmin, async (req, res)
         const salt = await bcrypt.genSalt(12);
         const passwordHash = await bcrypt.hash(password, salt);
 
-        // Crear usuario
+        // Crear usuario (email = correo)
         const { data: newUser, error: userError } = await supabase
             .from('usuarios')
             .insert({
-                email: username,
+                email: correo,
                 password_hash: passwordHash,
                 rol: 'TERAPEUTA',
                 activo: true
@@ -160,7 +172,7 @@ router.post('/terapeuta', authenticateToken, requireSuperAdmin, async (req, res)
             .insert({
                 nombre,
                 correo,
-                especialidad,
+                especialidad: especialidad || 'General',
                 telefono: telefono || null,
                 id_usuario: newUser.id
             })
@@ -171,10 +183,9 @@ router.post('/terapeuta', authenticateToken, requireSuperAdmin, async (req, res)
 
         // Auditoría
         await auditFromRequest(req, AUDIT_TYPES.TERAPEUTA_CREATED, {
-            username,
-            nombre,
             correo,
-            especialidad
+            nombre,
+            especialidad: especialidad || 'General'
         });
 
         res.status(201).json({

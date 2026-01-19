@@ -26,9 +26,9 @@ const { auditFromRequest, auditLogin, auditWithUser, AUDIT_TYPES } = require('..
  *         application/json:
  *           schema:
  *             type: object
- *             required: [username, password]
+ *             required: [email, password]
  *             properties:
- *               username: { type: string, example: "admin@cerebro.com" }
+ *               email: { type: string, example: "admin@cerebro.com" }
  *               password: { type: string, example: "Admin123!@" }
  *     responses:
  *       200:
@@ -37,12 +37,12 @@ const { auditFromRequest, auditLogin, auditWithUser, AUDIT_TYPES } = require('..
  *         description: Credenciales inválidas
  */
 router.post('/login', async (req, res) => {
-    const { username, password } = req.body;
+    const { email, password } = req.body;
 
-    if (!username || !password) {
+    if (!email || !password) {
         return res.status(400).json({
             success: false,
-            error: 'Username y password son requeridos'
+            error: 'Email y password son requeridos'
         });
     }
 
@@ -51,11 +51,11 @@ router.post('/login', async (req, res) => {
         const { data: userData, error: userError } = await supabase
             .from('usuarios')
             .select('*')
-            .eq('email', username)
+            .eq('email', email)
             .single();
 
         if (userError || !userData) {
-            await auditLogin(req, AUDIT_TYPES.LOGIN_FAILED, username, { reason: 'Usuario no encontrado' });
+            await auditLogin(req, AUDIT_TYPES.LOGIN_FAILED, email, { reason: 'Usuario no encontrado' });
             return res.status(401).json({
                 success: false,
                 error: 'Credenciales inválidas'
@@ -77,7 +77,7 @@ router.post('/login', async (req, res) => {
 
         // Verificar que el usuario esté activo
         if (!user.activo) {
-            await auditLogin(req, AUDIT_TYPES.LOGIN_FAILED, username, { reason: 'Usuario inactivo' });
+            await auditLogin(req, AUDIT_TYPES.LOGIN_FAILED, email, { reason: 'Usuario inactivo' });
             return res.status(401).json({
                 success: false,
                 error: 'Usuario desactivado. Contacte al administrador.'
@@ -87,7 +87,7 @@ router.post('/login', async (req, res) => {
         // Verificar contraseña
         const validPassword = await bcrypt.compare(password, user.password_hash);
         if (!validPassword) {
-            await auditLogin(req, AUDIT_TYPES.LOGIN_FAILED, username, { reason: 'Contraseña incorrecta' });
+            await auditLogin(req, AUDIT_TYPES.LOGIN_FAILED, email, { reason: 'Contraseña incorrecta' });
             return res.status(401).json({
                 success: false,
                 error: 'Credenciales inválidas'
@@ -103,13 +103,13 @@ router.post('/login', async (req, res) => {
         // Generar token
         const token = generateToken({
             id: user.id,
-            username: user.email,
+            email: user.email,
             rol: user.rol,
             id_terapeuta: user.id_terapeuta
         });
 
         // Registrar auditoría con usuario autenticado
-        await auditWithUser(req, AUDIT_TYPES.LOGIN_SUCCESS, user, { username });
+        await auditWithUser(req, AUDIT_TYPES.LOGIN_SUCCESS, user, { email });
 
         res.json({
             success: true,
@@ -118,7 +118,7 @@ router.post('/login', async (req, res) => {
                 token,
                 user: {
                     id: user.id,
-                    username: user.email,
+                    email: user.email,
                     rol: user.rol,
                     nombre: user.terapeuta_nombre || user.email,
                     id_terapeuta: user.id_terapeuta
@@ -147,11 +147,10 @@ router.post('/login', async (req, res) => {
  *         application/json:
  *           schema:
  *             type: object
- *             required: [nombre, correo, username, password]
+ *             required: [nombre, correo, password]
  *             properties:
  *               nombre: { type: string, example: "Administrador Principal" }
  *               correo: { type: string, example: "admin@clinica.com" }
- *               username: { type: string, example: "superadmin" }
  *               password: { type: string, example: "Contraseña123!@" }
  *     responses:
  *       201:
@@ -160,13 +159,13 @@ router.post('/login', async (req, res) => {
  *         description: Ya existe un superadministrador
  */
 router.post('/setup', async (req, res) => {
-    const { nombre, correo, username, password } = req.body;
+    const { nombre, correo, password } = req.body;
 
     // Validar campos requeridos
-    if (!nombre || !correo || !username || !password) {
+    if (!nombre || !correo || !password) {
         return res.status(400).json({
             success: false,
-            error: 'Todos los campos son requeridos: nombre, correo, username, password'
+            error: 'Todos los campos son requeridos: nombre, correo, password'
         });
     }
 
@@ -227,15 +226,14 @@ router.post('/setup', async (req, res) => {
 
         // Registrar auditoría
         await auditFromRequest(req, AUDIT_TYPES.SUPERADMIN_CREATED, {
-            username: correo,
-            nombre,
-            correo
+            email: correo,
+            nombre
         });
 
         // Generar token
         const token = generateToken({
             id: newUser.id,
-            username: newUser.email,
+            email: newUser.email,
             rol: newUser.rol
         });
 
@@ -246,7 +244,7 @@ router.post('/setup', async (req, res) => {
                 token,
                 user: {
                     id: newUser.id,
-                    username: newUser.email,
+                    email: newUser.email,
                     rol: newUser.rol,
                     nombre
                 }
@@ -299,7 +297,7 @@ router.get('/me', authenticateToken, async (req, res) => {
             success: true,
             data: {
                 id: user.id,
-                username: user.email,
+                email: user.email,
                 rol: user.rol,
                 activo: user.activo,
                 ultimo_acceso: user.ultimo_login,
@@ -390,7 +388,7 @@ router.post('/change-password', authenticateToken, async (req, res) => {
             .eq('id', req.user.id);
 
         // Registrar auditoría
-        await auditFromRequest(req, AUDIT_TYPES.PASSWORD_CHANGE, { username: req.user.username });
+        await auditFromRequest(req, AUDIT_TYPES.PASSWORD_CHANGE, { email: req.user.email });
 
         res.json({
             success: true,

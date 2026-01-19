@@ -31,7 +31,7 @@ const Dashboard = () => {
                             Sistema Clínico VR
                         </span>
                     </div>
-                    
+
                     <div className="flex items-center gap-4">
                         <div className="flex items-center gap-2">
                             <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center">
@@ -40,7 +40,7 @@ const Dashboard = () => {
                                 </span>
                             </div>
                             <span className="text-white font-medium">
-                                {user?.nombre || user?.username}
+                                {user?.nombre || user?.email}
                             </span>
                         </div>
                         <button
@@ -59,7 +59,7 @@ const Dashboard = () => {
             <main className="max-w-7xl mx-auto px-4 py-8">
                 <div className="bg-white rounded-2xl shadow-sm p-8">
                     <h1 className="text-2xl font-bold text-gray-800 mb-4">
-                        Bienvenido, {user?.nombre || user?.username}
+                        Bienvenido, {user?.nombre || user?.email}
                     </h1>
                     <p className="text-gray-600 mb-6">
                         Has iniciado sesión exitosamente en el Sistema Clínico VR.
@@ -72,8 +72,8 @@ const Dashboard = () => {
                         </h2>
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <p className="text-sm text-gray-500">Usuario</p>
-                                <p className="font-medium text-gray-800">{user?.username}</p>
+                                <p className="text-sm text-gray-500">Email</p>
+                                <p className="font-medium text-gray-800">{user?.email}</p>
                             </div>
                             <div>
                                 <p className="text-sm text-gray-500">Rol</p>

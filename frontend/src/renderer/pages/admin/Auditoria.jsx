@@ -254,7 +254,7 @@ const Auditoria = () => {
                                                 />
                                             </td>
                                             <td className="py-3 pr-4 text-sm text-gray-900">
-                                                {event.actor_username || 'sistema'}
+                                                {event.actor_email || 'sistema'}
                                             </td>
                                             <td className="py-3 pr-4 text-sm text-gray-500 font-mono">
                                                 {event.ip_origen || 'localhost'}

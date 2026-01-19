@@ -52,16 +52,16 @@ export const AuthProvider = ({ children }) => {
 
     /**
      * Iniciar sesión
-     * @param {string} username - Nombre de usuario
+     * @param {string} email - Correo electrónico
      * @param {string} password - Contraseña
      */
-    const login = async (username, password) => {
-        const result = await authService.login(username, password);
-        
+    const login = async (email, password) => {
+        const result = await authService.login(email, password);
+
         if (result.success) {
             setUser(result.data.user);
         }
-        
+
         return result;
     };
 

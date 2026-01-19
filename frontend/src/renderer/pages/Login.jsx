@@ -14,16 +14,23 @@ const isAdminRole = (rol) => {
 };
 
 /**
+ * Verificar si el rol es de terapeuta
+ */
+const isTherapistRole = (rol) => {
+    return rol?.toLowerCase() === 'terapeuta';
+};
+
+/**
  * Página de Login
  * Basada en el mockup proporcionado
  */
 const Login = () => {
     const navigate = useNavigate();
     const { login, isAuthenticated, user } = useAuth();
-    
+
     // Estado del formulario
     const [formData, setFormData] = useState({
-        username: '',
+        email: '',
         password: ''
     });
     const [error, setError] = useState('');
@@ -35,6 +42,8 @@ const Login = () => {
             // Redirigir según el rol
             if (isAdminRole(user.rol)) {
                 navigate('/admin/terapeutas');
+            } else if (isTherapistRole(user.rol)) {
+                navigate('/terapeuta');
             } else {
                 navigate('/dashboard');
             }
@@ -62,8 +71,12 @@ const Login = () => {
         setError('');
 
         // Validaciones básicas
-        if (!formData.username.trim()) {
-            setError('El usuario es requerido');
+        if (!formData.email.trim()) {
+            setError('El correo electrónico es requerido');
+            return;
+        }
+        if (!formData.email.includes('@')) {
+            setError('Ingrese un correo electrónico válido');
             return;
         }
         if (!formData.password) {
@@ -74,13 +87,15 @@ const Login = () => {
         setLoading(true);
 
         try {
-            const result = await login(formData.username, formData.password);
-            
+            const result = await login(formData.email, formData.password);
+
             if (result.success) {
                 // Redirigir según el rol del usuario
                 const userRole = result.data?.user?.rol;
                 if (isAdminRole(userRole)) {
                     navigate('/admin/terapeutas');
+                } else if (isTherapistRole(userRole)) {
+                    navigate('/terapeuta');
                 } else {
                     navigate('/dashboard');
                 }
@@ -114,16 +129,17 @@ const Login = () => {
                 {/* Card del formulario */}
                 <div className="bg-white rounded-2xl shadow-xl p-8">
                     <form onSubmit={handleSubmit} className="space-y-6">
-                        {/* Campo Usuario */}
+                        {/* Campo Correo Electrónico */}
                         <Input
-                            name="username"
-                            label="Usuario"
+                            name="email"
+                            type="email"
+                            label="Correo Electrónico"
                             placeholder="nombre@clinica.com"
-                            value={formData.username}
+                            value={formData.email}
                             onChange={handleChange}
                             icon={
                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                                 </svg>
                             }
                         />

@@ -59,11 +59,10 @@ const Icons = {
  * Badge de estado
  */
 const StatusBadge = ({ active }) => (
-    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-        active 
-            ? 'bg-green-100 text-green-700' 
-            : 'bg-gray-100 text-gray-500'
-    }`}>
+    <span className={`px-3 py-1 rounded-full text-xs font-medium ${active
+        ? 'bg-green-100 text-green-700'
+        : 'bg-gray-100 text-gray-500'
+        }`}>
         {active ? 'Activo' : 'Inactivo'}
     </span>
 );
@@ -76,9 +75,9 @@ const ActionButton = ({ icon: Icon, onClick, title, variant = 'default', disable
         default: 'text-gray-500 hover:text-gray-700 hover:bg-gray-100',
         danger: 'text-gray-500 hover:text-red-600 hover:bg-red-50'
     };
-    
+
     return (
-        <button 
+        <button
             onClick={onClick}
             title={title}
             disabled={disabled}
@@ -134,15 +133,15 @@ const GestionTerapeutas = () => {
 
     // Filtrar terapeutas
     const filteredTherapists = therapists.filter(t => {
-        const matchesSearch = 
+        const matchesSearch =
             (t.usuario || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
             (t.nombre || '').toLowerCase().includes(searchTerm.toLowerCase());
-        
-        const matchesFilter = 
+
+        const matchesFilter =
             filter === 'todos' ||
             (filter === 'activos' && t.activo) ||
             (filter === 'inactivos' && !t.activo);
-        
+
         return matchesSearch && matchesFilter;
     });
 
@@ -164,13 +163,12 @@ const GestionTerapeutas = () => {
         setActionLoading(true);
         try {
             const result = await therapistService.create({
-                nombre: `${data.nombre} ${data.apellido || ''}`.trim(),
+                nombre: data.nombre,
                 correo: data.correo,
-                username: data.username,
                 password: data.password,
                 especialidad: 'General'
             });
-            
+
             if (result.success) {
                 await fetchTherapists(); // Recargar lista
             } else {
@@ -195,7 +193,7 @@ const GestionTerapeutas = () => {
                 nombre: `${data.nombre} ${data.apellido || ''}`.trim(),
                 correo: data.correo
             });
-            
+
             if (result.success) {
                 await fetchTherapists();
             } else {
@@ -248,13 +246,15 @@ const GestionTerapeutas = () => {
         setActionLoading(true);
         try {
             // Crear asignaciones de pacientes
-            const assignments = data.patients.map(patientId => ({
+            // Crear asignaciones de pacientes
+            const assignments = data.patients.map((patientId, index) => ({
                 patientId,
-                therapistId: data.manualAssignments?.[patientId] || data.targetTherapists[0]
+                therapistId: data.manualAssignments?.[patientId] ||
+                    data.targetTherapists[index % data.targetTherapists.length]
             }));
-            
+
             const reassignResult = await therapistService.reassignPatients(assignments);
-            
+
             if (reassignResult.success) {
                 // Desactivar el terapeuta
                 await therapistService.toggleStatus(data.therapistId);
@@ -267,7 +267,7 @@ const GestionTerapeutas = () => {
         } finally {
             setActionLoading(false);
         }
-    }; 
+    };
 
     return (
         <AdminLayout>
@@ -309,11 +309,10 @@ const GestionTerapeutas = () => {
                                 <button
                                     key={f}
                                     onClick={() => setFilter(f)}
-                                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors capitalize ${
-                                        filter === f
-                                            ? 'bg-white text-gray-900 shadow-sm'
-                                            : 'text-gray-600 hover:text-gray-900'
-                                    }`}
+                                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors capitalize ${filter === f
+                                        ? 'bg-white text-gray-900 shadow-sm'
+                                        : 'text-gray-600 hover:text-gray-900'
+                                        }`}
                                 >
                                     {f === 'todos' ? 'Todos' : f === 'activos' ? 'Activos' : 'Inactivos'}
                                 </button>
@@ -343,74 +342,68 @@ const GestionTerapeutas = () => {
                             <div className="animate-spin rounded-full h-10 w-10 border-4 border-[#F76C6C] border-t-transparent"></div>
                         </div>
                     ) : (
-                    /* Table */
-                    <div className="overflow-x-auto">
-                        <table className="w-full">
-                            <thead>
-                                <tr className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider border-b border-gray-200">
-                                    <th className="pb-4 pr-4">Usuario</th>
-                                    <th className="pb-4 pr-4">Nombre</th>
-                                    <th className="pb-4 pr-4">Correo</th>
-                                    <th className="pb-4 pr-4 text-center">Pacientes</th>
-                                    <th className="pb-4 pr-4">Estado</th>
-                                    <th className="pb-4 text-center">Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {paginatedTherapists.map((therapist) => (
-                                    <tr key={therapist.id} className="hover:bg-gray-50">
-                                        <td className="py-4 pr-4">
-                                            <span className="font-medium text-gray-900">
-                                                {therapist.usuario}
-                                            </span>
-                                        </td>
-                                        <td className="py-4 pr-4 text-gray-700">
-                                            {therapist.nombre}
-                                        </td>
-                                        <td className="py-4 pr-4 text-gray-500">
-                                            {therapist.correo}
-                                        </td>
-                                        <td className="py-4 pr-4 text-center">
-                                            <span className="font-medium text-gray-900">
-                                                {therapist.pacientes}
-                                            </span>
-                                        </td>
-                                        <td className="py-4 pr-4">
-                                            <StatusBadge active={therapist.activo} />
-                                        </td>
-                                        <td className="py-4">
-                                            <div className="flex items-center justify-center gap-1">
-                                                <ActionButton 
-                                                    icon={Icons.Edit} 
-                                                    onClick={() => handleEdit(therapist)}
-                                                    title="Editar"
-                                                />
-                                                <ActionButton 
-                                                    icon={Icons.View} 
-                                                    onClick={() => handleView(therapist)}
-                                                    title="Ver detalles"
-                                                />
-                                                <ActionButton 
-                                                    icon={Icons.Power} 
-                                                    onClick={() => handleToggleStatus(therapist)}
-                                                    title={therapist.activo ? 'Desactivar' : 'Activar'}
-                                                    variant="danger"
-                                                />
-                                                <ActionButton 
-                                                    icon={Icons.Key} 
-                                                    onClick={() => {
-                                                        setSelectedTherapist(therapist);
-                                                        setShowResetModal(true);
-                                                    }}
-                                                    title="Resetear contraseña"
-                                                />
-                                            </div>
-                                        </td>
+                        /* Table */
+                        <div className="overflow-x-auto">
+                            <table className="w-full">
+                                <thead>
+                                    <tr className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                                        <th className="pb-4 pr-4">Nombre</th>
+                                        <th className="pb-4 pr-4">Correo</th>
+                                        <th className="pb-4 pr-4 text-center">Pacientes</th>
+                                        <th className="pb-4 pr-4">Estado</th>
+                                        <th className="pb-4 text-center">Acciones</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                    {paginatedTherapists.map((therapist) => (
+                                        <tr key={therapist.id} className="hover:bg-gray-50">
+                                            <td className="py-4 pr-4 text-gray-700">
+                                                {therapist.nombre}
+                                            </td>
+                                            <td className="py-4 pr-4 text-gray-500">
+                                                {therapist.correo}
+                                            </td>
+                                            <td className="py-4 pr-4 text-center">
+                                                <span className="font-medium text-gray-900">
+                                                    {therapist.pacientes}
+                                                </span>
+                                            </td>
+                                            <td className="py-4 pr-4">
+                                                <StatusBadge active={therapist.activo} />
+                                            </td>
+                                            <td className="py-4">
+                                                <div className="flex items-center justify-center gap-1">
+                                                    <ActionButton
+                                                        icon={Icons.Edit}
+                                                        onClick={() => handleEdit(therapist)}
+                                                        title="Editar"
+                                                    />
+                                                    <ActionButton
+                                                        icon={Icons.View}
+                                                        onClick={() => handleView(therapist)}
+                                                        title="Ver detalles"
+                                                    />
+                                                    <ActionButton
+                                                        icon={Icons.Power}
+                                                        onClick={() => handleToggleStatus(therapist)}
+                                                        title={therapist.activo ? 'Desactivar' : 'Activar'}
+                                                        variant="danger"
+                                                    />
+                                                    <ActionButton
+                                                        icon={Icons.Key}
+                                                        onClick={() => {
+                                                            setSelectedTherapist(therapist);
+                                                            setShowResetModal(true);
+                                                        }}
+                                                        title="Resetear contraseña"
+                                                    />
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     )}
 
                     {/* Pagination */}
@@ -430,11 +423,10 @@ const GestionTerapeutas = () => {
                                 <button
                                     key={i + 1}
                                     onClick={() => setCurrentPage(i + 1)}
-                                    className={`w-9 h-9 rounded-lg text-sm font-medium transition-colors ${
-                                        currentPage === i + 1
-                                            ? 'bg-[#F76C6C] text-white'
-                                            : 'text-gray-600 hover:bg-gray-100'
-                                    }`}
+                                    className={`w-9 h-9 rounded-lg text-sm font-medium transition-colors ${currentPage === i + 1
+                                        ? 'bg-[#F76C6C] text-white'
+                                        : 'text-gray-600 hover:bg-gray-100'
+                                        }`}
                                 >
                                     {i + 1}
                                 </button>

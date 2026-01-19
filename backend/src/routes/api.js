@@ -94,10 +94,10 @@ router.get('/patients', authenticateToken, requireTerapeuta, async (req, res) =>
                 .from('terapeuta_paciente')
                 .select('id_paciente')
                 .eq('id_terapeuta', req.user.id_terapeuta);
-            
+
             if (assignError) throw assignError;
             patientIds = assignments.map(a => a.id_paciente);
-            
+
             // Si no tiene pacientes, devolver array vacío
             if (patientIds.length === 0) {
                 return res.json({ success: true, data: [] });
@@ -132,7 +132,7 @@ router.get('/patients', authenticateToken, requireTerapeuta, async (req, res) =>
         const { data: allAssignments, error: assigError } = await supabase
             .from('terapeuta_paciente')
             .select('id_paciente, id_terapeuta, terapeutas(nombre)');
-        
+
         if (assigError) throw assigError;
 
         // Mapear terapeutas a pacientes
@@ -184,7 +184,7 @@ router.get('/patients/:id', authenticateToken, requireTerapeuta, async (req, res
                 .eq('id_paciente', id)
                 .eq('id_terapeuta', req.user.id_terapeuta)
                 .single();
-            
+
             if (!assignment) {
                 return res.status(403).json({
                     success: false,
@@ -486,7 +486,7 @@ router.get('/sessions', authenticateToken, requireTerapeuta, async (req, res) =>
                 .from('terapeuta_paciente')
                 .select('id_paciente')
                 .eq('id_terapeuta', req.user.id_terapeuta);
-            
+
             patientIds = assignments?.map(a => a.id_paciente) || [];
             if (patientIds.length === 0) {
                 return res.json({ success: true, data: [] });
@@ -849,7 +849,7 @@ router.get('/patients/:id/report', authenticateToken, requireTerapeuta, async (r
                 .eq('id_paciente', id)
                 .eq('id_terapeuta', req.user.id_terapeuta)
                 .single();
-            
+
             if (!assignment) {
                 return res.status(403).json({ success: false, error: 'Sin acceso a este paciente' });
             }
@@ -871,7 +871,7 @@ router.get('/patients/:id/report', authenticateToken, requireTerapeuta, async (r
                 fecha_fin,
                 estado,
                 actividad_juego(nombre, nivel_dificultad),
-                resumen_sesion(total_aciertos, total_errores, total_omisiones, tiempo_total_seg, observaciones)
+                resumen_sesion(total_aciertos, total_errores, tiempo_total_seg, observaciones)
             `)
             .eq('id_paciente', id)
             .order('fecha_inicio', { ascending: false });
@@ -888,7 +888,9 @@ router.get('/patients/:id/report', authenticateToken, requireTerapeuta, async (r
             estado: s.estado,
             total_aciertos: s.resumen_sesion?.total_aciertos || 0,
             total_errores: s.resumen_sesion?.total_errores || 0,
-            total_omisiones: s.resumen_sesion?.total_omisiones || 0,
+            // TODO: Descomentar cuando la columna exista en BD
+            // total_omisiones: s.resumen_sesion?.total_omisiones || 0,
+            total_omisiones: 0,
             tiempo_total_seg: s.resumen_sesion?.tiempo_total_seg || 0,
             observaciones: s.resumen_sesion?.observaciones
         }));
@@ -954,7 +956,7 @@ router.get('/terapeutas', async (req, res) => {
             especialidad: t.especialidad,
             correo: t.correo,
             telefono: t.telefono,
-            username: t.usuarios?.email,
+            email: t.usuarios?.email,
             activo: t.usuarios?.activo
         }));
 

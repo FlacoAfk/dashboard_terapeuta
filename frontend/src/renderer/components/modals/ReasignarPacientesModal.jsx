@@ -41,13 +41,12 @@ const Icons = {
  * Checkbox personalizado
  */
 const Checkbox = ({ checked, onChange, className = '' }) => (
-    <div 
+    <div
         onClick={onChange}
-        className={`w-5 h-5 rounded border-2 flex items-center justify-center cursor-pointer transition-colors ${
-            checked 
-                ? 'bg-[#F76C6C] border-[#F76C6C] text-white' 
-                : 'border-gray-300 hover:border-[#F76C6C]'
-        } ${className}`}
+        className={`w-5 h-5 rounded border-2 flex items-center justify-center cursor-pointer transition-colors ${checked
+            ? 'bg-[#F76C6C] border-[#F76C6C] text-white'
+            : 'border-gray-300 hover:border-[#F76C6C]'
+            } ${className}`}
     >
         {checked && <Icons.Check />}
     </div>
@@ -58,11 +57,10 @@ const Checkbox = ({ checked, onChange, className = '' }) => (
  */
 const RadioButton = ({ checked, onChange, label }) => (
     <label className="flex items-center gap-3 cursor-pointer group" onClick={onChange}>
-        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
-            checked 
-                ? 'border-[#F76C6C]' 
-                : 'border-gray-300 group-hover:border-[#F76C6C]'
-        }`}>
+        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${checked
+            ? 'border-[#F76C6C]'
+            : 'border-gray-300 group-hover:border-[#F76C6C]'
+            }`}>
             {checked && (
                 <div className="w-2.5 h-2.5 rounded-full bg-[#F76C6C]" />
             )}
@@ -75,10 +73,10 @@ const RadioButton = ({ checked, onChange, label }) => (
  * Modal para reasignar pacientes antes de desactivar terapeuta
  * Cumple con RF-SEG-02: No se puede eliminar terapeuta con pacientes activos
  */
-const ReasignarPacientesModal = ({ 
-    isOpen, 
-    onClose, 
-    onSubmit, 
+const ReasignarPacientesModal = ({
+    isOpen,
+    onClose,
+    onSubmit,
     therapist,
     patients = [],
     availableTherapists = []
@@ -97,12 +95,12 @@ const ReasignarPacientesModal = ({
         }
     }, [isOpen, patients]);
 
-    const filteredTherapists = availableTherapists.filter(t => 
+    const filteredTherapists = availableTherapists.filter(t =>
         t.nombre.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     const handlePatientToggle = (patientId) => {
-        setSelectedPatients(prev => 
+        setSelectedPatients(prev =>
             prev.includes(patientId)
                 ? prev.filter(id => id !== patientId)
                 : [...prev, patientId]
@@ -110,7 +108,7 @@ const ReasignarPacientesModal = ({
     };
 
     const handleTherapistToggle = (therapistId) => {
-        setSelectedTherapists(prev => 
+        setSelectedTherapists(prev =>
             prev.includes(therapistId)
                 ? prev.filter(id => id !== therapistId)
                 : [...prev, therapistId]
@@ -162,8 +160,8 @@ const ReasignarPacientesModal = ({
         onClose();
     };
 
-    const canSubmit = selectedPatients.length > 0 && 
-        (assignmentType === 'manual' 
+    const canSubmit = selectedPatients.length > 0 &&
+        (assignmentType === 'manual'
             ? Object.keys(manualAssignments).length === selectedPatients.length
             : selectedTherapists.length > 0
         );
@@ -178,7 +176,7 @@ const ReasignarPacientesModal = ({
                 {/* Warning Alert */}
                 <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
                     <p className="text-sm text-amber-800">
-                        Este terapeuta tiene <strong>{patients.length} pacientes</strong> asignados. 
+                        Este terapeuta tiene <strong>{patients.length} pacientes</strong> asignados.
                         Debes reasignarlos a otros terapeutas activos antes de proceder con la desactivación.
                     </p>
                 </div>
@@ -193,13 +191,13 @@ const ReasignarPacientesModal = ({
                             </span>
                         </div>
                         <div className="flex items-center gap-2 text-sm">
-                            <button 
+                            <button
                                 onClick={handleSelectAll}
                                 className="text-teal-600 hover:text-teal-700 font-medium"
                             >
                                 Seleccionar todos
                             </button>
-                            <button 
+                            <button
                                 onClick={handleDeselectAll}
                                 className="text-gray-500 hover:text-gray-700"
                             >
@@ -210,7 +208,7 @@ const ReasignarPacientesModal = ({
 
                     <div className="border border-gray-200 rounded-lg divide-y divide-gray-100 max-h-48 overflow-y-auto">
                         {patients.map(patient => (
-                            <div 
+                            <div
                                 key={patient.id}
                                 className="flex items-center justify-between px-4 py-3 hover:bg-gray-50"
                             >
@@ -231,7 +229,7 @@ const ReasignarPacientesModal = ({
                                     >
                                         <option value="">Manual: Seleccionar..</option>
                                         {availableTherapists.map(t => (
-                                            <option key={t.id} value={t.id}>{t.nombre}</option>
+                                            <option key={t.id} value={t.id_terapeuta}>{t.nombre}</option>
                                         ))}
                                     </select>
                                 )}
@@ -267,14 +265,14 @@ const ReasignarPacientesModal = ({
                         {/* Lista de terapeutas */}
                         <div className="border border-gray-200 rounded-lg divide-y divide-gray-100 max-h-40 overflow-y-auto">
                             {filteredTherapists.map(t => (
-                                <div 
+                                <div
                                     key={t.id}
                                     className="flex items-center justify-between px-4 py-3 hover:bg-gray-50"
                                 >
                                     <div className="flex items-center gap-3">
                                         <Checkbox
-                                            checked={selectedTherapists.includes(t.id)}
-                                            onChange={() => handleTherapistToggle(t.id)}
+                                            checked={selectedTherapists.includes(t.id_terapeuta)}
+                                            onChange={() => handleTherapistToggle(t.id_terapeuta)}
                                         />
                                         <span className="text-sm text-gray-900">{t.nombre}</span>
                                     </div>
@@ -314,13 +312,13 @@ const ReasignarPacientesModal = ({
                             <Icons.Info />
                         </div>
                         <p className="text-xs text-gray-500">
-                            {assignmentType === 'distribute' && 
+                            {assignmentType === 'distribute' &&
                                 'La distribución equitativa asignará los pacientes seleccionados balanceando la carga actual de los terapeutas destino seleccionados.'
                             }
-                            {assignmentType === 'single' && 
+                            {assignmentType === 'single' &&
                                 'Todos los pacientes serán asignados al terapeuta seleccionado. Selecciona solo un terapeuta destino.'
                             }
-                            {assignmentType === 'manual' && 
+                            {assignmentType === 'manual' &&
                                 'Selecciona manualmente a qué terapeuta quieres asignar cada paciente usando los selectores de la lista.'
                             }
                         </p>

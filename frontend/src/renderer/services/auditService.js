@@ -82,7 +82,7 @@ const auditService = {
         const rows = events.map(e => {
             const fecha = e.timestamp ? new Date(e.timestamp).toLocaleString('es-CO') : '';
             const tipo = e.tipo_label || e.tipo_evento || '';
-            const usuario = e.actor_username || 'sistema';
+            const usuario = e.actor_email || 'sistema';
             const ip = e.ip_origen || 'localhost';
             const detalles = e.detalle_texto || '';
 

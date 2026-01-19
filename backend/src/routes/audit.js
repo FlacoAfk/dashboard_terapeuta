@@ -121,14 +121,14 @@ router.get('/', authenticateToken, requireSuperAdmin, async (req, res) => {
             const userInfo = usersMap[a.id_usuario] || {};
 
             // Extraer campos especiales de la descripción
-            const { _actor_username, _ip_origen, _tipo_label, ...detalleClean } = descripcionObj;
+            const { _actor_email, _ip_origen, _tipo_label, ...detalleClean } = descripcionObj;
 
             return {
                 id: a.id,
                 tipo_evento: a.tipo_accion,
                 tipo_label: _tipo_label || AUDIT_TYPE_LABELS[a.tipo_accion] || a.tipo_accion,
                 id_usuario: a.id_usuario,
-                actor_username: _actor_username || userInfo.email || 'sistema',
+                actor_email: _actor_email || userInfo.email || 'sistema',
                 actor_nombre: userInfo.nombre || null,
                 ip_origen: _ip_origen || 'localhost',
                 detalle: Object.keys(detalleClean).length > 0 ? detalleClean : null,
@@ -199,7 +199,7 @@ router.get('/user/:id', authenticateToken, requireSuperAdmin, async (req, res) =
 
         const formattedData = data.map(a => {
             const descripcionObj = parseDescripcion(a.descripcion);
-            const { _actor_username, _ip_origen, _tipo_label, ...detalleClean } = descripcionObj;
+            const { _actor_email, _ip_origen, _tipo_label, ...detalleClean } = descripcionObj;
 
             return {
                 id: a.id,
@@ -309,13 +309,13 @@ router.get('/export', authenticateToken, requireSuperAdmin, async (req, res) => 
         const headers = ['ID', 'Fecha', 'Tipo', 'Usuario', 'IP', 'Detalles'];
         const rows = auditData.map(a => {
             const descripcionObj = parseDescripcion(a.descripcion);
-            const { _actor_username, _ip_origen, _tipo_label, ...detalleClean } = descripcionObj;
+            const { _actor_email, _ip_origen, _tipo_label, ...detalleClean } = descripcionObj;
 
             return [
                 a.id,
                 new Date(a.fecha).toLocaleString('es-CO'),
                 _tipo_label || AUDIT_TYPE_LABELS[a.tipo_accion] || a.tipo_accion,
-                _actor_username || usersMap[a.id_usuario] || 'sistema',
+                _actor_email || usersMap[a.id_usuario] || 'sistema',
                 _ip_origen || 'localhost',
                 Object.keys(detalleClean).length > 0 ? JSON.stringify(detalleClean) : ''
             ];
