@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import Modal from '../ui/Modal';
+import PasswordStrengthIndicator, { validatePassword } from '../ui/PasswordStrengthIndicator';
 
 /**
  * Iconos SVG
@@ -81,13 +82,10 @@ const CrearTerapeutaModal = ({ isOpen, onClose, onSubmit }) => {
             newErrors.correo = 'Correo electrónico inválido';
         }
 
-        // Contraseña: mínimo 8 caracteres y 1 mayúscula
-        if (!formData.password) {
-            newErrors.password = 'La contraseña es requerida';
-        } else if (formData.password.length < 8) {
-            newErrors.password = 'Mínimo 8 caracteres';
-        } else if (!/[A-Z]/.test(formData.password)) {
-            newErrors.password = 'Debe contener al menos 1 mayúscula';
+        // Contraseña: usar validación robusta (RF-SEG-01)
+        const passwordError = validatePassword(formData.password);
+        if (passwordError) {
+            newErrors.password = passwordError;
         }
 
         // Nombre
@@ -214,6 +212,7 @@ const CrearTerapeutaModal = ({ isOpen, onClose, onSubmit }) => {
                                     {showPassword ? <Icons.EyeOff /> : <Icons.Eye />}
                                 </button>
                             </div>
+                            <PasswordStrengthIndicator password={formData.password} showRequirements={true} />
                         </FormField>
 
                         <p className="text-xs text-gray-400">* Campos obligatorios</p>

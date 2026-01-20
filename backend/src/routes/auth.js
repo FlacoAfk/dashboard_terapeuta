@@ -15,6 +15,67 @@ const { generateToken, authenticateToken } = require('../middleware/authMiddlewa
 const { auditFromRequest, auditLogin, auditWithUser, AUDIT_TYPES } = require('../utils/auditHelper');
 
 /**
+ * ========================================
+ * SISTEMA DE BLOQUEO DE CUENTA
+ * ========================================
+ * RF-SEG-01: Bloqueo después de 5 intentos fallidos
+ */
+const loginAttempts = new Map(); // email -> { count, lockedUntil }
+const MAX_ATTEMPTS = 5;
+const LOCK_DURATION_MS = 15 * 60 * 1000; // 15 minutos
+
+/**
+ * Verificar si una cuenta está bloqueada
+ */
+const isAccountLocked = (email) => {
+    const attempt = loginAttempts.get(email);
+    if (!attempt) return false;
+
+    if (attempt.lockedUntil && Date.now() < attempt.lockedUntil) {
+        return true;
+    }
+
+    // Si el bloqueo expiró, resetear intentos
+    if (attempt.lockedUntil && Date.now() >= attempt.lockedUntil) {
+        loginAttempts.delete(email);
+    }
+
+    return false;
+};
+
+/**
+ * Registrar intento fallido de login
+ */
+const recordFailedAttempt = (email) => {
+    const attempt = loginAttempts.get(email) || { count: 0, lockedUntil: null };
+    attempt.count += 1;
+
+    if (attempt.count >= MAX_ATTEMPTS) {
+        attempt.lockedUntil = Date.now() + LOCK_DURATION_MS;
+    }
+
+    loginAttempts.set(email, attempt);
+    return attempt;
+};
+
+/**
+ * Resetear intentos al login exitoso
+ */
+const resetAttempts = (email) => {
+    loginAttempts.delete(email);
+};
+
+/**
+ * Obtener tiempo restante de bloqueo
+ */
+const getLockTimeRemaining = (email) => {
+    const attempt = loginAttempts.get(email);
+    if (!attempt || !attempt.lockedUntil) return 0;
+    const remaining = Math.ceil((attempt.lockedUntil - Date.now()) / 1000 / 60);
+    return remaining > 0 ? remaining : 0;
+};
+
+/**
  * @swagger
  * /api/auth/login:
  *   post:
@@ -35,6 +96,8 @@ const { auditFromRequest, auditLogin, auditWithUser, AUDIT_TYPES } = require('..
  *         description: Login exitoso
  *       401:
  *         description: Credenciales inválidas
+ *       423:
+ *         description: Cuenta bloqueada temporalmente
  */
 router.post('/login', async (req, res) => {
     const { email, password } = req.body;
@@ -43,6 +106,18 @@ router.post('/login', async (req, res) => {
         return res.status(400).json({
             success: false,
             error: 'Email y password son requeridos'
+        });
+    }
+
+    // Verificar si la cuenta está bloqueada
+    if (isAccountLocked(email)) {
+        const remainingMinutes = getLockTimeRemaining(email);
+        await auditLogin(req, AUDIT_TYPES.LOGIN_FAILED, email, { reason: 'Cuenta bloqueada', remainingMinutes });
+        return res.status(423).json({
+            success: false,
+            error: `Cuenta bloqueada por demasiados intentos fallidos. Intente nuevamente en ${remainingMinutes} minutos.`,
+            code: 'ACCOUNT_LOCKED',
+            remainingMinutes
         });
     }
 
@@ -55,6 +130,7 @@ router.post('/login', async (req, res) => {
             .single();
 
         if (userError || !userData) {
+            recordFailedAttempt(email);
             await auditLogin(req, AUDIT_TYPES.LOGIN_FAILED, email, { reason: 'Usuario no encontrado' });
             return res.status(401).json({
                 success: false,
@@ -87,10 +163,26 @@ router.post('/login', async (req, res) => {
         // Verificar contraseña
         const validPassword = await bcrypt.compare(password, user.password_hash);
         if (!validPassword) {
-            await auditLogin(req, AUDIT_TYPES.LOGIN_FAILED, email, { reason: 'Contraseña incorrecta' });
+            const attempt = recordFailedAttempt(email);
+            const attemptsRemaining = MAX_ATTEMPTS - attempt.count;
+            await auditLogin(req, AUDIT_TYPES.LOGIN_FAILED, email, { reason: 'Contraseña incorrecta', attemptsRemaining });
+
+            let errorMessage = 'Credenciales inválidas';
+            if (attemptsRemaining > 0 && attemptsRemaining <= 2) {
+                errorMessage += `. Intentos restantes: ${attemptsRemaining}`;
+            } else if (attemptsRemaining <= 0) {
+                const remainingMinutes = getLockTimeRemaining(email);
+                return res.status(423).json({
+                    success: false,
+                    error: `Cuenta bloqueada por demasiados intentos fallidos. Intente nuevamente en ${remainingMinutes} minutos.`,
+                    code: 'ACCOUNT_LOCKED',
+                    remainingMinutes
+                });
+            }
+
             return res.status(401).json({
                 success: false,
-                error: 'Credenciales inválidas'
+                error: errorMessage
             });
         }
 
@@ -107,6 +199,9 @@ router.post('/login', async (req, res) => {
             rol: user.rol,
             id_terapeuta: user.id_terapeuta
         });
+
+        // Login exitoso: resetear intentos fallidos
+        resetAttempts(email);
 
         // Registrar auditoría con usuario autenticado
         await auditWithUser(req, AUDIT_TYPES.LOGIN_SUCCESS, user, { email });
@@ -436,6 +531,72 @@ router.get('/check-setup', async (req, res) => {
 
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * @swagger
+ * /api/auth/forgot-password:
+ *   post:
+ *     summary: Solicitar restablecimiento de contraseña
+ *     tags: [Autenticación]
+ *     description: |
+ *       Envía instrucciones para restablecer la contraseña.
+ *       Por seguridad, siempre devuelve éxito sin importar si el email existe.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email]
+ *             properties:
+ *               email: { type: string, example: "usuario@clinica.com" }
+ *     responses:
+ *       200:
+ *         description: Instrucciones enviadas (si el email existe)
+ */
+router.post('/forgot-password', async (req, res) => {
+    const { email } = req.body;
+
+    if (!email) {
+        return res.status(400).json({
+            success: false,
+            error: 'El email es requerido'
+        });
+    }
+
+    try {
+        // Buscar usuario
+        const { data: user } = await supabase
+            .from('usuarios')
+            .select('id, email')
+            .eq('email', email)
+            .single();
+
+        if (user) {
+            // En una implementación real, aquí se enviaría un email con un token de reset
+            // Por ahora, solo registramos en auditoría
+            await auditFromRequest(req, AUDIT_TYPES.PASSWORD_RESET_REQUEST || 'PASSWORD_RESET_REQUEST', {
+                email,
+                message: 'Solicitud de restablecimiento de contraseña'
+            });
+
+            console.log(`📧 Solicitud de reset de contraseña para: ${email}`);
+        }
+
+        // Por seguridad, siempre devolvemos éxito
+        res.json({
+            success: true,
+            message: 'Si el email existe, recibirá instrucciones para restablecer su contraseña'
+        });
+
+    } catch (error) {
+        // Por seguridad, no revelamos errores específicos
+        res.json({
+            success: true,
+            message: 'Si el email existe, recibirá instrucciones para restablecer su contraseña'
+        });
     }
 });
 

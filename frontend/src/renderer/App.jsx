@@ -2,6 +2,8 @@ import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
+import SetupPage from './pages/SetupPage';
+import ForgotPassword from './pages/ForgotPassword';
 import { GestionTerapeutas, Auditoria } from './pages/admin';
 import { DashboardTerapeuta, DetallePaciente } from './pages/terapeuta';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -97,8 +99,14 @@ function App() {
     return (
         <AuthProvider>
             <Routes>
+                {/* Ruta de setup inicial (RF-SEG-01) */}
+                <Route path="/setup" element={<SetupPage />} />
+                
                 {/* Ruta de login */}
                 <Route path="/login" element={<Login />} />
+                
+                {/* Ruta de recuperación de contraseña */}
+                <Route path="/forgot-password" element={<ForgotPassword />} />
 
                 {/* Rutas protegidas - Dashboard general */}
                 <Route

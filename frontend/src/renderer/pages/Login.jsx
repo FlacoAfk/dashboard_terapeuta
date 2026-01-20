@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
@@ -178,12 +178,22 @@ const Login = () => {
                             Iniciar Sesión
                         </Button>
                     </form>
+                    
+                    {/* Link olvidé mi contraseña */}
+                    <div className="mt-4 text-center">
+                        <Link 
+                            to="/forgot-password" 
+                            className="text-sm text-teal-600 hover:underline"
+                        >
+                            ¿Olvidó su contraseña?
+                        </Link>
+                    </div>
                 </div>
             </div>
 
             {/* Versión */}
             <div className="absolute bottom-4 right-4 text-gray-500 text-sm">
-                v1.0.0
+                v1.3.0
             </div>
         </div>
     );

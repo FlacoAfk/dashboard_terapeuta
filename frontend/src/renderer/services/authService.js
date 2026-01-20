@@ -68,9 +68,38 @@ const authService = {
     async checkSetup() {
         try {
             const response = await api.get('/api/auth/check-setup');
-            return response.data;
+            return response.data || response;
         } catch (error) {
-            return { configured: false };
+            return { setupComplete: false };
+        }
+    },
+
+    /**
+     * Crear superadministrador inicial (RF-SEG-01)
+     * Solo funciona una vez durante la instalación
+     * @param {object} data - { nombre, correo, password }
+     * @returns {Promise<{success: boolean, data?: object, error?: string}>}
+     */
+    async setup(data) {
+        try {
+            const response = await api.post('/api/auth/setup', data);
+
+            if (response.success && response.data?.token) {
+                return {
+                    success: true,
+                    data: response.data
+                };
+            }
+
+            return {
+                success: false,
+                error: response.error || 'Error al crear superadministrador'
+            };
+        } catch (error) {
+            return {
+                success: false,
+                error: error.message || 'Error de conexión'
+            };
         }
     },
 
