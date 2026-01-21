@@ -555,12 +555,19 @@ Swagger UI disponible en: **http://localhost:3001/api-docs**
 | RF-SEG-01 | Superadministrador único | ✅ |
 | RF-SEG-02 | Gestión de terapeutas | ✅ |
 | RF-SEG-03 | Permisos de terapeuta | ✅ |
-| RF-SEG-04 | Interfaz visual terapeuta | ✅ (API lista) |
+| RF-SEG-04 | Interfaz visual terapeuta | ✅ (API lista, UI Limpia) |
 | RF-BDD-01 | Estructura de usuarios | ✅ |
 | RF-BDD-02 | Registro de sesiones | ✅ |
 | RF-BDD-03 | Registro de acciones | ✅ |
 | RF-BDD-04 | Aciertos/Errores/Omisiones | ✅ |
 | RF-BDD-08 | Auditoría | ✅ |
+
+### Mejoras Recientes (v1.3.1)
+- **UI Limpia:** Se han eliminado los códigos de requerimientos técnicos (ej. RF-SEG-01) de la interfaz de usuario final para mejorar la experiencia.
+- **Seguridad:** DevTools de Electron deshabilitadas/minimizadas por defecto en producción.
+- **Flujo de Setup:** Validación mejorada al intentar navegar al login sin configuración previa.
+- **Visibilidad Contraseña:** Agregado botón para ver/ocultar confirmación de contraseña en el setup.
+
 
 ---
 

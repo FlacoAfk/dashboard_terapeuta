@@ -1,9 +1,10 @@
 import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import SetupPage from './pages/SetupPage';
 import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 import { GestionTerapeutas, Auditoria } from './pages/admin';
 import { DashboardTerapeuta, DetallePaciente } from './pages/terapeuta';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -93,79 +94,108 @@ const TherapistRoute = ({ children }) => {
 };
 
 /**
+ * Componente de guardia global de configuración
+ */
+const SetupGuard = ({ children }) => {
+    const { isSetupConfigured, loading } = useAuth();
+    const location = useLocation();
+
+    if (loading) return (
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-4 border-teal-500 border-t-transparent"></div>
+        </div>
+    );
+
+    // Si NO está configurado y no estamos en setup, ir a setup
+    if (isSetupConfigured === false && location.pathname !== '/setup') {
+        return <Navigate to="/setup" replace />;
+    }
+
+    // Si SÍ está configurado y estamos en setup, ir a login
+    if (isSetupConfigured === true && location.pathname === '/setup') {
+        return <Navigate to="/login" replace />;
+    }
+
+    return children;
+};
+
+/**
  * Componente principal de la aplicación
  */
 function App() {
     return (
         <AuthProvider>
             <Routes>
-                {/* Ruta de setup inicial (RF-SEG-01) */}
-                <Route path="/setup" element={<SetupPage />} />
-                
-                {/* Ruta de login */}
-                <Route path="/login" element={<Login />} />
-                
-                {/* Ruta de recuperación de contraseña */}
-                <Route path="/forgot-password" element={<ForgotPassword />} />
+                {/* Todas las rutas envueltas en SetupGuard */}
+                <Route path="/*" element={
+                    <SetupGuard>
+                        <Routes>
+                             {/* Ruta de setup inicial */}
+                            <Route path="/setup" element={<SetupPage />} />
+                            
+                            <Route path="/login" element={<Login />} />
+                            <Route path="/forgot-password" element={<ForgotPassword />} />
+                            <Route path="/reset-password" element={<ResetPassword />} />
 
-                {/* Rutas protegidas - Dashboard general */}
-                <Route
-                    path="/dashboard/*"
-                    element={
-                        <ProtectedRoute>
-                            <Dashboard />
-                        </ProtectedRoute>
-                    }
-                />
+                            {/* Rutas protegidas - Dashboard general */}
+                            <Route
+                                path="/dashboard/*"
+                                element={
+                                    <ProtectedRoute>
+                                        <Dashboard />
+                                    </ProtectedRoute>
+                                }
+                            />
 
-                {/* Rutas de Admin (Root) */}
-                <Route
-                    path="/admin/terapeutas"
-                    element={
-                        <AdminRoute>
-                            <GestionTerapeutas />
-                        </AdminRoute>
-                    }
-                />
-                <Route
-                    path="/admin/auditoria"
-                    element={
-                        <AdminRoute>
-                            <Auditoria />
-                        </AdminRoute>
-                    }
-                />
-                <Route
-                    path="/admin"
-                    element={<Navigate to="/admin/terapeutas" replace />}
-                />
+                            {/* Rutas de Admin (Root) */}
+                            <Route
+                                path="/admin/terapeutas"
+                                element={
+                                    <AdminRoute>
+                                        <GestionTerapeutas />
+                                    </AdminRoute>
+                                }
+                            />
+                            <Route
+                                path="/admin/auditoria"
+                                element={
+                                    <AdminRoute>
+                                        <Auditoria />
+                                    </AdminRoute>
+                                }
+                            />
+                            <Route
+                                path="/admin"
+                                element={<Navigate to="/admin/terapeutas" replace />}
+                            />
 
-                {/* Rutas de Terapeuta */}
-                <Route
-                    path="/terapeuta"
-                    element={
-                        <TherapistRoute>
-                            <DashboardTerapeuta />
-                        </TherapistRoute>
-                    }
-                />
-                <Route
-                    path="/terapeuta/paciente/:id"
-                    element={
-                        <TherapistRoute>
-                            <DetallePaciente />
-                        </TherapistRoute>
-                    }
-                />
+                            {/* Rutas de Terapeuta */}
+                            <Route
+                                path="/terapeuta"
+                                element={
+                                    <TherapistRoute>
+                                        <DashboardTerapeuta />
+                                    </TherapistRoute>
+                                }
+                            />
+                            <Route
+                                path="/terapeuta/paciente/:id"
+                                element={
+                                    <TherapistRoute>
+                                        <DetallePaciente />
+                                    </TherapistRoute>
+                                }
+                            />
 
-                {/* Redirección por defecto */}
-                <Route path="/" element={<Navigate to="/login" replace />} />
-                <Route path="*" element={<Navigate to="/login" replace />} />
+                            {/* Redirección por defecto */}
+                            <Route path="/" element={<Navigate to="/login" replace />} />
+                            <Route path="*" element={<Navigate to="/login" replace />} />
+                        </Routes>
+                    </SetupGuard>
+                } />
             </Routes>
         </AuthProvider>
     );
 }
 
 export default App;
-
-

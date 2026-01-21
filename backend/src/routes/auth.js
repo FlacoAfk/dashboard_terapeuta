@@ -9,10 +9,12 @@
 
 const express = require('express');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const router = express.Router();
 const { supabase } = require('../config/supabase');
 const { generateToken, authenticateToken } = require('../middleware/authMiddleware');
 const { auditFromRequest, auditLogin, auditWithUser, AUDIT_TYPES } = require('../utils/auditHelper');
+const { sendPasswordResetEmail } = require('../services/emailService');
 
 /**
  * ========================================
@@ -575,14 +577,46 @@ router.post('/forgot-password', async (req, res) => {
             .single();
 
         if (user) {
-            // En una implementación real, aquí se enviaría un email con un token de reset
-            // Por ahora, solo registramos en auditoría
-            await auditFromRequest(req, AUDIT_TYPES.PASSWORD_RESET_REQUEST || 'PASSWORD_RESET_REQUEST', {
-                email,
-                message: 'Solicitud de restablecimiento de contraseña'
-            });
+            // Generar token seguro
+            const resetToken = crypto.randomBytes(32).toString('hex');
+            const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
 
-            console.log(`📧 Solicitud de reset de contraseña para: ${email}`);
+            // Invalidar tokens anteriores del usuario
+            await supabase
+                .from('password_reset_tokens')
+                .update({ used: true })
+                .eq('id_usuario', user.id)
+                .eq('used', false);
+
+            // Guardar nuevo token
+            const { error: tokenError } = await supabase
+                .from('password_reset_tokens')
+                .insert({
+                    id_usuario: user.id,
+                    token: resetToken,
+                    expires_at: expiresAt.toISOString(),
+                    used: false
+                });
+
+            if (tokenError) {
+                console.error('Error guardando token:', tokenError.message);
+            } else {
+                // Enviar email con link
+                const emailResult = await sendPasswordResetEmail(email, resetToken);
+
+                // Registrar en auditoría
+                await auditFromRequest(req, AUDIT_TYPES.PASSWORD_RESET_REQUEST || 'PASSWORD_RESET_REQUEST', {
+                    email,
+                    message: 'Solicitud de restablecimiento de contraseña',
+                    emailSent: emailResult.success
+                });
+
+                if (emailResult.success) {
+                    console.log(`📧 Email de reset enviado a: ${email}`);
+                } else {
+                    console.error(`❌ Error enviando email a ${email}: ${emailResult.error}`);
+                }
+            }
         }
 
         // Por seguridad, siempre devolvemos éxito
@@ -593,6 +627,7 @@ router.post('/forgot-password', async (req, res) => {
 
     } catch (error) {
         // Por seguridad, no revelamos errores específicos
+        console.error('Error en forgot-password:', error.message);
         res.json({
             success: true,
             message: 'Si el email existe, recibirá instrucciones para restablecer su contraseña'
@@ -600,4 +635,127 @@ router.post('/forgot-password', async (req, res) => {
     }
 });
 
+/**
+ * @swagger
+ * /api/auth/reset-password:
+ *   post:
+ *     summary: Restablecer contraseña con token
+ *     tags: [Autenticación]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [token, newPassword]
+ *             properties:
+ *               token: { type: string }
+ *               newPassword: { type: string }
+ *     responses:
+ *       200:
+ *         description: Contraseña actualizada
+ *       400:
+ *         description: Token inválido o expirado
+ */
+router.post('/reset-password', async (req, res) => {
+    const { token, newPassword } = req.body;
+
+    if (!token || !newPassword) {
+        return res.status(400).json({
+            success: false,
+            error: 'Token y nueva contraseña son requeridos'
+        });
+    }
+
+    // Validar política de contraseña
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{10,}$/;
+    if (!passwordRegex.test(newPassword)) {
+        return res.status(400).json({
+            success: false,
+            error: 'La contraseña debe tener mínimo 10 caracteres, incluir mayúsculas, minúsculas, números y símbolos (@$!%*?&)'
+        });
+    }
+
+    try {
+        // Buscar token válido
+        const { data: tokenData, error: tokenError } = await supabase
+            .from('password_reset_tokens')
+            .select('id, id_usuario, expires_at, used')
+            .eq('token', token)
+            .single();
+
+        if (tokenError || !tokenData) {
+            return res.status(400).json({
+                success: false,
+                error: 'Token inválido o no encontrado'
+            });
+        }
+
+        // Verificar si ya fue usado
+        if (tokenData.used) {
+            return res.status(400).json({
+                success: false,
+                error: 'Este enlace ya fue utilizado. Solicite uno nuevo.'
+            });
+        }
+
+        // Verificar si expiró
+        if (new Date(tokenData.expires_at) < new Date()) {
+            return res.status(400).json({
+                success: false,
+                error: 'Este enlace ha expirado. Solicite uno nuevo.'
+            });
+        }
+
+        // Hash de nueva contraseña
+        const salt = await bcrypt.genSalt(12);
+        const passwordHash = await bcrypt.hash(newPassword, salt);
+
+        // Actualizar contraseña
+        const { error: updateError } = await supabase
+            .from('usuarios')
+            .update({ password_hash: passwordHash })
+            .eq('id', tokenData.id_usuario);
+
+        if (updateError) {
+            throw updateError;
+        }
+
+        // Marcar token como usado
+        await supabase
+            .from('password_reset_tokens')
+            .update({ used: true })
+            .eq('id', tokenData.id);
+
+        // Obtener email del usuario para auditoría
+        const { data: userData } = await supabase
+            .from('usuarios')
+            .select('email')
+            .eq('id', tokenData.id_usuario)
+            .single();
+
+        // Registrar auditoría
+        await auditFromRequest(req, AUDIT_TYPES.PASSWORD_CHANGE, {
+            id_usuario: tokenData.id_usuario,
+            email: userData?.email,
+            method: 'reset_token'
+        });
+
+        console.log(`✅ Contraseña restablecida para usuario ${tokenData.id_usuario}`);
+
+        res.json({
+            success: true,
+            message: 'Contraseña restablecida exitosamente. Ahora puede iniciar sesión.'
+        });
+
+    } catch (error) {
+        console.error('Error en reset-password:', error.message);
+        res.status(500).json({
+            success: false,
+            error: 'Error al restablecer la contraseña'
+        });
+    }
+});
+
 module.exports = router;
+

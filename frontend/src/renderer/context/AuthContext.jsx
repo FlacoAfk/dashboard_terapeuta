@@ -22,11 +22,39 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [isSetupConfigured, setIsSetupConfigured] = useState(true); // Default true to avoid flash
 
-    // Verificar autenticación al cargar
+    // Verificar autenticación y configuración al cargar
     useEffect(() => {
-        checkAuth();
+        const init = async () => {
+             await Promise.all([checkAuth(), checkSetupStatus()]);
+             setLoading(false);
+        };
+        init();
     }, []);
+
+    const checkSetupStatus = async () => {
+        try {
+            const result = await authService.checkSetup();
+            console.log('[AuthContext] checkSetup result:', result);
+
+            // Si el backend devuelve success: true, usamos el valor de 'configured'
+            // Si falla, asumimos configurado para no bloquear error, o no configurado si es 404/etc
+            if (result && typeof result.configured !== 'undefined') {
+                setIsSetupConfigured(result.configured);
+                
+                // Si el sistema NO está configurado pero hay tokens viejos, limpiarlos
+                // Esto evita el problema de pantalla en blanco por datos obsoletos
+                if (!result.configured && authService.getToken()) {
+                    console.log('[AuthContext] Sistema sin configurar pero hay token viejo. Limpiando...');
+                    authService.removeToken();
+                    setUser(null);
+                }
+            }
+        } catch (error) {
+            console.error('Error verificando setup:', error);
+        }
+    };
 
     /**
      * Verificar si hay una sesión activa
@@ -45,9 +73,7 @@ export const AuthProvider = ({ children }) => {
         } catch (error) {
             console.error('Error verificando autenticación:', error);
             authService.removeToken();
-        } finally {
-            setLoading(false);
-        }
+        } 
     };
 
     /**
@@ -78,6 +104,8 @@ export const AuthProvider = ({ children }) => {
         user,
         loading,
         isAuthenticated: !!user,
+        isSetupConfigured,
+        checkSetupStatus, // Exponer para recargar tras setup exitoso
         login,
         logout,
         checkAuth

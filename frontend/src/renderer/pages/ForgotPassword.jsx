@@ -15,15 +15,21 @@ const ForgotPassword = () => {
     const [submitted, setSubmitted] = useState(false);
     const [error, setError] = useState('');
 
+    /**
+     * Maneja el envío del formulario de recuperación
+     * @param {Event} e - Evento del formulario
+     */
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
 
+        // Validación de campo vacío
         if (!email.trim()) {
             setError('El correo electrónico es requerido');
             return;
         }
 
+        // Validación de formato de email
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
             setError('Ingrese un correo electrónico válido');
             return;
@@ -31,16 +37,17 @@ const ForgotPassword = () => {
 
         setLoading(true);
         try {
+            // Llamada al endpoint de recuperación
+            // Por seguridad, siempre mostramos éxito aunque el email no exista
             const response = await api.post('/api/auth/forgot-password', { email });
             
             if (response.success) {
                 setSubmitted(true);
             } else {
-                // No mostrar si el email existe o no por seguridad
                 setSubmitted(true);
             }
         } catch (err) {
-            // Por seguridad, mostrar mensaje genérico
+            // Manejo silencioso de errores para no revelar información del sistema
             setSubmitted(true);
         } finally {
             setLoading(false);

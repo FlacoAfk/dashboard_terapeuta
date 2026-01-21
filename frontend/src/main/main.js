@@ -33,11 +33,33 @@ const createWindow = () => {
     // En desarrollo, cargar desde el servidor de Vite
     if (process.env.NODE_ENV === 'development') {
         mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL);
-        mainWindow.webContents.openDevTools();
+        // DevTools desactivado por defecto
+        // mainWindow.webContents.openDevTools({ mode: 'detach', activate: false });
     } else {
         // En producción, cargar el archivo HTML compilado
         mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
     }
+
+    // Limpiar almacenamiento al cargar para evitar problemas de estado obsoleto
+    mainWindow.webContents.on('did-finish-load', () => {
+        mainWindow.webContents.executeJavaScript(`
+            // Evitar loops infinitos de recarga
+            if (!sessionStorage.getItem('__electron_cleaned__')) {
+                fetch('http://localhost:3001/api/auth/check-setup')
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.success && data.data && !data.data.configured) {
+                            console.log('[Electron] Sistema sin configurar, limpiando storage y recargando...');
+                            localStorage.clear();
+                            sessionStorage.clear();
+                            sessionStorage.setItem('__electron_cleaned__', 'true');
+                            location.reload();
+                        }
+                    })
+                    .catch(err => console.error('[Electron] Error checking setup:', err));
+            }
+        `);
+    });
 
     // Mostrar ventana cuando esté lista para evitar flash blanco
     mainWindow.on('ready-to-show', () => {

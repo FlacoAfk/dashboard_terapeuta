@@ -40,7 +40,7 @@ const PORT = process.env.PORT || 3001;
 
 // Permitir peticiones desde Electron y Vite dev server
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:5173', 'file://'],
+  origin: ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:5174', 'file://'],
   credentials: true
 }));
 

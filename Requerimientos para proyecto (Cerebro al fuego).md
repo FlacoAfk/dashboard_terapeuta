@@ -28,7 +28,7 @@ Este documento busca:
 
 Con esta documentación se garantiza que las necesidades del proyecto sean entendidas de forma homogénea, evitando ambigüedades y asegurando coherencia durante todo el ciclo de desarrollo.
 
-3. **ESTRUCTURA DEL CÓDIGO DE REQUERIMIENTO**
+3. ## **ESTRUCTURA DEL CÓDIGO DE REQUERIMIENTO**
 
 **\[RF/RN \- MM \- NN\]**
 
@@ -44,7 +44,7 @@ MM: Sufijo del módulo al que pertenece, por ejemplo:
 * UNT \= Requerimiento funcional \- estructura de niveles \- 02 (RF \- UNT \- 02).  
 * El sufijo SEG hace referencia a los requerimientos del módulo de seguridad y el sufijo UNT hace referencia a los requerimientos del módulo Unity.
 
-4. **REQUERIMIENTOS FUNCIONALES**
+4. ## **REQUERIMIENTOS FUNCIONALES**
 
 **REQUERIMIENTOS FUNCIONALES \- MÓDULO DE SEGURIDAD**
 
@@ -590,3 +590,352 @@ MM: Sufijo del módulo al que pertenece, por ejemplo:
 **Firma                                                                     Firma**
 
 **—-----------------------                                                  —--—----------------------**
+
+---
+
+5. ## **ESQUEMA DE BASE DE DATOS (SUPABASE)**
+
+Esta sección documenta la estructura actual de la base de datos implementada en Supabase PostgreSQL para el Dashboard del Terapeuta.
+
+### **Configuración de Conexión**
+
+| Parámetro | Valor |
+|-----------|-------|
+| **Provider** | Supabase |
+| **URL** | `https://vtspkfdwhazxrigihdto.supabase.co` |
+| **SDK** | `@supabase/supabase-js` |
+| **Base de datos** | PostgreSQL |
+
+---
+
+### **Tablas y Columnas**
+
+#### **5.1 usuarios**
+Tabla principal de autenticación y gestión de cuentas del sistema.
+
+| Columna | Tipo | Descripción |
+|---------|------|-------------|
+| `id` | INTEGER (PK) | Identificador único del usuario |
+| `email` | VARCHAR | Correo electrónico (único) |
+| `password_hash` | VARCHAR | Hash de la contraseña (bcrypt) |
+| `rol` | VARCHAR | Rol del usuario: `SUPERADMIN`, `TERAPEUTA` |
+| `activo` | BOOLEAN | Estado de la cuenta |
+| `fecha_creacion` | TIMESTAMP | Fecha de creación de la cuenta |
+| `ultimo_login` | TIMESTAMP | Último inicio de sesión |
+
+---
+
+#### **5.2 terapeutas**
+Información extendida de los usuarios con rol de terapeuta.
+
+| Columna | Tipo | Descripción |
+|---------|------|-------------|
+| `id` | INTEGER (PK) | Identificador único del terapeuta |
+| `id_usuario` | INTEGER (FK → usuarios) | Referencia al usuario base |
+| `nombre` | VARCHAR | Nombre completo del terapeuta |
+| `correo` | VARCHAR | Correo electrónico profesional |
+| `especialidad` | VARCHAR | Especialidad clínica |
+| `telefono` | VARCHAR | Teléfono de contacto |
+
+---
+
+#### **5.3 pacientes**
+Información de los pacientes registrados en el sistema.
+
+| Columna | Tipo | Descripción |
+|---------|------|-------------|
+| `id` | INTEGER (PK) | Identificador único del paciente |
+| `identificacion` | VARCHAR | Número de identificación |
+| `nombre` | VARCHAR | Nombre completo del paciente |
+| `edad` | INTEGER | Edad del paciente |
+| `diagnostico` | TEXT | Diagnóstico clínico (DCLA) |
+| `activo` | BOOLEAN | Estado activo del paciente |
+| `fecha_registro` | TIMESTAMP | Fecha de registro en el sistema |
+
+---
+
+#### **5.4 terapeuta_paciente**
+Tabla de relación muchos-a-muchos entre terapeutas y pacientes.
+
+| Columna | Tipo | Descripción |
+|---------|------|-------------|
+| `id_terapeuta` | INTEGER (FK → terapeutas) | Referencia al terapeuta asignado |
+| `id_paciente` | INTEGER (FK → pacientes) | Referencia al paciente |
+
+---
+
+#### **5.5 actividad_juego**
+Catálogo de actividades disponibles en el videojuego VR.
+
+| Columna | Tipo | Descripción |
+|---------|------|-------------|
+| `id` | INTEGER (PK) | Identificador único de la actividad |
+| `nombre` | VARCHAR | Nombre de la actividad |
+| `nivel_dificultad` | VARCHAR | Nivel: Fácil, Intermedio, Difícil |
+| `tiempo_max_seg` | INTEGER | Tiempo máximo en segundos |
+
+---
+
+#### **5.6 sesiones**
+Registro de sesiones clínicas VR ejecutadas (RF-BDD-02).
+
+| Columna | Tipo | Descripción |
+|---------|------|-------------|
+| `id` | INTEGER (PK) | Identificador único de la sesión |
+| `id_paciente` | INTEGER (FK → pacientes) | Paciente que realizó la sesión |
+| `id_actividad` | INTEGER (FK → actividad_juego) | Actividad ejecutada |
+| `id_terapeuta` | INTEGER (FK → terapeutas) | Terapeuta supervisor |
+| `estado` | VARCHAR | Estado: `INICIADA`, `EN_PAUSA`, `COMPLETADA`, `INTERRUMPIDA` |
+| `fecha_inicio` | TIMESTAMP | Fecha/hora de inicio |
+| `fecha_fin` | TIMESTAMP | Fecha/hora de finalización |
+| `duracion_total` | INTEGER | Duración total en segundos |
+| `numero_pausas` | INTEGER | Número de pausas realizadas |
+| `numero_alertas_descanso` | INTEGER | Alertas de descanso mostradas |
+
+---
+
+#### **5.7 eventos_interacciones**
+Registro detallado de acciones VR (RF-BDD-03).
+
+| Columna | Tipo | Descripción |
+|---------|------|-------------|
+| `id` | INTEGER (PK) | Identificador único del evento |
+| `id_sesion` | INTEGER (FK → sesiones) | Sesión asociada |
+| `tipo_accion` | VARCHAR | Tipo: `pick_up`, `drop`, `pour`, `cut`, `move`, `open_drawer`, `turn_on_stove`, etc. |
+| `objeto_id` | VARCHAR | ID del asset involucrado |
+| `objeto_descripcion` | VARCHAR | Descripción del objeto |
+| `posicion_x` | NUMERIC | Coordenada X |
+| `posicion_y` | NUMERIC | Coordenada Y |
+| `posicion_z` | NUMERIC | Coordenada Z |
+| `cantidad` | NUMERIC | Cantidad (ej: ml vertidos) |
+| `metadatos_estado` | JSON | Estado adicional del objeto |
+| `timestamp_evento` | TIMESTAMP | Marca temporal del evento |
+
+---
+
+#### **5.8 evaluacion_cognitiva**
+Clasificación cognitiva de acciones (RF-BDD-04).
+
+| Columna | Tipo | Descripción |
+|---------|------|-------------|
+| `id` | INTEGER (PK) | Identificador único |
+| `id_sesion` | INTEGER (FK → sesiones) | Sesión asociada |
+| `id_evento` | INTEGER (FK → eventos_interacciones) | Evento evaluado |
+| `resultado_tipo` | VARCHAR | Clasificación: `ACIERTO`, `ERROR`, `OMISION` |
+| `resultado_detalle` | TEXT | Descripción del resultado |
+| `objeto_esperado_id` | VARCHAR | Objeto que debía seleccionarse |
+| `objeto_elegido_id` | VARCHAR | Objeto que se seleccionó |
+| `tiempo_desde_ultimo_evento` | INTEGER | Tiempo en milisegundos |
+| `confidence_score` | NUMERIC | Puntuación de confianza (0-1) |
+| `timestamp_evaluacion` | TIMESTAMP | Marca temporal de evaluación |
+
+---
+
+#### **5.9 resumen_sesion**
+Resumen agregado de métricas por sesión.
+
+| Columna | Tipo | Descripción |
+|---------|------|-------------|
+| `id` | INTEGER (PK) | Identificador único |
+| `id_sesion` | INTEGER (FK → sesiones) | Sesión asociada |
+| `total_aciertos` | INTEGER | Total de aciertos |
+| `total_errores` | INTEGER | Total de errores |
+| `total_omisiones` | INTEGER | Total de omisiones |
+| `tiempo_total_seg` | INTEGER | Tiempo total en segundos |
+| `observaciones` | TEXT | Notas del terapeuta |
+
+---
+
+#### **5.10 resumen_cognitivo_sesion**
+Métricas cognitivas calculadas automáticamente.
+
+| Columna | Tipo | Descripción |
+|---------|------|-------------|
+| `id` | INTEGER (PK) | Identificador único |
+| `id_sesion` | INTEGER (FK → sesiones) | Sesión asociada |
+| `total_aciertos` | INTEGER | Total de aciertos |
+| `total_errores` | INTEGER | Total de errores |
+| `total_omisiones` | INTEGER | Total de omisiones |
+| `tiempo_total` | INTEGER | Tiempo total |
+| `tiempo_promedio_reaccion` | INTEGER | Tiempo promedio de reacción (ms) |
+| `puntaje_final` | NUMERIC | Puntuación final calculada |
+| `observaciones` | TEXT | Observaciones adicionales |
+| `created_at` | TIMESTAMP | Fecha de creación |
+| `updated_at` | TIMESTAMP | Última actualización |
+
+---
+
+#### **5.11 auditoria**
+Registro de eventos administrativos (RF-BDD-08).
+
+| Columna | Tipo | Descripción |
+|---------|------|-------------|
+| `id` | INTEGER (PK) | Identificador único |
+| `id_usuario` | INTEGER (FK → usuarios) | Usuario que realizó la acción |
+| `tipo_accion` | VARCHAR | Tipo de evento administrativo |
+| `descripcion` | JSON/TEXT | Detalles del evento |
+| `fecha` | TIMESTAMP | Fecha/hora del evento |
+
+---
+
+#### **5.12 password_reset_tokens**
+Tokens temporales para recuperación de contraseña.
+
+| Columna | Tipo | Descripción |
+|---------|------|-------------|
+| `id` | SERIAL (PK) | Identificador único |
+| `id_usuario` | INTEGER (FK → usuarios) | Usuario asociado |
+| `token` | VARCHAR(64) | Token único de recuperación |
+| `expires_at` | TIMESTAMP | Fecha de expiración |
+| `used` | BOOLEAN | Si el token fue utilizado |
+| `created_at` | TIMESTAMP | Fecha de creación |
+
+---
+
+### **Diagrama de Clases (Mermaid)**
+
+```mermaid
+classDiagram
+    class usuarios {
+        +int id PK
+        +varchar email
+        +varchar password_hash
+        +varchar rol
+        +boolean activo
+        +timestamp fecha_creacion
+        +timestamp ultimo_login
+    }
+    
+    class terapeutas {
+        +int id PK
+        +int id_usuario FK
+        +varchar nombre
+        +varchar correo
+        +varchar especialidad
+        +varchar telefono
+    }
+    
+    class pacientes {
+        +int id PK
+        +varchar identificacion
+        +varchar nombre
+        +int edad
+        +text diagnostico
+        +boolean activo
+        +timestamp fecha_registro
+    }
+    
+    class terapeuta_paciente {
+        +int id_terapeuta FK
+        +int id_paciente FK
+    }
+    
+    class sesiones {
+        +int id PK
+        +int id_paciente FK
+        +int id_actividad FK
+        +int id_terapeuta FK
+        +varchar estado
+        +timestamp fecha_inicio
+        +timestamp fecha_fin
+        +int duracion_total
+        +int numero_pausas
+        +int numero_alertas_descanso
+    }
+    
+    class actividad_juego {
+        +int id PK
+        +varchar nombre
+        +varchar nivel_dificultad
+        +int tiempo_max_seg
+    }
+    
+    class eventos_interacciones {
+        +int id PK
+        +int id_sesion FK
+        +varchar tipo_accion
+        +varchar objeto_id
+        +varchar objeto_descripcion
+        +numeric posicion_x
+        +numeric posicion_y
+        +numeric posicion_z
+        +numeric cantidad
+        +json metadatos_estado
+        +timestamp timestamp_evento
+    }
+    
+    class evaluacion_cognitiva {
+        +int id PK
+        +int id_sesion FK
+        +int id_evento FK
+        +varchar resultado_tipo
+        +text resultado_detalle
+        +varchar objeto_esperado_id
+        +varchar objeto_elegido_id
+        +int tiempo_desde_ultimo_evento
+        +numeric confidence_score
+        +timestamp timestamp_evaluacion
+    }
+    
+    class resumen_sesion {
+        +int id PK
+        +int id_sesion FK
+        +int total_aciertos
+        +int total_errores
+        +int total_omisiones
+        +int tiempo_total_seg
+        +text observaciones
+    }
+    
+    class resumen_cognitivo_sesion {
+        +int id PK
+        +int id_sesion FK
+        +int total_aciertos
+        +int total_errores
+        +int total_omisiones
+        +int tiempo_total
+        +int tiempo_promedio_reaccion
+        +numeric puntaje_final
+        +text observaciones
+    }
+    
+    class auditoria {
+        +int id PK
+        +int id_usuario FK
+        +varchar tipo_accion
+        +json descripcion
+        +timestamp fecha
+    }
+    
+    class password_reset_tokens {
+        +int id PK
+        +int id_usuario FK
+        +varchar token
+        +timestamp expires_at
+        +boolean used
+        +timestamp created_at
+    }
+
+    usuarios "1" --> "0..1" terapeutas : tiene
+    usuarios "1" --> "*" auditoria : genera
+    usuarios "1" --> "*" password_reset_tokens : tiene
+    terapeutas "1" --> "*" terapeuta_paciente : asigna
+    pacientes "1" --> "*" terapeuta_paciente : asignado a
+    pacientes "1" --> "*" sesiones : tiene
+    actividad_juego "1" --> "*" sesiones : usada en
+    terapeutas "1" --> "*" sesiones : supervisa
+    sesiones "1" --> "*" eventos_interacciones : contiene
+    sesiones "1" --> "*" evaluacion_cognitiva : tiene
+    sesiones "1" --> "0..1" resumen_sesion : tiene
+    sesiones "1" --> "0..1" resumen_cognitivo_sesion : tiene
+    eventos_interacciones "1" --> "0..1" evaluacion_cognitiva : evaluado en
+```
+
+---
+
+### **Notas de Implementación**
+
+1. **SDK Utilizado**: El backend usa exclusivamente `@supabase/supabase-js` para todas las operaciones de base de datos.
+2. **Migraciones**: Los scripts de migración se encuentran en `backend/migrations/`.
+3. **Configuración**: Las credenciales de Supabase se configuran en `backend/.env`.
+4. **Índices**: Se han creado índices en `password_reset_tokens` para optimizar búsquedas por token y fecha de expiración.
