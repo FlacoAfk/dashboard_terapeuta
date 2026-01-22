@@ -562,11 +562,11 @@ Swagger UI disponible en: **http://localhost:3001/api-docs**
 | RF-BDD-04 | Aciertos/Errores/Omisiones | ✅ |
 | RF-BDD-08 | Auditoría | ✅ |
 
-### Mejoras Recientes (v1.3.1)
-- **UI Limpia:** Se han eliminado los códigos de requerimientos técnicos (ej. RF-SEG-01) de la interfaz de usuario final para mejorar la experiencia.
-- **Seguridad:** DevTools de Electron deshabilitadas/minimizadas por defecto en producción.
-- **Flujo de Setup:** Validación mejorada al intentar navegar al login sin configuración previa.
-- **Visibilidad Contraseña:** Agregado botón para ver/ocultar confirmación de contraseña en el setup.
+### Mejoras Recientes (v1.4.0)
+- **Configuración del Terapeuta:** Nueva página para que los terapeutas editen su perfil y cambien su contraseña.
+- **Seguridad Mejorada:** Validación estricta en backend para prevenir asignación de pacientes a terapeutas inactivos.
+- **UI Unificada:** Modales de creación y edición con estructura consistente.
+- **Navegación Corregida:** Sidebar de terapeuta ahora marca correctamente la sección activa.
 
 
 ---

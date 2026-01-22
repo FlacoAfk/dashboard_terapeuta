@@ -20,7 +20,6 @@ const createWindow = () => {
   });
   if (process.env.NODE_ENV === "development") {
     mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL);
-    mainWindow.webContents.openDevTools({ mode: "detach", activate: false });
   } else {
     mainWindow.loadFile(path.join(__dirname, "../renderer/index.html"));
   }

@@ -45,9 +45,10 @@ const Icons = {
 /**
  * Item de navegación en el sidebar
  */
-const NavItem = ({ to, icon: Icon, label }) => (
+const NavItem = ({ to, icon: Icon, label, end }) => (
     <NavLink
         to={to}
+        end={end}
         className={({ isActive }) =>
             `flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${isActive
                 ? 'bg-[#2AA87E]/10 text-[#2AA87E] font-medium border-l-4 border-[#2AA87E]'
@@ -171,6 +172,7 @@ const TherapistLayout = ({ children }) => {
                                 to="/terapeuta"
                                 icon={Icons.Pacientes}
                                 label="Pacientes"
+                                end
                             />
                             <NavItem
                                 to="/terapeuta/configuracion"

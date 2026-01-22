@@ -107,12 +107,24 @@ const ReasignarPacientesModal = ({
         );
     };
 
+    // Limpiar selecciones al cambiar el tipo de asignación
+    useEffect(() => {
+        setSelectedTherapists([]);
+    }, [assignmentType]);
+
     const handleTherapistToggle = (therapistId) => {
-        setSelectedTherapists(prev =>
-            prev.includes(therapistId)
-                ? prev.filter(id => id !== therapistId)
-                : [...prev, therapistId]
-        );
+        if (assignmentType === 'single') {
+            // En modo "un solo terapeuta", al seleccionar uno reemplazamos la selección anterior
+            setSelectedTherapists(prev => 
+                prev.includes(therapistId) ? [] : [therapistId]
+            );
+        } else {
+            setSelectedTherapists(prev =>
+                prev.includes(therapistId)
+                    ? prev.filter(id => id !== therapistId)
+                    : [...prev, therapistId]
+            );
+        }
     };
 
     const handleSelectAll = () => {

@@ -1,6 +1,6 @@
 {
     "name": "sistema-clinico-vr-frontend",
-    "version": "1.3.1",
+    "version": "1.4.0",
     "description": "Sistema Clínico VR - Dashboard Terapeuta (Electron + React)",
     "main": "dist-electron/main/main.js",
     "scripts": {

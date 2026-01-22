@@ -246,8 +246,23 @@ router.post('/patients', authenticateToken, requireTerapeuta, async (req, res) =
 
         if (error) throw error;
 
-        // RF-SEG-03: Si es terapeuta, asignar automáticamente
+        // RF-SEG-03: Si es terapeuta, asignar automáticamente (con validación estricta de estado)
         if (req.user.rol === 'TERAPEUTA' && req.user.id_terapeuta) {
+            // Validar que el terapeuta esté realmente activo en DB (por si fue desactivado recientemente)
+            const { data: userStatus } = await supabase
+                .from('usuarios')
+                .select('activo')
+                .eq('id', req.user.id)
+                .single();
+
+            if (!userStatus?.activo) {
+                // Si está desactivado, no le asignamos el paciente (y quizás deberíamos fallar todo el request, pero para no romper UX de creación...)
+                // El requerimiento dice "no asignar".
+                console.warn(`[Seguridad] Terapeuta ${req.user.id} intentó crear paciente estando inactivo through ID assignment.`);
+                // Opcional: Lanzar error para impedir la creación del paciente
+                throw new Error('Su cuenta usuario está desactivada. No puede asignar pacientes.');
+            }
+
             await supabase
                 .from('terapeuta_paciente')
                 .insert({

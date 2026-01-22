@@ -7,6 +7,7 @@ import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import { GestionTerapeutas, Auditoria } from './pages/admin';
 import { DashboardTerapeuta, DetallePaciente } from './pages/terapeuta';
+import ConfiguracionTerapeuta from './pages/terapeuta/ConfiguracionTerapeuta';
 import { AuthProvider, useAuth } from './context/AuthContext';
 
 /**
@@ -183,6 +184,14 @@ function App() {
                                 element={
                                     <TherapistRoute>
                                         <DetallePaciente />
+                                    </TherapistRoute>
+                                }
+                            />
+                            <Route
+                                path="/terapeuta/configuracion"
+                                element={
+                                    <TherapistRoute>
+                                        <ConfiguracionTerapeuta />
                                     </TherapistRoute>
                                 }
                             />

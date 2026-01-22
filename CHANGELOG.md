@@ -2,6 +2,42 @@
 
 Todos los cambios notables de este proyecto serán documentados en este archivo.
 
+## [1.4.0] - 2026-01-22
+
+### ✨ Nuevas Funcionalidades
+
+- **Panel de Configuración del Terapeuta** (`/terapeuta/configuracion`)
+  - Nueva página ConfiguracionTerapeuta.jsx
+  - Terapeutas pueden editar su perfil (nombre, correo)
+  - Cambio de contraseña seguro desde el panel
+
+- **Modal Editar Terapeuta Mejorado**
+  - Estructura unificada con el modal de creación
+  - Eliminado campo "Usuario" redundante
+  - Orden de campos: Nombre, Email, Contraseña
+
+- **Validación de Seguridad Reforzada**
+  - Backend valida estado activo del terapeuta antes de asignar pacientes
+  - Previene auto-asignación por terapeutas desactivados
+  - Frontend filtra terapeutas inactivos de selectores
+
+### 🔧 Mejoras
+
+- **Reasignación de Pacientes**
+  - Modal de reasignación no reactiva accidentalmente al terapeuta desactivado
+  - Flujo de seguridad para inconsistencias de estado
+
+- **Navegación del Terapeuta**
+  - Fix: "Pacientes" ya no permanece activo al visitar "Configuración"
+  - Layout de página de configuración responsivo (ancho completo)
+
+### 🐛 Correcciones
+
+- Corregido: Sidebar de terapeuta mostraba ambos ítems activos simultáneamente
+- Corregido: Cards de perfil con ancho máximo muy estrecho
+
+---
+
 ## [1.3.0] - 2026-01-20
 
 ### ✨ Nuevas Funcionalidades

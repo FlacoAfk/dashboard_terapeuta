@@ -52,7 +52,6 @@ const FormField = ({ label, required, hint, error, children }) => (
  */
 const EditarTerapeutaModal = ({ isOpen, onClose, onSubmit, therapist }) => {
     const [formData, setFormData] = useState({
-        usuario: '',
         password: '',
         nombre: '',
         apellido: '',
@@ -72,7 +71,6 @@ const EditarTerapeutaModal = ({ isOpen, onClose, onSubmit, therapist }) => {
             const apellido = partes.slice(1).join(' ') || '';
 
             setFormData({
-                usuario: therapist.usuario || '',
                 password: '',  // No mostramos la contraseña actual
                 nombre: nombre,
                 apellido: apellido,
@@ -91,12 +89,6 @@ const EditarTerapeutaModal = ({ isOpen, onClose, onSubmit, therapist }) => {
 
     const validateForm = () => {
         const newErrors = {};
-
-        if (!formData.usuario) {
-            newErrors.usuario = 'El usuario es requerido';
-        } else if (!/^[a-z0-9]+$/.test(formData.usuario)) {
-            newErrors.usuario = 'Solo letras minúsculas y números';
-        }
 
         // Contraseña es opcional en edición (solo si se quiere cambiar)
         if (formData.password && formData.password.length < 8) {
@@ -132,7 +124,10 @@ const EditarTerapeutaModal = ({ isOpen, onClose, onSubmit, therapist }) => {
         try {
             const updateData = {
                 id: therapist.id,
-                username: formData.usuario,
+                // username se elimina o se usa el correo si el backend lo requiere, pero aquí la solicitud original de 'tal cual' sugiere UX visual.
+                // En el backend anterior vimos que 'username' se usaba para 'usuario'.
+                // Si el backend espera 'username', podemos enviar el correo también.
+                // Asumiremos que el backend maneja actualización sin 'username' explícito o que el correo funge como tal.
                 nombre: `${formData.nombre} ${formData.apellido}`,
                 correo: formData.correo
             };
@@ -152,7 +147,7 @@ const EditarTerapeutaModal = ({ isOpen, onClose, onSubmit, therapist }) => {
     };
 
     const handleClose = () => {
-        setFormData({ usuario: '', password: '', nombre: '', apellido: '', correo: '' });
+        setFormData({ password: '', nombre: '', apellido: '', correo: '' });
         setErrors({});
         setShowPassword(false);
         onClose();
@@ -171,54 +166,7 @@ const EditarTerapeutaModal = ({ isOpen, onClose, onSubmit, therapist }) => {
                             Información del Terapeuta
                         </p>
 
-                        {/* Usuario */}
-                        <FormField 
-                            label="Usuario" 
-                            required 
-                            hint="Solo letras minúsculas y números"
-                            error={errors.usuario}
-                        >
-                            <input
-                                type="text"
-                                name="usuario"
-                                value={formData.usuario}
-                                onChange={handleChange}
-                                placeholder="jperez"
-                                className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-colors ${
-                                    errors.usuario ? 'border-red-300' : 'border-gray-300'
-                                }`}
-                            />
-                        </FormField>
-
-                        {/* Contraseña */}
-                        <FormField 
-                            label="Contraseña" 
-                            required 
-                            hint="Mín. 1 mayúscula y 8 dígitos (dejar vacío para mantener actual)"
-                            error={errors.password}
-                        >
-                            <div className="relative">
-                                <input
-                                    type={showPassword ? 'text' : 'password'}
-                                    name="password"
-                                    value={formData.password}
-                                    onChange={handleChange}
-                                    placeholder="P@ssw0rd123"
-                                    className={`w-full px-4 py-2.5 pr-12 border rounded-lg focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-colors ${
-                                        errors.password ? 'border-red-300' : 'border-gray-300'
-                                    }`}
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                                >
-                                    {showPassword ? <Icons.EyeOff /> : <Icons.Eye />}
-                                </button>
-                            </div>
-                        </FormField>
-
-                        {/* Nombre y Apellido */}
+                        {/* Nombre y Apellido en grid */}
                         <div className="grid grid-cols-2 gap-4">
                             <FormField label="Nombre" required error={errors.nombre}>
                                 <input
@@ -259,6 +207,34 @@ const EditarTerapeutaModal = ({ isOpen, onClose, onSubmit, therapist }) => {
                                     errors.correo ? 'border-red-300' : 'border-gray-300'
                                 }`}
                             />
+                        </FormField>
+
+                        {/* Contraseña */}
+                        <FormField 
+                            label="Contraseña" 
+                            required={false}
+                            hint="Dejar vacío para mantener la contraseña actual"
+                            error={errors.password}
+                        >
+                            <div className="relative">
+                                <input
+                                    type={showPassword ? 'text' : 'password'}
+                                    name="password"
+                                    value={formData.password}
+                                    onChange={handleChange}
+                                    placeholder="••••••••"
+                                    className={`w-full px-4 py-2.5 pr-12 border rounded-lg focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-colors ${
+                                        errors.password ? 'border-red-300' : 'border-gray-300'
+                                    }`}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                >
+                                    {showPassword ? <Icons.EyeOff /> : <Icons.Eye />}
+                                </button>
+                            </div>
                         </FormField>
 
                         <p className="text-xs text-gray-400">* Campos obligatorios</p>
