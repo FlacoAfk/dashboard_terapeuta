@@ -115,6 +115,21 @@ const api = {
             const data = await response.json();
 
             if (!response.ok) {
+                // Manejo automático de errores de autenticación
+                if (data.code === 'USER_DISABLED' ||
+                    data.code === 'TOKEN_EXPIRED' ||
+                    data.code === 'AUTH_REQUIRED' ||
+                    data.code === 'INVALID_TOKEN') {
+
+                    console.warn('[API] Sesión inválida o usuario desactivado. Cerrando sesión...');
+                    this.removeToken();
+
+                    // Redirigir al login si no estamos ya allí
+                    if (!window.location.pathname.includes('/login')) {
+                        window.location.href = '/login';
+                    }
+                }
+
                 throw new Error(data.error || `Error ${response.status}`);
             }
 

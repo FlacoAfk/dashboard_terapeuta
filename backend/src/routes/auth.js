@@ -14,7 +14,8 @@ const router = express.Router();
 const { supabase } = require('../config/supabase');
 const { generateToken, authenticateToken } = require('../middleware/authMiddleware');
 const { auditFromRequest, auditLogin, auditWithUser, AUDIT_TYPES } = require('../utils/auditHelper');
-const { sendPasswordResetEmail } = require('../services/emailService');
+const { sendPasswordResetEmail, sendVerificationCodeEmail } = require('../services/emailService');
+const { validateLogin } = require('../validators/authValidator');
 
 /**
  * ========================================
@@ -101,7 +102,7 @@ const getLockTimeRemaining = (email) => {
  *       423:
  *         description: Cuenta bloqueada temporalmente
  */
-router.post('/login', async (req, res) => {
+router.post('/login', validateLogin, async (req, res) => {
     const { email, password } = req.body;
 
     if (!email || !password) {
@@ -754,6 +755,75 @@ router.post('/reset-password', async (req, res) => {
             success: false,
             error: 'Error al restablecer la contraseña'
         });
+    }
+});
+
+/**
+ * @swagger
+ * /api/auth/request-verification-code:
+ *   post:
+ *     summary: Solicitar código de verificación para cambio de contraseña
+ *     tags: [Autenticación]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Código enviado
+ */
+router.post('/request-verification-code', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const email = req.user.email;
+
+        // Generar código de 6 dígitos
+        const code = Math.floor(100000 + Math.random() * 900000).toString();
+        const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutos
+
+        // Invalidar tokens anteriores
+        await supabase
+            .from('password_reset_tokens')
+            .update({ used: true })
+            .eq('id_usuario', userId)
+            .eq('used', false);
+
+        // Guardar nuevo código
+        const { error: tokenError } = await supabase
+            .from('password_reset_tokens')
+            .insert({
+                id_usuario: userId,
+                token: code, // Usamos el código como token
+                expires_at: expiresAt.toISOString(),
+                used: false
+            });
+
+        if (tokenError) {
+            throw tokenError;
+        }
+
+        // Enviar email
+        const emailResult = await sendVerificationCodeEmail(email, code);
+
+        if (!emailResult.success) {
+            return res.status(500).json({
+                success: false,
+                error: 'Error al enviar el correo de verificación'
+            });
+        }
+
+        // Auditoría
+        await auditFromRequest(req, AUDIT_TYPES.PASSWORD_RESET_REQUEST || 'PASSWORD_RESET_REQUEST', {
+            email,
+            method: 'verification_code'
+        });
+
+        res.json({
+            success: true,
+            message: 'Código de verificación enviado a su correo electrónico'
+        });
+
+    } catch (error) {
+        console.error('Error en request-verification-code:', error);
+        res.status(500).json({ success: false, error: 'Error al generar código de verificación' });
     }
 });
 

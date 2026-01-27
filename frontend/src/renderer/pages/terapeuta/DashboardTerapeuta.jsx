@@ -4,6 +4,10 @@ import TherapistLayout from '../../components/layout/TherapistLayout';
 import { useAuth } from '../../context/AuthContext';
 import patientService from '../../services/patientService';
 import sessionService from '../../services/sessionService';
+import Swal from 'sweetalert2';
+import { showConfirm, showToast } from '../../utils/alertUtils';
+import CrearPacienteModal from '../../components/modals/CrearPacienteModal';
+import EditarPacienteModal from '../../components/modals/EditarPacienteModal';
 
 /**
  * Iconos SVG
@@ -56,6 +60,11 @@ const Icons = {
     Activate: () => (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+    ),
+    Refresh: () => (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
         </svg>
     )
 };
@@ -199,15 +208,33 @@ const DashboardTerapeuta = () => {
     };
 
     const handleToggleStatus = async (patient) => {
+        const action = patient.activo !== false ? 'desactivar' : 'activar';
+        const confirmed = await showConfirm(
+            `¿${action.charAt(0).toUpperCase() + action.slice(1)} paciente?`,
+            `Estás a punto de ${action} al paciente ${patient.nombre}.`,
+            `Sí, ${action}`
+        );
+
+        if (!confirmed) return;
+
         try {
             const result = await patientService.toggleStatus(patient.id, patient.activo);
             if (result.success) {
+                showToast('success', `Paciente ${action === 'activar' ? 'activado' : 'desactivado'} correctamente`);
                 fetchData(); // Refresh
             } else {
-                alert('Error al cambiar estado: ' + result.error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: result.error || 'No se pudo cambiar el estado'
+                });
             }
         } catch (err) {
-            alert('Error al cambiar estado');
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: 'Ha ocurrido un error inesperado'
+            });
         }
     };
 
@@ -286,20 +313,32 @@ const DashboardTerapeuta = () => {
                         </div>
 
                         {/* Filters */}
-                        <div className="flex gap-4 mt-4">
-                            <label className="text-sm text-gray-500">Filtros:</label>
-                            {['todos', 'activos', 'inactivos'].map((f) => (
-                                <label key={f} className="flex items-center gap-2 cursor-pointer">
-                                    <input
-                                        type="radio"
-                                        name="filter"
-                                        checked={filter === f}
-                                        onChange={() => setFilter(f)}
-                                        className="text-[#2AA87E] focus:ring-[#2AA87E]"
-                                    />
-                                    <span className="text-sm text-gray-700 capitalize">{f}</span>
-                                </label>
-                            ))}
+                        <div className="flex gap-4 mt-4 items-center justify-between">
+                            <div className="flex gap-4">
+                                <label className="text-sm text-gray-500">Filtros:</label>
+                                {['todos', 'activos', 'inactivos'].map((f) => (
+                                    <label key={f} className="flex items-center gap-2 cursor-pointer">
+                                        <input
+                                            type="radio"
+                                            name="filter"
+                                            checked={filter === f}
+                                            onChange={() => setFilter(f)}
+                                            className="text-[#2AA87E] focus:ring-[#2AA87E]"
+                                        />
+                                        <span className="text-sm text-gray-700 capitalize">{f}</span>
+                                    </label>
+                                ))}
+                            </div>
+
+                            {/* Refresh Button */}
+                            <button
+                                onClick={fetchData}
+                                disabled={loading}
+                                className="p-2 text-gray-500 hover:text-[#2AA87E] hover:bg-[#2AA87E]/10 rounded-lg transition-colors"
+                                title="Recargar datos"
+                            >
+                                <Icons.Refresh />
+                            </button>
                         </div>
                     </div>
 
@@ -384,6 +423,7 @@ const DashboardTerapeuta = () => {
                                                         >
                                                             {patient.activo !== false ? <Icons.Deactivate /> : <Icons.Activate />}
                                                         </button>
+
                                                     </div>
                                                 </td>
                                             </tr>
@@ -396,7 +436,7 @@ const DashboardTerapeuta = () => {
                 </div>
             </div>
 
-            {/* Modals - TODO */}
+            {/* Modals */}
             {showCreateModal && (
                 <CrearPacienteModal
                     onClose={() => setShowCreateModal(false)}
@@ -411,254 +451,6 @@ const DashboardTerapeuta = () => {
                 />
             )}
         </TherapistLayout>
-    );
-};
-
-// Placeholder modals - will be replaced by actual components
-const CrearPacienteModal = ({ onClose, onSuccess }) => {
-    const [formData, setFormData] = useState({
-        identificacion: '',
-        nombre: '',
-        apellido: '',
-        edad: '',
-        condicion: ''
-    });
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        if (!formData.nombre || !formData.identificacion) {
-            setError('Nombre y documento son requeridos');
-            return;
-        }
-
-        setLoading(true);
-        try {
-            const result = await patientService.create(formData);
-            if (result.success) {
-                onSuccess();
-            } else {
-                setError(result.error || 'Error al crear paciente');
-            }
-        } catch (err) {
-            setError('Error al crear paciente');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    return (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4">
-                <div className="p-6 border-b border-gray-200 flex justify-between items-center">
-                    <h2 className="text-xl font-semibold text-gray-900">Crear Nuevo Paciente</h2>
-                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600">×</button>
-                </div>
-                <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Documento de Identidad *</label>
-                        <input
-                            type="text"
-                            value={formData.identificacion}
-                            onChange={(e) => setFormData({ ...formData, identificacion: e.target.value })}
-                            placeholder="Ej. 1001234567"
-                            className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#2AA87E]/20 focus:border-[#2AA87E]"
-                        />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Nombre *</label>
-                            <input
-                                type="text"
-                                value={formData.nombre}
-                                onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
-                                placeholder="Ej. Ana"
-                                className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#2AA87E]/20 focus:border-[#2AA87E]"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Apellido *</label>
-                            <input
-                                type="text"
-                                value={formData.apellido}
-                                onChange={(e) => setFormData({ ...formData, apellido: e.target.value })}
-                                placeholder="Ej. López García"
-                                className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#2AA87E]/20 focus:border-[#2AA87E]"
-                            />
-                        </div>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Edad *</label>
-                        <input
-                            type="number"
-                            value={formData.edad}
-                            onChange={(e) => setFormData({ ...formData, edad: e.target.value })}
-                            placeholder="Ej. 45"
-                            min="1"
-                            max="120"
-                            className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#2AA87E]/20 focus:border-[#2AA87E]"
-                        />
-                        <p className="text-xs text-gray-500 mt-1">Solo números, entre 1 y 120</p>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Diagnóstico (DCLA) *</label>
-                        <textarea
-                            value={formData.condicion}
-                            onChange={(e) => setFormData({ ...formData, condicion: e.target.value })}
-                            placeholder="Describa el diagnóstico o condición del paciente..."
-                            rows={3}
-                            className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#2AA87E]/20 focus:border-[#2AA87E]"
-                        />
-                    </div>
-
-                    {error && (
-                        <div className="bg-red-50 text-red-600 px-4 py-2 rounded-lg text-sm">
-                            {error}
-                        </div>
-                    )}
-
-                    <div className="flex justify-end gap-3 pt-4">
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-                        >
-                            Cancelar
-                        </button>
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="px-6 py-2 bg-[#2AA87E] hover:bg-[#239469] text-white rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
-                        >
-                            {loading ? (
-                                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                            ) : (
-                                <>✓ Crear</>
-                            )}
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    );
-};
-
-const EditarPacienteModal = ({ patient, onClose, onSuccess }) => {
-    const [formData, setFormData] = useState({
-        identificacion: patient.identificacion || '',
-        nombre: patient.nombre?.split(' ')[0] || '',
-        apellido: patient.nombre?.split(' ').slice(1).join(' ') || '',
-        edad: patient.edad || '',
-        condicion: patient.diagnostico || ''
-    });
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        setLoading(true);
-        try {
-            const result = await patientService.update(patient.id, formData);
-            if (result.success) {
-                onSuccess();
-            } else {
-                setError(result.error || 'Error al actualizar paciente');
-            }
-        } catch (err) {
-            setError('Error al actualizar paciente');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    return (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4">
-                <div className="p-6 border-b border-gray-200 flex justify-between items-center">
-                    <h2 className="text-xl font-semibold text-gray-900">Editar Paciente</h2>
-                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl">×</button>
-                </div>
-                <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Documento de Identidad *</label>
-                        <input
-                            type="text"
-                            value={formData.identificacion}
-                            onChange={(e) => setFormData({ ...formData, identificacion: e.target.value })}
-                            className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#2AA87E]/20 focus:border-[#2AA87E]"
-                        />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Nombre *</label>
-                            <input
-                                type="text"
-                                value={formData.nombre}
-                                onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
-                                className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#2AA87E]/20 focus:border-[#2AA87E]"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Apellido</label>
-                            <input
-                                type="text"
-                                value={formData.apellido}
-                                onChange={(e) => setFormData({ ...formData, apellido: e.target.value })}
-                                className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#2AA87E]/20 focus:border-[#2AA87E]"
-                            />
-                        </div>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Edad *</label>
-                        <input
-                            type="number"
-                            value={formData.edad}
-                            onChange={(e) => setFormData({ ...formData, edad: e.target.value })}
-                            min="1"
-                            max="120"
-                            className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#2AA87E]/20 focus:border-[#2AA87E]"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Diagnóstico (DCLA) *</label>
-                        <textarea
-                            value={formData.condicion}
-                            onChange={(e) => setFormData({ ...formData, condicion: e.target.value })}
-                            rows={3}
-                            className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#2AA87E]/20 focus:border-[#2AA87E]"
-                        />
-                    </div>
-
-                    {error && (
-                        <div className="bg-red-50 text-red-600 px-4 py-2 rounded-lg text-sm">
-                            {error}
-                        </div>
-                    )}
-
-                    <div className="flex justify-end gap-3 pt-4">
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-                        >
-                            Cancelar
-                        </button>
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="px-6 py-2 bg-[#2AA87E] hover:bg-[#239469] text-white rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
-                        >
-                            {loading ? (
-                                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                            ) : (
-                                <>✓ Guardar Cambios</>
-                            )}
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
     );
 };
 

@@ -122,6 +122,42 @@ const authService = {
      */
     isAuthenticated() {
         return !!this.getToken();
+    },
+
+    /**
+     * Solicitar código de verificación para cambio de contraseña
+     * @returns {Promise<{success: boolean, message?: string, error?: string}>}
+     */
+    async requestVerificationCode() {
+        try {
+            const response = await api.post('/api/auth/request-verification-code', {});
+            return response;
+        } catch (error) {
+            return {
+                success: false,
+                error: error.message || 'Error al solicitar código'
+            };
+        }
+    },
+
+    /**
+     * Restablecer contraseña usando código de verificación
+     * @param {string} token - Código de verificación
+     * @param {string} newPassword - Nueva contraseña
+     */
+    async resetPassword(token, newPassword) {
+        try {
+            const response = await api.post('/api/auth/reset-password', {
+                token,
+                newPassword
+            });
+            return response;
+        } catch (error) {
+            return {
+                success: false,
+                error: error.message || 'Error al restablecer contraseña'
+            };
+        }
     }
 };
 

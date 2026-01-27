@@ -12,6 +12,7 @@ const router = express.Router();
 const { supabase } = require('../config/supabase');
 const { authenticateToken, requireTerapeuta, requireSuperAdmin, optionalAuth } = require('../middleware/authMiddleware');
 const { auditFromRequest, AUDIT_TYPES } = require('../utils/auditHelper');
+const { validatePatient, validatePatientAssign } = require('../validators/patientValidator');
 
 // ========================================
 // ESTADO DE LA API
@@ -220,7 +221,7 @@ router.get('/patients/:id', authenticateToken, requireTerapeuta, async (req, res
  *     summary: Crear un nuevo paciente
  *     tags: [Pacientes]
  */
-router.post('/patients', authenticateToken, requireTerapeuta, async (req, res) => {
+router.post('/patients', authenticateToken, requireTerapeuta, validatePatient, async (req, res) => {
     const { identificacion, nombre, edad, diagnostico } = req.body;
 
     if (!nombre) {
@@ -295,7 +296,7 @@ router.post('/patients', authenticateToken, requireTerapeuta, async (req, res) =
  *     summary: Actualizar un paciente
  *     tags: [Pacientes]
  */
-router.put('/patients/:id', authenticateToken, requireTerapeuta, async (req, res) => {
+router.put('/patients/:id', authenticateToken, requireTerapeuta, validatePatient, async (req, res) => {
     const { id } = req.params;
     const { identificacion, nombre, edad, diagnostico, activo } = req.body;
 
@@ -337,48 +338,53 @@ router.put('/patients/:id', authenticateToken, requireTerapeuta, async (req, res
     }
 });
 
+// [REMOVED] DELETE route - Hard delete is not allowed. Use deactivation.
+
 /**
  * @swagger
- * /api/patients/{id}:
- *   delete:
- *     summary: Eliminar un paciente (solo Superadmin)
+ * /api/patients/{id}/toggle-status:
+ *   put:
+ *     summary: Activar/desactivar paciente
  *     tags: [Pacientes]
  */
-router.delete('/patients/:id', authenticateToken, requireSuperAdmin, async (req, res) => {
+router.put('/patients/:id/toggle-status', authenticateToken, requireTerapeuta, async (req, res) => {
     const { id } = req.params;
 
     try {
-        // Primero eliminar asignaciones
-        await supabase
-            .from('terapeuta_paciente')
-            .delete()
-            .eq('id_paciente', id);
-
-        // Luego eliminar paciente
-        const { data: deleted, error } = await supabase
+        // Obtener estado actual
+        const { data: patient, error: fetchError } = await supabase
             .from('pacientes')
-            .delete()
+            .select('activo, nombre')
+            .eq('id', id)
+            .single();
+
+        if (fetchError || !patient) {
+            return res.status(404).json({ success: false, error: 'Paciente no encontrado' });
+        }
+
+        const newState = !patient.activo;
+
+        // Actualizar estado
+        const { data: updated, error: updateError } = await supabase
+            .from('pacientes')
+            .update({ activo: newState })
             .eq('id', id)
             .select()
             .single();
 
-        if (error || !deleted) {
-            return res.status(404).json({
-                success: false,
-                error: 'Paciente no encontrado'
-            });
-        }
+        if (updateError) throw updateError;
 
         // Auditoría
-        await auditFromRequest(req, AUDIT_TYPES.PATIENT_DELETED, {
+        await auditFromRequest(req, newState ? AUDIT_TYPES.PATIENT_UPDATED : AUDIT_TYPES.PATIENT_DELETED, {
             id_paciente: id,
-            nombre: deleted.nombre
+            nombre: patient.nombre,
+            accion: newState ? 'reactivado' : 'desactivado'
         });
 
         res.json({
             success: true,
-            message: 'Paciente eliminado',
-            data: deleted
+            message: `Paciente ${newState ? 'activado' : 'desactivado'} exitosamente`,
+            data: updated
         });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
@@ -392,7 +398,7 @@ router.delete('/patients/:id', authenticateToken, requireSuperAdmin, async (req,
  *     summary: Asignar paciente a terapeuta (solo Superadmin)
  *     tags: [Pacientes]
  */
-router.post('/patients/:id/assign', authenticateToken, requireSuperAdmin, async (req, res) => {
+router.post('/patients/:id/assign', authenticateToken, requireSuperAdmin, validatePatientAssign, async (req, res) => {
     const { id } = req.params;
     const { id_terapeuta } = req.body;
 
@@ -723,7 +729,6 @@ router.put('/sessions/:id/finish', authenticateToken, requireTerapeuta, async (r
                 id_sesion: parseInt(id),
                 total_aciertos,
                 total_errores,
-                total_omisiones,
                 tiempo_total_seg,
                 observaciones
             }, { onConflict: 'id_sesion' });

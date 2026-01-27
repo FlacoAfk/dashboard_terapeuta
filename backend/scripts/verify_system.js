@@ -3,7 +3,12 @@ const axios = require('axios');
 
 const API_URL = 'http://localhost:3001/api';
 const ADMIN_EMAIL = process.env.SUPERADMIN_EMAIL || 'admin@cerebroalfuego.local';
-const ADMIN_PASS = process.env.SUPERADMIN_PASSWORD || 'admin123';
+const ADMIN_PASS = process.env.SUPERADMIN_PASSWORD; // Must be set in .env or passed via env var
+if (!ADMIN_PASS) {
+    console.warn('⚠️ WARNING: SUPERADMIN_PASSWORD not set. Using insecure default for local dev ONLY.');
+}
+const PASS_TO_USE = ADMIN_PASS || 'admin123';
+
 
 async function runTests() {
     console.log('🚀 Starting Final API-Only Therapist Flow Tests...');
@@ -22,7 +27,7 @@ async function runTests() {
         console.log('\n[1] Login as Admin...');
         const adminLogin = await axios.post(`${API_URL}/auth/login`, {
             email: ADMIN_EMAIL,
-            password: ADMIN_PASS
+            password: PASS_TO_USE
         });
 
         if (adminLogin.data.data && adminLogin.data.data.token) {

@@ -46,3 +46,7 @@ temp/
 *_output.txt
 backend/scripts/*.json
 backend/scripts/*.txt
+
+# Playwright
+playwright-report/
+test-results/

@@ -209,33 +209,7 @@ const EditarTerapeutaModal = ({ isOpen, onClose, onSubmit, therapist }) => {
                             />
                         </FormField>
 
-                        {/* Contraseña */}
-                        <FormField 
-                            label="Contraseña" 
-                            required={false}
-                            hint="Dejar vacío para mantener la contraseña actual"
-                            error={errors.password}
-                        >
-                            <div className="relative">
-                                <input
-                                    type={showPassword ? 'text' : 'password'}
-                                    name="password"
-                                    value={formData.password}
-                                    onChange={handleChange}
-                                    placeholder="••••••••"
-                                    className={`w-full px-4 py-2.5 pr-12 border rounded-lg focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-colors ${
-                                        errors.password ? 'border-red-300' : 'border-gray-300'
-                                    }`}
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                                >
-                                    {showPassword ? <Icons.EyeOff /> : <Icons.Eye />}
-                                </button>
-                            </div>
-                        </FormField>
+
 
                         <p className="text-xs text-gray-400">* Campos obligatorios</p>
 

@@ -105,15 +105,15 @@ const patientService = {
      */
     async toggleStatus(id, currentStatus) {
         try {
-            const response = await api.put(`/api/patients/${id}`, {
-                activo: !currentStatus
-            });
+            const response = await api.put(`/api/patients/${id}/toggle-status`, {});
             return { success: true, data: response.data };
         } catch (error) {
             console.error('[PatientService] toggleStatus error:', error);
             return { success: false, error: error.message };
         }
     },
+
+
 
     /**
      * Obtener estadísticas del terapeuta

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import AdminLayout from '../../components/layout/AdminLayout';
 import { CrearTerapeutaModal, EditarTerapeutaModal, ReasignarPacientesModal, ResetPasswordModal } from '../../components/modals';
 import therapistService from '../../services/therapistService';
+import { showAlert, showConfirm, showToast } from '../../utils/alertUtils';
 
 /**
  * Iconos SVG
@@ -184,11 +185,12 @@ const GestionTerapeutas = () => {
 
             if (result.success) {
                 await fetchTherapists(); // Recargar lista
+                showToast('success', 'Terapeuta creado exitosamente');
             } else {
-                alert(`Error: ${result.error}`);
+                showAlert('error', 'Error', result.error);
             }
         } catch (err) {
-            alert('Error al crear terapeuta');
+            showAlert('error', 'Error', 'No se pudo crear el terapeuta');
         } finally {
             setActionLoading(false);
         }
@@ -209,19 +211,28 @@ const GestionTerapeutas = () => {
 
             if (result.success) {
                 await fetchTherapists();
+                showToast('success', 'Terapeuta actualizado');
             } else {
-                alert(`Error: ${result.error}`);
+                showAlert('error', 'Error', result.error);
             }
         } catch (err) {
-            alert('Error al actualizar terapeuta');
+            showAlert('error', 'Error', 'No se pudo actualizar el terapeuta');
         } finally {
             setActionLoading(false);
         }
     };
 
-
-
     const handleToggleStatus = async (therapist) => {
+        const action = therapist.activo ? 'desactivar' : 'activar';
+        
+        // Confirmación antes de cualquier acción
+        const confirmed = await showConfirm(
+            `¿${action.charAt(0).toUpperCase() + action.slice(1)} terapeuta?`,
+            `¿Estás seguro que deseas ${action} a ${therapist.nombre}?`
+        );
+
+        if (!confirmed) return;
+
         if (therapist.activo && therapist.pacientes > 0) {
             // RF-SEG-02: Si tiene pacientes, cargar lista y mostrar modal
             try {
@@ -241,11 +252,12 @@ const GestionTerapeutas = () => {
                 const result = await therapistService.toggleStatus(therapist.id);
                 if (result.success) {
                     await fetchTherapists();
+                    showToast('success', `Terapeuta ${therapist.activo ? 'desactivado' : 'activado'} correctamente`);
                 } else {
-                    alert(`Error: ${result.error}`);
+                    showAlert('error', 'Error', result.error);
                 }
             } catch (err) {
-                alert('Error al cambiar estado');
+                showAlert('error', 'Error', 'Error al cambiar estado');
             } finally {
                 setActionLoading(false);
             }
@@ -255,7 +267,6 @@ const GestionTerapeutas = () => {
     const handleReasignarSubmit = async (data) => {
         setActionLoading(true);
         try {
-            // Crear asignaciones de pacientes
             // Crear asignaciones de pacientes
             const assignments = data.patients.map((patientId, index) => ({
                 patientId,
@@ -267,20 +278,27 @@ const GestionTerapeutas = () => {
 
             if (reassignResult.success) {
                 // Desactivar el terapeuta SOLO si está activo actualmente.
-                // Si estamos corrigiendo una inconsistencia (ya está inactivo), NO lo tocamos para evitar reactivarlo accidentalmente.
                 if (selectedTherapist?.activo) {
                     await therapistService.toggleStatus(data.therapistId);
                 }
                 await fetchTherapists();
+                showToast('success', 'Pacientes reasignados y terapeuta desactivado');
             } else {
-                alert(`Error: ${reassignResult.error}`);
+                showAlert('error', 'Error', reassignResult.error);
             }
         } catch (err) {
-            alert('Error al reasignar pacientes');
+            showAlert('error', 'Error', 'Error al reasignar pacientes');
         } finally {
             setActionLoading(false);
         }
     };
+    
+    // ... (rendering code) ... (Note: This replace block covers functions, need to ensure return is handled locally or I do smaller targets. 
+    // Wait, the block is contiguous. I will leave the return alone.
+    // The previous block ended at handleReasignarSubmit end. 
+    // I also need to update ResetPasswordModal implementation which is inline in the return. 
+    // It is safer to do ResetPasswordModal in a separate call or carefully constructing this one.)
+
 
     return (
         <AdminLayout>
@@ -497,12 +515,12 @@ const GestionTerapeutas = () => {
                     try {
                         const result = await therapistService.resetPassword(data.therapistId, data.newPassword);
                         if (result.success) {
-                            alert('Contraseña reseteada exitosamente');
+                            showToast('success', 'Contraseña reseteada exitosamente');
                         } else {
                             throw new Error(result.error);
                         }
                     } catch (err) {
-                        alert('Error al resetear contraseña: ' + err.message);
+                        showAlert('error', 'Error', 'Error al resetear contraseña: ' + err.message);
                     } finally {
                         setActionLoading(false);
                     }

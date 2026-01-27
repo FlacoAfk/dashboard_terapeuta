@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { showConfirm } from '../../utils/alertUtils';
 
 /**
  * Iconos SVG para el sidebar del terapeuta
@@ -95,9 +96,17 @@ const TherapistLayout = ({ children }) => {
     const { user, logout } = useAuth();
     const [showUserMenu, setShowUserMenu] = useState(false);
 
-    const handleLogout = () => {
-        logout();
-        navigate('/login');
+    const handleLogout = async () => {
+        const confirmed = await showConfirm(
+            '¿Cerrar sesión?',
+            '¿Estás seguro que deseas salir del sistema?',
+            'Sí, cerrar sesión'
+        );
+
+        if (confirmed) {
+            logout();
+            navigate('/login');
+        }
     };
 
     return (

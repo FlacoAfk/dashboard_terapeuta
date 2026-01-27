@@ -38,7 +38,7 @@ Sistema de gestión de terapeutas y pacientes para el proyecto de realidad virtu
 | **Frontend** | Electron + Tailwind CSS | Aplicación de escritorio |
 | **Autenticación** | JWT (Bearer Token) | Tokens con expiración de 24h |
 | **Documentación** | Swagger UI | Documentación interactiva de la API |
-| **ORM/Driver** | node-postgres (pg) | Driver nativo de PostgreSQL |
+| **ORM/Driver** | @supabase/supabase-js | SDK oficial de Supabase |
 
 ---
 
@@ -50,7 +50,7 @@ dashboard_terapeuta/
 │   ├── src/
 │   │   ├── server.js               # Servidor Express (puerto 3001)
 │   │   ├── config/
-│   │   │   ├── database.js         # Pool de conexiones PostgreSQL
+│   │   │   ├── supabase.js         # Cliente SDK Supabase
 │   │   │   └── swagger.js          # Configuración Swagger/OpenAPI
 │   │   ├── middleware/
 │   │   │   └── authMiddleware.js   # JWT Auth & Control de Roles
@@ -312,7 +312,7 @@ El backend sigue una arquitectura por capas:
 
 | Archivo | Descripción |
 |---------|-------------|
-| `database.js` | Pool de conexiones PostgreSQL con SSL. Exporta funciones `query()`, `testConnection()` y el pool. |
+| `supabase.js` | Configuración del cliente Supabase. Exporta instancia `supabase` y `testConnection()`. |
 | `swagger.js` | Configuración de OpenAPI 3.0 para documentación automática de la API. |
 
 #### 📂 `middleware/`
@@ -562,11 +562,12 @@ Swagger UI disponible en: **http://localhost:3001/api-docs**
 | RF-BDD-04 | Aciertos/Errores/Omisiones | ✅ |
 | RF-BDD-08 | Auditoría | ✅ |
 
-### Mejoras Recientes (v1.4.0)
+### Mejoras Recientes (v1.5.0)
+- **Limpieza de Proyecto:** Eliminación de archivos temporales y scripts obsoletos para reducir deuda técnica.
+- **Seguridad Reforzada:** Actualización de archivos ignorados (.gitignore) y validación de ausencia de datos sensibles.
 - **Configuración del Terapeuta:** Nueva página para que los terapeutas editen su perfil y cambien su contraseña.
 - **Seguridad Mejorada:** Validación estricta en backend para prevenir asignación de pacientes a terapeutas inactivos.
 - **UI Unificada:** Modales de creación y edición con estructura consistente.
-- **Navegación Corregida:** Sidebar de terapeuta ahora marca correctamente la sección activa.
 
 
 ---

@@ -3,7 +3,9 @@ import React, { useState } from 'react';
 import TherapistLayout from '../../components/layout/TherapistLayout';
 import { useAuth } from '../../context/AuthContext';
 import EditarTerapeutaModal from '../../components/modals/EditarTerapeutaModal';
+import VerificarCorreoModal from '../../components/modals/VerificarCorreoModal';
 import therapistService from '../../services/therapistService';
+import { showConfirm, showToast, showAlert } from '../../utils/alertUtils';
 
 /**
  * Página de Configuración / Perfil del Terapeuta
@@ -11,7 +13,7 @@ import therapistService from '../../services/therapistService';
 const ConfiguracionTerapeuta = () => {
     const { user, login } = useAuth(); // Usamos login para actualizar el estado del usuario si es necesario (o un reload)
     const [showEditModal, setShowEditModal] = useState(false);
-    const [message, setMessage] = useState(null);
+    const [showVerifyModal, setShowVerifyModal] = useState(false);
 
     // El objeto 'user' del contexto tiene la info básica del token/login.
     // Para edición completa, idealmente tendríamos todo el objeto terapeuta.
@@ -25,19 +27,27 @@ const ConfiguracionTerapeuta = () => {
     };
 
     const handleUpdate = async (updateData) => {
+        const confirmed = await showConfirm(
+            '¿Guardar cambios?',
+            'Estás a punto de modificar tu información de perfil.',
+            'Sí, guardar cambios'
+        );
+
+        if (!confirmed) return;
+
         try {
             // updateData trae: id, nombre, correo, (password). 
             // Llamamos al servicio. Nota: therapistService.update usa /api/usuarios/:id
             const result = await therapistService.update(currentTherapist.id, updateData);
 
             if (result.success) {
-                setMessage({ type: 'success', text: 'Información actualizada correctamente. Los cambios se reflejarán en el próximo inicio de sesión.' });
+                showToast('success', 'Información actualizada correctamente');
                 // Opcional: Podríamos intentar recargar el usuario del contexto si hubiera un método 'refreshUser'
             } else {
-                setMessage({ type: 'error', text: result.error || 'Error al actualizar' });
+                showAlert('error', 'Error', result.error || 'Error al actualizar');
             }
         } catch (error) {
-            setMessage({ type: 'error', text: 'Error al actualizar información' });
+            showAlert('error', 'Error', 'Error al actualizar información');
         }
     };
 
@@ -48,12 +58,6 @@ const ConfiguracionTerapeuta = () => {
                      <h1 className="text-2xl font-bold text-gray-900">Configuración de Cuenta</h1>
                      <p className="text-gray-500 mt-1">Gestiona tu información personal y seguridad</p>
                 </div>
-
-                {message && (
-                    <div className={`p-4 rounded-lg border ${message.type === 'success' ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'}`}>
-                        {message.text}
-                    </div>
-                )}
 
                 {/* Tarjeta de Perfil */}
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden w-full">
@@ -105,10 +109,10 @@ const ConfiguracionTerapeuta = () => {
                      <div className="flex items-center justify-between">
                         <div>
                             <p className="text-gray-900 font-medium">Contraseña</p>
-                            <p className="text-sm text-gray-500">Puedes cambiar tu contraseña editando tu perfil</p>
+                            <p className="text-sm text-gray-500">Puedes cambiar tu contraseña verificando tu identidad</p>
                         </div>
                         <button 
-                             onClick={() => setShowEditModal(true)}
+                             onClick={() => setShowVerifyModal(true)}
                              className="text-[#2AA87E] hover:text-[#239469] font-medium text-sm"
                         >
                             Cambiar contraseña
@@ -117,13 +121,23 @@ const ConfiguracionTerapeuta = () => {
                 </div>
              </div>
 
-             {/* Modal de Edición (Reutilizado) */}
-             <EditarTerapeutaModal 
-                isOpen={showEditModal}
-                onClose={() => setShowEditModal(false)}
-                onSubmit={handleUpdate}
-                therapist={currentTherapist}
-             />
+             {/* Modals */}
+             {showEditModal && (
+                 <EditarTerapeutaModal
+                     isOpen={showEditModal}
+                     onClose={() => setShowEditModal(false)}
+                     onSubmit={handleUpdate}
+                     therapist={currentTherapist}
+                 />
+             )}
+
+             {showVerifyModal && (
+                 <VerificarCorreoModal
+                     isOpen={showVerifyModal}
+                     onClose={() => setShowVerifyModal(false)}
+                     email={user.email}
+                 />
+             )}
         </TherapistLayout>
     );
 };

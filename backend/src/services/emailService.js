@@ -112,7 +112,63 @@ const sendPasswordResetEmail = async (to, resetToken = null, frontendUrl = 'http
     }
 };
 
+/**
+ * Enviar código de verificación (6 dígitos)
+ * @param {string} to - Destinatario
+ * @param {string} code - Código de 6 dígitos
+ */
+const sendVerificationCodeEmail = async (to, code) => {
+    const fromAddress = process.env.SMTP_FROM || process.env.SMTP_USER;
+
+    const mailOptions = {
+        from: fromAddress,
+        to: to,
+        subject: '🔐 Código de Verificación - Cerebro al Fuego',
+        html: `
+            <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #374151;">
+                <div style="text-align: center; margin-bottom: 24px;">
+                     <h1 style="color: #2AA87E; font-size: 24px; margin: 0;">Cerebro al Fuego</h1>
+                     <p style="color: #6B7280; font-size: 14px; margin-top: 4px;">Seguridad de Cuenta</p>
+                </div>
+                
+                <div style="background: #ffffff; padding: 32px; border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); border: 1px solid #E5E7EB;">
+                    <h2 style="color: #111827; font-size: 20px; font-weight: 600; margin-top: 0; margin-bottom: 16px;">
+                        Verifica tu identidad
+                    </h2>
+                    <p style="margin-bottom: 24px; line-height: 1.5;">
+                        Para continuar con el cambio de contraseña, por favor ingresa el siguiente código de verificación:
+                    </p>
+                    
+                    <div style="background: #F3F4F6; border-radius: 12px; padding: 24px; text-align: center; margin-bottom: 24px; letter-spacing: 8px;">
+                        <span style="font-family: 'Courier New', monospace; font-size: 32px; font-weight: 700; color: #2AA87E;">
+                            ${code}
+                        </span>
+                    </div>
+
+                    <p style="font-size: 14px; color: #6B7280; margin-bottom: 0;">
+                        Este código expirará en 15 minutos. Si no solicitaste este cambio, por favor ignora este correo y cambia tu contraseña inmediatamente si sospechas actividad inusual.
+                    </p>
+                </div>
+                
+                <div style="text-align: center; margin-top: 24px; font-size: 12px; color: #9CA3AF;">
+                    <p>© 2026 Cerebro al Fuego. Todos los derechos reservados.</p>
+                </div>
+            </div>
+        `
+    };
+
+    try {
+        const info = await transporter.sendMail(mailOptions);
+        console.log(`📧 Código enviado a ${to}: ${info.messageId}`);
+        return { success: true, messageId: info.messageId };
+    } catch (error) {
+        console.error(`❌ Error enviando código a ${to}:`, error.message);
+        return { success: false, error: error.message };
+    }
+};
+
 module.exports = {
     verifyConnection,
-    sendPasswordResetEmail
+    sendPasswordResetEmail,
+    sendVerificationCodeEmail
 };

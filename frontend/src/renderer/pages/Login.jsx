@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Logo from '../components/ui/Logo';
+import { showAlert } from '../utils/alertUtils';
 
 /**
  * Verificar si el rol es de administrador
@@ -100,10 +101,11 @@ const Login = () => {
                     navigate('/dashboard');
                 }
             } else {
-                setError(result.error || 'Credenciales inválidas');
+                // Usar modal para errores de credenciales o cuenta
+                await showAlert('error', 'Error de inicio de sesión', result.error || 'Credenciales inválidas');
             }
         } catch (err) {
-            setError('Error de conexión con el servidor');
+            await showAlert('error', 'Error de conexión', 'No se pudo conectar con el servidor');
         } finally {
             setLoading(false);
         }

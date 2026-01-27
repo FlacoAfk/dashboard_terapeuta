@@ -12,7 +12,8 @@ const bcrypt = require('bcryptjs');
 const router = express.Router();
 const { supabase } = require('../config/supabase');
 const { authenticateToken, requireSuperAdmin } = require('../middleware/authMiddleware');
-const { auditFromRequest, AUDIT_TYPES } = require('../utils/auditHelper');
+const { validateUserCreate, validateUserUpdate } = require('../validators/userValidator');
+const { AUDIT_TYPES, auditFromRequest } = require('../utils/auditHelper');
 
 /**
  * @swagger
@@ -114,7 +115,7 @@ router.get('/', authenticateToken, requireSuperAdmin, async (req, res) => {
  *       403:
  *         description: Acceso denegado
  */
-router.post('/terapeuta', authenticateToken, requireSuperAdmin, async (req, res) => {
+router.post('/terapeuta', authenticateToken, requireSuperAdmin, validateUserCreate, async (req, res) => {
     const { nombre, correo, password, especialidad, telefono } = req.body;
 
     // Validar campos requeridos (correo es el identificador de login)
@@ -125,11 +126,12 @@ router.post('/terapeuta', authenticateToken, requireSuperAdmin, async (req, res)
         });
     }
 
-    // Validar contraseña (mínimo 8 caracteres con una mayúscula)
-    if (password.length < 8 || !/[A-Z]/.test(password)) {
+    // Validar contraseña (mínimo 10 caracteres, mayúscula, minúscula, número, símbolo)
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{10,}$/;
+    if (!passwordRegex.test(password)) {
         return res.status(400).json({
             success: false,
-            error: 'La contraseña debe tener mínimo 8 caracteres y al menos 1 mayúscula'
+            error: 'La contraseña debe tener mínimo 10 caracteres, mayúsculas, minúsculas, números y símbolos'
         });
     }
 
@@ -231,7 +233,7 @@ router.post('/terapeuta', authenticateToken, requireSuperAdmin, async (req, res)
  *       200:
  *         description: Usuario actualizado
  */
-router.put('/:id', authenticateToken, async (req, res) => {
+router.put('/:id', authenticateToken, validateUserUpdate, async (req, res) => {
     const { id } = req.params;
     const { nombre, correo, especialidad, telefono, password } = req.body; // Added password support for self-edit
 
@@ -261,10 +263,11 @@ router.put('/:id', authenticateToken, async (req, res) => {
         // Si se envía password y es el mismo usuario o superadmin
         if (password) {
             // Validar contraseña
-            if (password.length < 8 || !/[A-Z]/.test(password)) {
+            const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{10,}$/;
+            if (!passwordRegex.test(password)) {
                 return res.status(400).json({
                     success: false,
-                    error: 'La contraseña debe tener mínimo 8 caracteres y al menos 1 mayúscula'
+                    error: 'La contraseña debe tener mínimo 10 caracteres, mayúsculas, minúsculas, números y símbolos'
                 });
             }
 
@@ -361,8 +364,39 @@ router.put('/:id/toggle-estado', authenticateToken, requireSuperAdmin, async (re
             });
         }
 
-        // Toggle estado
         const newState = !user.activo;
+
+        // Si se está desactivando, verificar si es terapeuta con pacientes
+        if (!newState && user.rol === 'TERAPEUTA') {
+            const { data: assignments } = await supabase
+                .from('terapeuta_paciente')
+                .select('id_paciente')
+                .eq('id_terapeuta',
+                    (await supabase.from('terapeutas').select('id').eq('id_usuario', id).single()).data?.id
+                ); // Subquery simplificada en logica, pero requiere doble query aqui o join previo.
+
+            // Hagamoslo bien: Obtener ID terapeuta
+            const { data: terapeuta } = await supabase
+                .from('terapeutas')
+                .select('id')
+                .eq('id_usuario', id)
+                .single();
+
+            if (terapeuta) {
+                const { count } = await supabase
+                    .from('terapeuta_paciente')
+                    .select('id_paciente', { count: 'exact', head: true })
+                    .eq('id_terapeuta', terapeuta.id);
+
+                if (count > 0) {
+                    return res.status(400).json({
+                        success: false,
+                        error: 'No se puede desactivar un terapeuta con pacientes asignados. Reasígnelos primero.',
+                        code: 'THERAPIST_HAS_PATIENTS'
+                    });
+                }
+            }
+        }
         const { data: updated, error } = await supabase
             .from('usuarios')
             .update({ activo: newState })
@@ -421,6 +455,7 @@ router.put('/:id/toggle-estado', authenticateToken, requireSuperAdmin, async (re
 router.post('/:id/reset-password', authenticateToken, requireSuperAdmin, async (req, res) => {
     const { id } = req.params;
     const { newPassword } = req.body;
+    console.log(`[DEBUG] Reset password request for ID: ${id}`);
 
     if (!newPassword) {
         return res.status(400).json({

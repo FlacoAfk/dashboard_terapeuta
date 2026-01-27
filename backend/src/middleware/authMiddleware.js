@@ -15,7 +15,12 @@ const JWT_EXPIRES_IN = '24h';
 /**
  * Middleware para verificar el token JWT
  */
-const authenticateToken = (req, res, next) => {
+const { supabase } = require('../config/supabase');
+
+/**
+ * Middleware para verificar el token JWT
+ */
+const authenticateToken = async (req, res, next) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
@@ -29,6 +34,31 @@ const authenticateToken = (req, res, next) => {
 
     try {
         const decoded = jwt.verify(token, JWT_SECRET);
+
+        // Verificar estado en base de datos
+        // RF-SEG-02: Validar que el usuario siga activo
+        const { data: user, error } = await supabase
+            .from('usuarios')
+            .select('activo')
+            .eq('id', decoded.id)
+            .single();
+
+        if (error || !user) {
+            return res.status(401).json({
+                success: false,
+                error: 'Usuario no encontrado',
+                code: 'USER_NOT_FOUND'
+            });
+        }
+
+        if (!user.activo) {
+            return res.status(403).json({
+                success: false,
+                error: 'Su cuenta ha sido desactivada. Contacte al administrador.',
+                code: 'USER_DISABLED'
+            });
+        }
+
         req.user = decoded;
         next();
     } catch (error) {
