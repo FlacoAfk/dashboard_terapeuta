@@ -23,12 +23,7 @@ const apiRoutes = require('./routes/api');
 const authRoutes = require('./routes/auth');
 const usuariosRoutes = require('./routes/usuarios');
 const auditRoutes = require('./routes/audit');
-
-// Importar nuevas rutas (sesiones VR, eventos, evaluaciones, métricas)
-const sesionesRoutes = require('./routes/sesiones');
-const eventosRoutes = require('./routes/eventos');
-const evaluacionRoutes = require('./routes/evaluacion');
-const metricasRoutes = require('./routes/metricas');
+const vrResultsRoutes = require('./routes/vrResults');
 
 // Crear aplicación Express
 const app = express();
@@ -83,11 +78,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/usuarios', usuariosRoutes);
 app.use('/api/audit', auditRoutes);
 
-// Nuevas rutas para Unity/VR (RF-BDD-02, RF-BDD-03, RF-BDD-04, RF-BDD-09)
-app.use('/api/sesiones', sesionesRoutes);
-app.use('/api/eventos', eventosRoutes);
-app.use('/api/evaluacion', evaluacionRoutes);
-app.use('/api/metricas', metricasRoutes);
+// Endpoint para resultados de sesiones VR (nuevo formato)
+app.use('/api/v1', vrResultsRoutes);
 
 // ========================================
 // MANEJO DE ERRORES
@@ -114,11 +106,8 @@ app.listen(PORT, async () => {
   console.log(`📋 API:       http://localhost:${PORT}/api/status`);
   console.log(`📚 Docs:      http://localhost:${PORT}/api-docs`);
   console.log('----------------------------------------');
-  console.log('📁 Nuevas rutas Unity/VR:');
-  console.log(`   - Sesiones:   /api/sesiones`);
-  console.log(`   - Eventos:    /api/eventos`);
-  console.log(`   - Evaluación: /api/evaluacion`);
-  console.log(`   - Métricas:   /api/metricas`);
+  console.log('📁 Rutas VR Unity:');
+  console.log(`   - VR Results: /api/v1/session-results`);
   console.log('========================================');
 
   // Verificar conexión a Supabase

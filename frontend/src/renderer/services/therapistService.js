@@ -122,7 +122,9 @@ const therapistService = {
                 .map(p => ({
                     id: p.id,
                     nombre: p.nombre,
-                    identificacion: p.identificacion
+                    identificacion: p.identificacion,
+                    edad: p.edad,
+                    diagnostico: p.diagnostico
                 }));
             return { success: true, data: patients };
         } catch (error) {

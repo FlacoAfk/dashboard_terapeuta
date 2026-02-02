@@ -27,25 +27,26 @@ const Dashboard = () => {
                         <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
                             <span className="text-white font-bold">VR</span>
                         </div>
-                        <span className="text-white font-semibold text-xl">
+                        <span className="text-white font-semibold text-lg sm:text-xl hidden sm:inline">
                             Sistema Clínico VR
                         </span>
                     </div>
 
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 sm:gap-4">
                         <div className="flex items-center gap-2">
                             <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center">
                                 <span className="text-[#E85A5A] font-semibold text-sm">
                                     {user?.nombre?.charAt(0) || 'U'}
                                 </span>
                             </div>
-                            <span className="text-white font-medium">
+                            <span className="text-white font-medium hidden sm:inline">
                                 {user?.nombre || user?.email}
                             </span>
                         </div>
                         <button
                             onClick={handleLogout}
-                            className="text-white/80 hover:text-white transition-colors"
+                            className="text-white/80 hover:text-white transition-colors p-2"
+                            title="Cerrar sesión"
                         >
                             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -70,7 +71,7 @@ const Dashboard = () => {
                         <h2 className="text-lg font-semibold text-gray-700 mb-4">
                             Información de la sesión
                         </h2>
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                                 <p className="text-sm text-gray-500">Email</p>
                                 <p className="font-medium text-gray-800">{user?.email}</p>

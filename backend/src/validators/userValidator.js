@@ -1,4 +1,11 @@
-const { body, validationResult } = require('express-validator');
+/**
+ * ========================================
+ * VALIDADOR DE USUARIOS
+ * ========================================
+ */
+
+const { body } = require('express-validator');
+const { handleValidationErrors } = require('../utils/validationUtils');
 
 const validateUserCreate = [
     body('nombre')
@@ -21,17 +28,7 @@ const validateUserCreate = [
         .optional()
         .trim()
         .matches(/^[0-9]+$/).withMessage('El teléfono solo debe contener números'),
-    (req, res, next) => {
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            return res.status(400).json({
-                success: false,
-                error: errors.array()[0].msg,
-                details: errors.array()
-            });
-        }
-        next();
-    }
+    handleValidationErrors
 ];
 
 const validateUserUpdate = [
@@ -47,17 +44,7 @@ const validateUserUpdate = [
         .optional()
         .isLength({ min: 8 }).withMessage('La contraseña debe tener al menos 8 caracteres')
         .matches(/[A-Z]/).withMessage('La contraseña debe contener al menos una mayúscula'),
-    (req, res, next) => {
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            return res.status(400).json({
-                success: false,
-                error: errors.array()[0].msg,
-                details: errors.array()
-            });
-        }
-        next();
-    }
+    handleValidationErrors
 ];
 
 module.exports = { validateUserCreate, validateUserUpdate };

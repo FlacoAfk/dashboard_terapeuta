@@ -133,19 +133,19 @@ const Auditoria = () => {
             <div className="space-y-6">
                 {/* Header */}
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">
+                    <h1 className="text-xl lg:text-2xl font-bold text-gray-900">
                         Auditoría del Sistema
                     </h1>
-                    <p className="text-gray-500 mt-1">
+                    <p className="text-gray-500 mt-1 text-sm lg:text-base">
                         Registros de actividad de la plataforma para control y seguridad.
                     </p>
                 </div>
 
                 {/* Filtros */}
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 lg:p-6">
                     <div className="flex flex-wrap items-end gap-4 mb-6">
                         {/* Mes */}
-                        <div>
+                        <div className="flex-1 min-w-[150px] sm:flex-none">
                             <label className="block text-sm font-medium text-gray-700 mb-2">Mes</label>
                             <div className="relative">
                                 <select
@@ -164,7 +164,7 @@ const Auditoria = () => {
                         </div>
 
                         {/* Año */}
-                        <div>
+                        <div className="flex-1 min-w-[100px] sm:flex-none">
                             <label className="block text-sm font-medium text-gray-700 mb-2">Año</label>
                             <div className="relative">
                                 <select

@@ -1,4 +1,11 @@
-const { body, validationResult } = require('express-validator');
+/**
+ * ========================================
+ * VALIDADOR DE PACIENTES
+ * ========================================
+ */
+
+const { body } = require('express-validator');
+const { handleValidationErrors } = require('../utils/validationUtils');
 
 const validatePatient = [
     body('nombre')
@@ -14,34 +21,14 @@ const validatePatient = [
     body('diagnostico')
         .optional()
         .trim(),
-    (req, res, next) => {
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            return res.status(400).json({
-                success: false,
-                error: errors.array()[0].msg,
-                details: errors.array()
-            });
-        }
-        next();
-    }
+    handleValidationErrors
 ];
 
 const validatePatientAssign = [
     body('id_terapeuta')
         .notEmpty().withMessage('El ID del terapeuta es requerido')
         .isInt().withMessage('El ID del terapeuta debe ser un número entero'),
-    (req, res, next) => {
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            return res.status(400).json({
-                success: false,
-                error: errors.array()[0].msg,
-                details: errors.array()
-            });
-        }
-        next();
-    }
+    handleValidationErrors
 ];
 
 module.exports = { validatePatient, validatePatientAssign };

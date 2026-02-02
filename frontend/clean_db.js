@@ -92,6 +92,8 @@ async function run() {
     await cleanTable('eventos');
     await cleanTable('sesiones');
     await cleanTable('pacientes');
+    await cleanTable('terapeuta_paciente'); // Dependencies first
+    await cleanTable('terapeutas');
     await cleanTable('usuarios');
 
     await cleanAuthUsers();

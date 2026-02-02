@@ -91,7 +91,7 @@ MM: Sufijo del módulo al que pertenece, por ejemplo:
 | **Postcondiciones** | Nuevos terapeutas activos y con acceso limitado a sus pacientes. Todas las acciones del Superadministrador quedan registradas. |  |  |  |  |  |
 | **Criterios de aceptación** | El Superadministrador puede ver, crear, editar y eliminar terapeutas. Solo él puede reasignar pacientes entre terapeutas. Los cambios son visibles de inmediato en la base de datos. |  |  |  |  |  |
 | **Requerimientos no funcionales** | Operaciones de creación/modificación en menos de 5 segundos. Interfaz responsiva con texto claro (24 pt o más). Confirmaciones visuales y auditivas para acciones críticas. |  |  |  |  |  |
-| **Estado** | Aprobado( ) | Rechazado() |  | Pendiente (x) |  | Corregir() |
+| **Estado** | Aprobado(x) | Rechazado() |  | Pendiente () |  | Corregir() |
 | **Observaciones** |  |  |  |  |  |  |
 
 | Título del Requerimiento | Gestión de roles y permisos del Terapeuta |  |  |  |  |  |
@@ -664,108 +664,9 @@ Tabla de relación muchos-a-muchos entre terapeutas y pacientes.
 
 ---
 
-#### **5.5 actividad_juego**
-Catálogo de actividades disponibles en el videojuego VR.
-
-| Columna | Tipo | Descripción |
-|---------|------|-------------|
-| `id` | INTEGER (PK) | Identificador único de la actividad |
-| `nombre` | VARCHAR | Nombre de la actividad |
-| `nivel_dificultad` | VARCHAR | Nivel: Fácil, Intermedio, Difícil |
-| `tiempo_max_seg` | INTEGER | Tiempo máximo en segundos |
-
 ---
 
-#### **5.6 sesiones**
-Registro de sesiones clínicas VR ejecutadas (RF-BDD-02).
-
-| Columna | Tipo | Descripción |
-|---------|------|-------------|
-| `id` | INTEGER (PK) | Identificador único de la sesión |
-| `id_paciente` | INTEGER (FK → pacientes) | Paciente que realizó la sesión |
-| `id_actividad` | INTEGER (FK → actividad_juego) | Actividad ejecutada |
-| `id_terapeuta` | INTEGER (FK → terapeutas) | Terapeuta supervisor |
-| `estado` | VARCHAR | Estado: `INICIADA`, `EN_PAUSA`, `COMPLETADA`, `INTERRUMPIDA` |
-| `fecha_inicio` | TIMESTAMP | Fecha/hora de inicio |
-| `fecha_fin` | TIMESTAMP | Fecha/hora de finalización |
-| `duracion_total` | INTEGER | Duración total en segundos |
-| `numero_pausas` | INTEGER | Número de pausas realizadas |
-| `numero_alertas_descanso` | INTEGER | Alertas de descanso mostradas |
-
----
-
-#### **5.7 eventos_interacciones**
-Registro detallado de acciones VR (RF-BDD-03).
-
-| Columna | Tipo | Descripción |
-|---------|------|-------------|
-| `id` | INTEGER (PK) | Identificador único del evento |
-| `id_sesion` | INTEGER (FK → sesiones) | Sesión asociada |
-| `tipo_accion` | VARCHAR | Tipo: `pick_up`, `drop`, `pour`, `cut`, `move`, `open_drawer`, `turn_on_stove`, etc. |
-| `objeto_id` | VARCHAR | ID del asset involucrado |
-| `objeto_descripcion` | VARCHAR | Descripción del objeto |
-| `posicion_x` | NUMERIC | Coordenada X |
-| `posicion_y` | NUMERIC | Coordenada Y |
-| `posicion_z` | NUMERIC | Coordenada Z |
-| `cantidad` | NUMERIC | Cantidad (ej: ml vertidos) |
-| `metadatos_estado` | JSON | Estado adicional del objeto |
-| `timestamp_evento` | TIMESTAMP | Marca temporal del evento |
-
----
-
-#### **5.8 evaluacion_cognitiva**
-Clasificación cognitiva de acciones (RF-BDD-04).
-
-| Columna | Tipo | Descripción |
-|---------|------|-------------|
-| `id` | INTEGER (PK) | Identificador único |
-| `id_sesion` | INTEGER (FK → sesiones) | Sesión asociada |
-| `id_evento` | INTEGER (FK → eventos_interacciones) | Evento evaluado |
-| `resultado_tipo` | VARCHAR | Clasificación: `ACIERTO`, `ERROR`, `OMISION` |
-| `resultado_detalle` | TEXT | Descripción del resultado |
-| `objeto_esperado_id` | VARCHAR | Objeto que debía seleccionarse |
-| `objeto_elegido_id` | VARCHAR | Objeto que se seleccionó |
-| `tiempo_desde_ultimo_evento` | INTEGER | Tiempo en milisegundos |
-| `confidence_score` | NUMERIC | Puntuación de confianza (0-1) |
-| `timestamp_evaluacion` | TIMESTAMP | Marca temporal de evaluación |
-
----
-
-#### **5.9 resumen_sesion**
-Resumen agregado de métricas por sesión.
-
-| Columna | Tipo | Descripción |
-|---------|------|-------------|
-| `id` | INTEGER (PK) | Identificador único |
-| `id_sesion` | INTEGER (FK → sesiones) | Sesión asociada |
-| `total_aciertos` | INTEGER | Total de aciertos |
-| `total_errores` | INTEGER | Total de errores |
-| `total_omisiones` | INTEGER | Total de omisiones |
-| `tiempo_total_seg` | INTEGER | Tiempo total en segundos |
-| `observaciones` | TEXT | Notas del terapeuta |
-
----
-
-#### **5.10 resumen_cognitivo_sesion**
-Métricas cognitivas calculadas automáticamente.
-
-| Columna | Tipo | Descripción |
-|---------|------|-------------|
-| `id` | INTEGER (PK) | Identificador único |
-| `id_sesion` | INTEGER (FK → sesiones) | Sesión asociada |
-| `total_aciertos` | INTEGER | Total de aciertos |
-| `total_errores` | INTEGER | Total de errores |
-| `total_omisiones` | INTEGER | Total de omisiones |
-| `tiempo_total` | INTEGER | Tiempo total |
-| `tiempo_promedio_reaccion` | INTEGER | Tiempo promedio de reacción (ms) |
-| `puntaje_final` | NUMERIC | Puntuación final calculada |
-| `observaciones` | TEXT | Observaciones adicionales |
-| `created_at` | TIMESTAMP | Fecha de creación |
-| `updated_at` | TIMESTAMP | Última actualización |
-
----
-
-#### **5.11 auditoria**
+#### **5.5 auditoria**
 Registro de eventos administrativos (RF-BDD-08).
 
 | Columna | Tipo | Descripción |
@@ -778,7 +679,7 @@ Registro de eventos administrativos (RF-BDD-08).
 
 ---
 
-#### **5.12 password_reset_tokens**
+#### **5.6 password_reset_tokens**
 Tokens temporales para recuperación de contraseña.
 
 | Columna | Tipo | Descripción |
@@ -792,9 +693,77 @@ Tokens temporales para recuperación de contraseña.
 
 ---
 
+#### **5.7 vr_session_results**
+
+Sesión principal del videojuego VR incluyendo métricas globales y JSON completo para auditoría.
+
+| Columna | Tipo | Descripción |
+|---------|------|-------------|
+| `id` | UUID (PK) | Identificador único |
+| `schema_version` | TEXT | Versión del esquema JSON |
+| `participant_id` | TEXT | ID del participante |
+| `activity_id` | TEXT | ID de la actividad (ej: tinto_easy_01) |
+| `started_at` | TIMESTAMPTZ | Inicio de la sesión |
+| `ended_at` | TIMESTAMPTZ | Fin de la sesión |
+| `total_seconds` | DOUBLE | Duración total en segundos |
+| `summary_total_errors` | INT | Total de errores |
+| `summary_total_drops` | INT | Total de drops |
+| `summary_total_releases` | INT | Total de releases |
+| `summary_sets_completed` | INT | Sets completados |
+| `raw_payload` | JSONB | JSON completo para auditoría |
+| `created_at` | TIMESTAMPTZ | Fecha de creación |
+
+---
+
+#### **5.8 vr_set_results**
+Resultados por cada set (Ingredients/Utensils/Preparation/Organization).
+
+| Columna | Tipo | Descripción |
+|---------|------|-------------|
+| `id` | UUID (PK) | Identificador único |
+| `session_id` | UUID (FK → vr_session_results) | Sesión asociada |
+| `set_name` | TEXT | Nombre del set |
+| `started_at` | TIMESTAMPTZ | Inicio del set |
+| `ended_at` | TIMESTAMPTZ | Fin del set |
+| `duration_seconds` | DOUBLE | Duración en segundos |
+| `blocked_count` | INT | Conteo de bloqueos |
+| `drops_count` | INT | Conteo de drops |
+| `releases_count` | INT | Conteo de releases |
+| `completion_coffee_added` | BOOLEAN | Café agregado (solo Preparation) |
+| `completion_sugar_added` | BOOLEAN | Azúcar agregada (solo Preparation) |
+| `completion_cup_coffee_amount_01` | DOUBLE | Cantidad de café servido |
+| `created_at` | TIMESTAMPTZ | Fecha de creación |
+
+---
+
+#### **5.9 vr_set_errors**
+Errores explícitos con código y timestamp por cada set.
+
+| Columna | Tipo | Descripción |
+|---------|------|-------------|
+| `id` | UUID (PK) | Identificador único |
+| `set_id` | UUID (FK → vr_set_results) | Set asociado |
+| `code` | TEXT | Código de error (ej: STOVE_ON_NO_POT) |
+| `message` | TEXT | Mensaje descriptivo |
+| `occurred_at` | TIMESTAMPTZ | Timestamp del error |
+| `created_at` | TIMESTAMPTZ | Fecha de creación |
+
+---
+
+#### **5.10 vr_set_returned_objects**
+Objetos retornados en el set Organization.
+
+| Columna | Tipo | Descripción |
+|---------|------|-------------|
+| `id` | UUID (PK) | Identificador único |
+| `set_id` | UUID (FK → vr_set_results) | Set asociado |
+| `object_name` | TEXT | Nombre del objeto retornado |
+| `created_at` | TIMESTAMPTZ | Fecha de creación |
+
+---
+
 ### **Diagrama de Clases (Mermaid)**
 
-```mermaid
 classDiagram
     class usuarios {
         +int id PK
@@ -830,75 +799,6 @@ classDiagram
         +int id_paciente FK
     }
     
-    class sesiones {
-        +int id PK
-        +int id_paciente FK
-        +int id_actividad FK
-        +int id_terapeuta FK
-        +varchar estado
-        +timestamp fecha_inicio
-        +timestamp fecha_fin
-        +int duracion_total
-        +int numero_pausas
-        +int numero_alertas_descanso
-    }
-    
-    class actividad_juego {
-        +int id PK
-        +varchar nombre
-        +varchar nivel_dificultad
-        +int tiempo_max_seg
-    }
-    
-    class eventos_interacciones {
-        +int id PK
-        +int id_sesion FK
-        +varchar tipo_accion
-        +varchar objeto_id
-        +varchar objeto_descripcion
-        +numeric posicion_x
-        +numeric posicion_y
-        +numeric posicion_z
-        +numeric cantidad
-        +json metadatos_estado
-        +timestamp timestamp_evento
-    }
-    
-    class evaluacion_cognitiva {
-        +int id PK
-        +int id_sesion FK
-        +int id_evento FK
-        +varchar resultado_tipo
-        +text resultado_detalle
-        +varchar objeto_esperado_id
-        +varchar objeto_elegido_id
-        +int tiempo_desde_ultimo_evento
-        +numeric confidence_score
-        +timestamp timestamp_evaluacion
-    }
-    
-    class resumen_sesion {
-        +int id PK
-        +int id_sesion FK
-        +int total_aciertos
-        +int total_errores
-        +int total_omisiones
-        +int tiempo_total_seg
-        +text observaciones
-    }
-    
-    class resumen_cognitivo_sesion {
-        +int id PK
-        +int id_sesion FK
-        +int total_aciertos
-        +int total_errores
-        +int total_omisiones
-        +int tiempo_total
-        +int tiempo_promedio_reaccion
-        +numeric puntaje_final
-        +text observaciones
-    }
-    
     class auditoria {
         +int id PK
         +int id_usuario FK
@@ -916,20 +816,53 @@ classDiagram
         +timestamp created_at
     }
 
+    class vr_session_results {
+        +uuid id PK
+        +text schema_version
+        +text participant_id
+        +text activity_id
+        +timestamptz started_at
+        +timestamptz ended_at
+        +double total_seconds
+        +int summary_total_errors
+        +int summary_total_drops
+        +int summary_sets_completed
+        +jsonb raw_payload
+    }
+
+    class vr_set_results {
+        +uuid id PK
+        +uuid session_id FK
+        +text set_name
+        +timestamptz started_at
+        +double duration_seconds
+        +int blocked_count
+        +int drops_count
+    }
+
+    class vr_set_errors {
+        +uuid id PK
+        +uuid set_id FK
+        +text code
+        +text message
+        +timestamptz occurred_at
+    }
+
+    class vr_set_returned_objects {
+        +uuid id PK
+        +uuid set_id FK
+        +text object_name
+    }
+
     usuarios "1" --> "0..1" terapeutas : tiene
     usuarios "1" --> "*" auditoria : genera
     usuarios "1" --> "*" password_reset_tokens : tiene
     terapeutas "1" --> "*" terapeuta_paciente : asigna
     pacientes "1" --> "*" terapeuta_paciente : asignado a
-    pacientes "1" --> "*" sesiones : tiene
-    actividad_juego "1" --> "*" sesiones : usada en
-    terapeutas "1" --> "*" sesiones : supervisa
-    sesiones "1" --> "*" eventos_interacciones : contiene
-    sesiones "1" --> "*" evaluacion_cognitiva : tiene
-    sesiones "1" --> "0..1" resumen_sesion : tiene
-    sesiones "1" --> "0..1" resumen_cognitivo_sesion : tiene
-    eventos_interacciones "1" --> "0..1" evaluacion_cognitiva : evaluado en
-```
+    
+    vr_session_results "1" --> "*" vr_set_results : tiene
+    vr_set_results "1" --> "*" vr_set_errors : contiene
+    vr_set_results "1" --> "*" vr_set_returned_objects : contiene
 
 ---
 
@@ -939,3 +872,70 @@ classDiagram
 2. **Migraciones**: Los scripts de migración se encuentran en `backend/migrations/`.
 3. **Configuración**: Las credenciales de Supabase se configuran en `backend/.env`.
 4. **Índices**: Se han creado índices en `password_reset_tokens` para optimizar búsquedas por token y fecha de expiración.
+
+---
+
+6. ## **INTEGRACIÓN CON VIDEOJUEGO VR (UNITY)**
+
+### **Arquitectura del Proyecto**
+
+El proyecto "Cerebro al Fuego" se divide en dos módulos independientes que se comunican mediante JSON:
+
+| Módulo | Tecnología | Descripción |
+|--------|------------|-------------|
+| **Dashboard Terapeuta** | Electron + Express | Gestión de pacientes, terapeutas y análisis de sesiones |
+| **Videojuego VR** | Unity | Aplicación de realidad virtual con actividades de cocina |
+
+### **Formato de Registro de Actividades**
+
+El videojuego en Unity exporta los datos de cada sesión clínica en formato JSON con la siguiente estructura:
+
+```json
+{
+  "sesion": 1,
+  "fecha": "2026-02-27",
+  "actividades": [
+    {
+      "instruccion": "Buscar los ingredientes para hacer un tinto y dejarlos en el mesón",
+      "tiempo_estimado_seg": 75,
+      "cumple": "PARCIALMENTE",
+      "tiempo_real_seg": 143,
+      "especificacion": "Solo encontró 3 ingredientes",
+      "imprevisto": "Se pausó al finalizar la tarea dos"
+    }
+  ]
+}
+```
+
+### **Criterios de Cumplimiento**
+
+| Valor | Descripción |
+|-------|-------------|
+| `CUMPLE` | Realiza completamente lo indicado en la instrucción |
+| `PARCIALMENTE` | Realiza solo una parte de lo indicado |
+| `NO_CUMPLE` | No realiza ninguna de las acciones solicitadas |
+
+> **Nota:** El participante puede avanzar a la siguiente tarea independientemente del nivel de cumplimiento. El interés principal es identificar aciertos y desaciertos en la ejecución.
+
+### **Tabla `registro_actividades`**
+
+Para almacenar estos datos, se creará la siguiente tabla en Supabase:
+
+| Columna | Tipo | Descripción |
+|---------|------|-------------|
+| `id` | SERIAL (PK) | Identificador único |
+| `id_sesion` | INTEGER (FK → sesiones) | Sesión asociada |
+| `instruccion` | TEXT | Instrucción dada al participante |
+| `tiempo_estimado_seg` | INTEGER | Tiempo estimado en segundos |
+| `tiempo_real_seg` | INTEGER | Tiempo real de ejecución |
+| `cumple` | VARCHAR(20) | `CUMPLE`, `PARCIALMENTE`, `NO_CUMPLE` |
+| `especificacion` | TEXT | Detalles del cumplimiento |
+| `imprevisto` | TEXT | Eventos inesperados durante la actividad |
+| `orden_actividad` | INTEGER | Orden de la actividad en la sesión |
+| `created_at` | TIMESTAMP | Fecha de registro |
+
+### **Observaciones**
+
+- El cumplimiento parcial o incorrecto **no impide** el avance a la siguiente actividad.
+- El registro busca evidenciar las capacidades reales del participante y las dificultades presentadas durante la ejecución.
+- Los imprevistos deben documentarse únicamente si afectan el desarrollo normal de la actividad.

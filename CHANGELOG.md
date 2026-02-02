@@ -2,6 +2,94 @@
 
 Todos los cambios notables de este proyecto serán documentados en este archivo.
 
+## [1.7.0] - 2026-02-02
+
+### ✨ Nuevas Funcionalidades
+
+- **Toggle de Visibilidad de Contraseña**
+  - Icono de ojo en campos de contraseña en Reset Password
+  - Permite ver/ocultar contraseña mientras se escribe
+  - Mejora la experiencia de usuario en formularios de seguridad
+
+- **Script de Seed Mejorado**
+  - `seed_complete.js` usa variables de entorno para credenciales
+  - Lee `SUPERADMIN_EMAIL` y `SUPERADMIN_PASSWORD` desde `.env`
+  - Limpia usuarios existentes antes de crear nuevos (evita duplicados)
+
+- **Script de Limpieza de BD**
+  - Nuevo `clear_database.js` para resetear datos de prueba
+  - Limpia todas las tablas en orden correcto de dependencias
+
+### 🔧 Mejoras
+
+- **Limpieza del Proyecto**
+  - Eliminados archivos temporales y de desarrollo
+  - Actualizado `.gitignore` con exclusiones comprehensivas
+  - Excluidos: `.env`, logs, test-results, artefactos de AI
+
+- **Documentación**
+  - `.env.example` actualizado con todas las variables necesarias
+  - Estructura de proyecto limpia para producción
+
+### 🧪 Testing
+
+- **QA Browser Testing Completo**
+  - Todas las funcionalidades probadas via UI
+  - Autenticación, Admin, Terapeuta, Pacientes, Sesiones VR
+  - Documentados 24+ casos de prueba exitosos
+
+---
+
+## [1.6.0] - 2026-02-02
+
+### ✨ Nuevas Funcionalidades
+
+- **Integración VR Completa**
+  - Nuevo endpoint `/api/v1/session-results` para recibir datos de Unity
+  - Servicio `vrResultsService.js` para consumir API de sesiones VR
+  - Vista detallada de sesiones VR con sets, errores y objetos retornados
+
+- **Visualización de Sesiones VR**
+  - Componente `VRSessionCard.jsx` con sets expandibles
+  - Traducción de códigos de error a español
+  - Métricas visuales: errores, drops, releases por set
+
+### 🎨 Mejoras de UI/UX
+
+- **Diseño Responsivo**
+  - Frontend adaptable a diferentes tamaños de pantalla desktop
+  - Breakpoints optimizados para resoluciones 1024px+
+  - Layouts flexibles en AdminLayout y TerapeutaLayout
+
+- **Modal de Reasignación de Pacientes**
+  - Nuevo tamaño `2xl` para modales grandes
+  - Filas de pacientes expandibles con información detallada
+  - Selector de terapeuta con indicador visual de asignación
+  - Panel de información del terapeuta seleccionado
+
+- **Vista Detalle de Paciente**
+  - Enfocada exclusivamente en sesiones VR
+  - Eliminada pestaña de sesiones del sistema
+
+### 🔧 Refactorización
+
+- **Limpieza de Código Backend**
+  - Eliminadas rutas obsoletas: `sesiones.js`, `eventos.js`, `evaluacion.js`, `metricas.js`
+  - Actualizado `server.js` para remover imports legacy
+  - Extracción de utilidad compartida `validationUtils.js`
+
+- **Limpieza de Código Frontend**
+  - Eliminado servicio obsoleto `sessionService.js`
+  - Refactorizado `DashboardTerapeuta.jsx` para usar `vrResultsService`
+
+### 📝 Documentación
+
+- Actualizado esquema de base de datos en requerimientos
+- Documentadas tablas VR: `vr_session_results`, `vr_set_results`, `vr_set_errors`, `vr_set_returned_objects`
+- Actualizada tabla de requerimientos implementados en README
+
+---
+
 ## [1.4.0] - 2026-01-22
 
 ### ✨ Nuevas Funcionalidades

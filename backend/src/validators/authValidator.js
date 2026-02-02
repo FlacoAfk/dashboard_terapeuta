@@ -1,4 +1,11 @@
-const { body, validationResult } = require('express-validator');
+/**
+ * ========================================
+ * VALIDADOR DE AUTENTICACIÓN
+ * ========================================
+ */
+
+const { body } = require('express-validator');
+const { handleValidationErrors } = require('../utils/validationUtils');
 
 const validateLogin = [
     body('email')
@@ -7,17 +14,7 @@ const validateLogin = [
         .isEmail().withMessage('Debe ser un correo electrónico válido'),
     body('password')
         .notEmpty().withMessage('La contraseña es requerida'),
-    (req, res, next) => {
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            return res.status(400).json({
-                success: false,
-                error: errors.array()[0].msg, // Return the first error message
-                details: errors.array()
-            });
-        }
-        next();
-    }
+    handleValidationErrors
 ];
 
 module.exports = { validateLogin };

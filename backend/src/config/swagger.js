@@ -24,6 +24,7 @@ Esta API proporciona endpoints para gestionar:
 - **Terapeutas**: Información de terapeutas
 - **Actividades**: Actividades del juego terapéutico
 - **Dashboard**: Estadísticas generales
+- **VR Results**: Resultados de sesiones del videojuego Unity
 
 ### Base de Datos
 Conectada a **Supabase PostgreSQL**
@@ -48,7 +49,8 @@ Conectada a **Supabase PostgreSQL**
             { name: 'Terapeutas', description: 'Información de terapeutas' },
             { name: 'Actividades', description: 'Actividades del juego' },
             { name: 'Dashboard', description: 'Estadísticas generales' },
-            { name: 'Auditoría', description: 'Eventos de auditoría (solo Superadmin)' }
+            { name: 'Auditoría', description: 'Eventos de auditoría (solo Superadmin)' },
+            { name: 'VR Results', description: 'Resultados de sesiones VR (Unity)' }
         ],
         components: {
             securitySchemes: {
@@ -160,6 +162,81 @@ Conectada a **Supabase PostgreSQL**
                     properties: {
                         success: { type: 'boolean', example: false },
                         error: { type: 'string' }
+                    }
+                },
+                VRSessionResult: {
+                    type: 'object',
+                    properties: {
+                        id: { type: 'string', format: 'uuid' },
+                        schema_version: { type: 'string', example: '1.0' },
+                        participant_id: { type: 'string' },
+                        activity_id: { type: 'string', example: 'tinto_easy_01' },
+                        started_at: { type: 'string', format: 'date-time' },
+                        ended_at: { type: 'string', format: 'date-time' },
+                        total_seconds: { type: 'number' },
+                        summary_total_errors: { type: 'integer' },
+                        summary_total_drops: { type: 'integer' },
+                        summary_total_releases: { type: 'integer' },
+                        summary_sets_completed: { type: 'integer' },
+                        raw_payload: { type: 'object' }
+                    }
+                },
+                VRSessionInput: {
+                    type: 'object',
+                    required: ['schemaVersion', 'participantId', 'activityId', 'startedAtIso', 'endedAtIso', 'totalSeconds', 'sets'],
+                    properties: {
+                        schemaVersion: { type: 'string', example: '1.0' },
+                        participantId: { type: 'string', example: 'PACIENTE_001' },
+                        activityId: { type: 'string', example: 'tinto_easy_01' },
+                        startedAtIso: { type: 'string', format: 'date-time' },
+                        endedAtIso: { type: 'string', format: 'date-time' },
+                        totalSeconds: { type: 'number', example: 355.17 },
+                        summary: {
+                            type: 'object',
+                            properties: {
+                                totalErrors: { type: 'integer' },
+                                totalDrops: { type: 'integer' },
+                                totalReleases: { type: 'integer' },
+                                setsCompleted: { type: 'integer' }
+                            }
+                        },
+                        sets: {
+                            type: 'array',
+                            items: { $ref: '#/components/schemas/VRSetResult' }
+                        }
+                    }
+                },
+                VRSetResult: {
+                    type: 'object',
+                    required: ['setName', 'startedAtIso', 'endedAtIso', 'durationSeconds'],
+                    properties: {
+                        setName: { type: 'string', enum: ['Ingredients', 'Utensils', 'Preparation', 'Organization'] },
+                        startedAtIso: { type: 'string', format: 'date-time' },
+                        endedAtIso: { type: 'string', format: 'date-time' },
+                        durationSeconds: { type: 'number' },
+                        blockedCount: { type: 'integer', default: 0 },
+                        dropsCount: { type: 'integer', default: 0 },
+                        releasesCount: { type: 'integer', default: 0 },
+                        completion: {
+                            type: 'object',
+                            properties: {
+                                coffeeAdded: { type: 'boolean' },
+                                sugarAdded: { type: 'boolean' },
+                                cupCoffeeAmount01: { type: 'number' }
+                            }
+                        },
+                        returnedObjects: { type: 'array', items: { type: 'string' } },
+                        errors: {
+                            type: 'array',
+                            items: {
+                                type: 'object',
+                                properties: {
+                                    code: { type: 'string', example: 'STOVE_ON_NO_POT' },
+                                    message: { type: 'string' },
+                                    timestampIso: { type: 'string', format: 'date-time' }
+                                }
+                            }
+                        }
                     }
                 }
             }

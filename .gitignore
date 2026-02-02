@@ -2,10 +2,11 @@
 node_modules/
 package-lock.json
 
-# Environment
+# Environment (NEVER commit these!)
 .env
 .env.local
 .env.*.local
+backend/.env
 
 # Build outputs
 dist/
@@ -26,20 +27,25 @@ npm-debug.log*
 # OS files
 .DS_Store
 Thumbs.db
+desktop.ini
 
 # IDE
 .idea/
 .vscode/
 *.swp
 *.swo
+*.sublime-*
 
-# Test coverage
+# Test coverage and results
 coverage/
+test-results/
+playwright-report/
 
 # Temporary files
 tmp/
 temp/
 *.tmp
+*.bak
 
 # Debug script outputs
 *_result.json
@@ -47,6 +53,12 @@ temp/
 backend/scripts/*.json
 backend/scripts/*.txt
 
-# Playwright
-playwright-report/
-test-results/
+# Sanity and debug logs
+sanity_logs.txt
+*sanity*.txt
+
+# Local development scripts (keep in repo but ignore outputs)
+backend/scripts/clear_with_sql.js
+
+# Gemini/AI artifacts (local only)
+.gemini/

@@ -304,24 +304,25 @@ const GestionTerapeutas = () => {
         <AdminLayout>
             <div className="space-y-6">
                 {/* Header */}
-                <div className="flex items-center justify-between">
-                    <h1 className="text-2xl font-bold text-gray-900">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <h1 className="text-xl lg:text-2xl font-bold text-gray-900">
                         Gestión de Terapeutas
                     </h1>
                     <button
                         onClick={handleNewTherapist}
-                        className="flex items-center gap-2 bg-[#F76C6C] hover:bg-[#E55A5A] text-white font-medium px-4 py-2.5 rounded-lg transition-colors shadow-sm"
+                        className="flex items-center gap-2 bg-[#F76C6C] hover:bg-[#E55A5A] text-white font-medium px-4 py-2.5 rounded-lg transition-colors shadow-sm w-full sm:w-auto justify-center"
                     >
                         <Icons.Plus />
-                        Nuevo terapeuta
+                        <span className="hidden sm:inline">Nuevo terapeuta</span>
+                        <span className="sm:hidden">Nuevo</span>
                     </button>
                 </div>
 
                 {/* Filtros y Búsqueda */}
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                    <div className="flex items-center justify-between gap-4 mb-6">
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 lg:p-6">
+                    <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 mb-6">
                         {/* Search */}
-                        <div className="relative flex-1 max-w-md">
+                        <div className="relative flex-1 max-w-full lg:max-w-md">
                             <div className="absolute left-3 top-1/2 -translate-y-1/2">
                                 <Icons.Search />
                             </div>
@@ -334,30 +335,32 @@ const GestionTerapeutas = () => {
                             />
                         </div>
 
-                        {/* Filter Tabs */}
-                        <div className="flex items-center bg-gray-100 rounded-lg p-1">
-                            {['todos', 'activos', 'inactivos'].map((f) => (
-                                <button
-                                    key={f}
-                                    onClick={() => setFilter(f)}
-                                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors capitalize ${filter === f
-                                        ? 'bg-white text-gray-900 shadow-sm'
-                                        : 'text-gray-600 hover:text-gray-900'
-                                        }`}
-                                >
-                                    {f === 'todos' ? 'Todos' : f === 'activos' ? 'Activos' : 'Inactivos'}
-                                </button>
-                            ))}
+                        {/* Filter Tabs and Refresh */}
+                        <div className="flex items-center gap-2">
+                            <div className="flex items-center bg-gray-100 rounded-lg p-1 flex-1 lg:flex-none">
+                                {['todos', 'activos', 'inactivos'].map((f) => (
+                                    <button
+                                        key={f}
+                                        onClick={() => setFilter(f)}
+                                        className={`px-2 lg:px-4 py-2 rounded-md text-xs lg:text-sm font-medium transition-colors capitalize flex-1 lg:flex-none ${filter === f
+                                            ? 'bg-white text-gray-900 shadow-sm'
+                                            : 'text-gray-600 hover:text-gray-900'
+                                            }`}
+                                    >
+                                        {f === 'todos' ? 'Todos' : f === 'activos' ? 'Activos' : 'Inactivos'}
+                                    </button>
+                                ))}
+                            </div>
+                            {/* Refresh Button */}
+                            <button
+                                onClick={fetchTherapists}
+                                disabled={loading}
+                                className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-50 flex-shrink-0"
+                                title="Recargar"
+                            >
+                                <Icons.Refresh />
+                            </button>
                         </div>
-                        {/* Refresh Button */}
-                        <button
-                            onClick={fetchTherapists}
-                            disabled={loading}
-                            className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-50"
-                            title="Recargar"
-                        >
-                            <Icons.Refresh />
-                        </button>
                     </div>
 
                     {/* Error Message */}
@@ -434,11 +437,11 @@ const GestionTerapeutas = () => {
                     )}
 
                     {/* Pagination */}
-                    <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-200">
-                        <span className="text-sm text-gray-500">
-                            Mostrando {Math.min(startIndex + 1, filteredTherapists.length)} - {Math.min(startIndex + itemsPerPage, filteredTherapists.length)} de {filteredTherapists.length} resultados
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t border-gray-200">
+                        <span className="text-sm text-gray-500 text-center sm:text-left">
+                            Mostrando {Math.min(startIndex + 1, filteredTherapists.length)} - {Math.min(startIndex + itemsPerPage, filteredTherapists.length)} de {filteredTherapists.length}
                         </span>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1 sm:gap-2 flex-wrap justify-center">
                             <button
                                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                                 disabled={currentPage === 1}
@@ -450,7 +453,7 @@ const GestionTerapeutas = () => {
                                 <button
                                     key={i + 1}
                                     onClick={() => setCurrentPage(i + 1)}
-                                    className={`w-9 h-9 rounded-lg text-sm font-medium transition-colors ${currentPage === i + 1
+                                    className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg text-sm font-medium transition-colors ${currentPage === i + 1
                                         ? 'bg-[#F76C6C] text-white'
                                         : 'text-gray-600 hover:bg-gray-100'
                                         }`}

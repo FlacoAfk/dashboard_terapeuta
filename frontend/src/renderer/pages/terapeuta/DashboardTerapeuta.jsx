@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import TherapistLayout from '../../components/layout/TherapistLayout';
 import { useAuth } from '../../context/AuthContext';
 import patientService from '../../services/patientService';
-import sessionService from '../../services/sessionService';
+import vrResultsService from '../../services/vrResultsService';
 import Swal from 'sweetalert2';
 import { showConfirm, showToast } from '../../utils/alertUtils';
 import CrearPacienteModal from '../../components/modals/CrearPacienteModal';
@@ -171,15 +171,51 @@ const DashboardTerapeuta = () => {
                 setError(patientsResult.error);
             }
 
-            // Fetch stats
-            const sessionStats = await sessionService.getStats();
+            // Fetch patient stats
             const patientStats = await patientService.getStats();
+
+            // Calculate VR session stats (from today and this week)
+            const patients = patientsResult.data || [];
+            let sessionsToday = 0;
+            let sessionsThisWeek = 0;
+            let totalAciertos = 0;
+            let totalEventos = 0;
+
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const weekAgo = new Date();
+            weekAgo.setDate(weekAgo.getDate() - 7);
+            weekAgo.setHours(0, 0, 0, 0);
+
+            // Get VR sessions for all patients
+            for (const patient of patients.slice(0, 10)) { // Limit to first 10 for performance
+                if (patient.identificacion) {
+                    const sessions = await vrResultsService.getSessionsByParticipant(patient.identificacion);
+                    if (sessions.success && sessions.data) {
+                        sessions.data.forEach(session => {
+                            const sessionDate = new Date(session.started_at_iso);
+                            if (sessionDate >= today) sessionsToday++;
+                            if (sessionDate >= weekAgo) sessionsThisWeek++;
+                            // Calculate total sets for performance metrics
+                            if (session.sets && session.sets.length > 0) {
+                                session.sets.forEach(set => {
+                                    const errorsCount = set.errors_count || 0;
+                                    totalAciertos += set.total_objects_returned - errorsCount;
+                                    totalEventos += set.total_objects_returned;
+                                });
+                            }
+                        });
+                    }
+                }
+            }
+
+            const rendimiento = totalEventos > 0 ? Math.round((totalAciertos / totalEventos) * 100) : 0;
 
             setStats({
                 activos: patientStats.success ? patientStats.data.activos : 0,
-                hoy: sessionStats.success ? sessionStats.data.hoy : 0,
-                semana: sessionStats.success ? sessionStats.data.semana : 0,
-                rendimiento: sessionStats.success ? sessionStats.data.rendimientoPromedio : 0
+                hoy: sessionsToday,
+                semana: sessionsThisWeek,
+                rendimiento: rendimiento
             });
         } catch (err) {
             setError('Error al cargar datos');
@@ -243,11 +279,11 @@ const DashboardTerapeuta = () => {
             <div className="space-y-6">
                 {/* Header */}
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                    <h1 className="text-xl lg:text-2xl font-bold text-gray-900 flex items-center gap-2">
                         <span className="text-2xl">👋</span>
-                        Bienvenido, {user?.nombre || 'Dr. Terapeuta'}
+                        <span className="truncate">Bienvenido, {user?.nombre || 'Dr. Terapeuta'}</span>
                     </h1>
-                    <p className="text-gray-500 mt-1">
+                    <p className="text-gray-500 mt-1 text-sm lg:text-base">
                         Aquí tienes un resumen de tu actividad reciente.
                     </p>
                 </div>
@@ -282,19 +318,19 @@ const DashboardTerapeuta = () => {
 
                 {/* Patients Table */}
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-                    <div className="p-6 border-b border-gray-200">
-                        <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div className="p-4 lg:p-6 border-b border-gray-200">
+                        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
                             <h2 className="text-lg font-semibold text-gray-900">MIS PACIENTES</h2>
 
-                            <div className="flex items-center gap-4">
+                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
                                 {/* Search */}
-                                <div className="relative">
+                                <div className="relative flex-1 sm:flex-none">
                                     <input
                                         type="text"
                                         placeholder="Buscar..."
                                         value={searchTerm}
                                         onChange={(e) => setSearchTerm(e.target.value)}
-                                        className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2AA87E]/20 focus:border-[#2AA87E] w-48"
+                                        className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2AA87E]/20 focus:border-[#2AA87E] w-full sm:w-48"
                                     />
                                     <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
                                         <Icons.Search />
@@ -304,17 +340,18 @@ const DashboardTerapeuta = () => {
                                 {/* New Patient Button */}
                                 <button
                                     onClick={() => setShowCreateModal(true)}
-                                    className="flex items-center gap-2 bg-[#2AA87E] hover:bg-[#239469] text-white font-medium px-4 py-2 rounded-lg transition-colors"
+                                    className="flex items-center justify-center gap-2 bg-[#2AA87E] hover:bg-[#239469] text-white font-medium px-4 py-2 rounded-lg transition-colors"
                                 >
                                     <Icons.Plus />
-                                    Nuevo Paciente
+                                    <span className="hidden sm:inline">Nuevo Paciente</span>
+                                    <span className="sm:hidden">Nuevo</span>
                                 </button>
                             </div>
                         </div>
 
                         {/* Filters */}
-                        <div className="flex gap-4 mt-4 items-center justify-between">
-                            <div className="flex gap-4">
+                        <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 mt-4 items-start sm:items-center justify-between">
+                            <div className="flex flex-wrap gap-2 sm:gap-4 items-center">
                                 <label className="text-sm text-gray-500">Filtros:</label>
                                 {['todos', 'activos', 'inactivos'].map((f) => (
                                     <label key={f} className="flex items-center gap-2 cursor-pointer">

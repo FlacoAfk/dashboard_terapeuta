@@ -346,6 +346,87 @@ El backend sigue una arquitectura por capas:
 
 ---
 
+## 🎮 Integración con Videojuego VR (Unity)
+
+El proyecto "Cerebro al Fuego" se divide en dos módulos que se comunican mediante JSON:
+
+| Módulo | Tecnología | Descripción |
+|--------|------------|-------------|
+| **Dashboard Terapeuta** | Electron + Express | Gestión de pacientes, terapeutas y análisis de sesiones |
+| **Videojuego VR** | Unity | Aplicación de realidad virtual con actividades de cocina |
+
+### Flujo de Comunicación
+
+```
+┌────────────────────────┐     POST JSON      ┌────────────────────────┐
+│    VIDEOJUEGO VR       │ ─────────────────> │  DASHBOARD BACKEND     │
+│       (Unity)          │                    │    (Express.js)        │
+│                        │                    │         │              │
+│  Sets: Ingredients     │                    │         ▼              │
+│        Utensils        │                    │ ┌──────────────────┐   │
+│        Preparation     │                    │ │    SUPABASE      │   │
+│        Organization    │                    │ │  (PostgreSQL)    │   │
+└────────────────────────┘                    │ └──────────────────┘   │
+                                              └────────────────────────┘
+```
+
+### Formato JSON de Sesión VR
+
+```json
+{
+  "schemaVersion": "1.0",
+  "participantId": "PACIENTE_001",
+  "activityId": "tinto_easy_01",
+  "startedAtIso": "2026-01-21T05:13:26.428Z",
+  "endedAtIso": "2026-01-21T05:19:21.598Z",
+  "totalSeconds": 355.17,
+  "summary": {
+    "totalErrors": 3,
+    "totalDrops": 2,
+    "totalReleases": 5,
+    "setsCompleted": 4
+  },
+  "sets": [
+    {
+      "setName": "Ingredients",
+      "durationSeconds": 40.18,
+      "blockedCount": 1,
+      "dropsCount": 0,
+      "releasesCount": 1,
+      "errors": [{ "code": "STOVE_ON_NO_POT", "message": "...", "timestampIso": "..." }]
+    }
+  ]
+}
+```
+
+> **Nota:** No existen estrellas ni puntajes visibles al usuario. Toda la información es para evaluación terapéutica.
+
+### Sets de Evaluación
+
+| Set | Descripción | Campos especiales |
+|-----|-------------|-------------------|
+| **Ingredients** | Recolección de ingredientes | - |
+| **Utensils** | Selección de utensilios | - |
+| **Preparation** | Preparación del café | `completion` (coffeeAdded, sugarAdded) |
+| **Organization** | Organización y limpieza | `returnedObjects` (lista de objetos) |
+
+### Endpoint Principal
+
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| POST | `/api/v1/session-results` | Recibe datos completos de sesión VR |
+| GET | `/api/v1/session-results` | Lista todas las sesiones |
+| GET | `/api/v1/session-results/:id` | Obtiene sesión con detalles |
+
+### Tablas en Supabase
+
+- `vr_session_results` - Sesión principal con raw JSON
+- `vr_set_results` - Resultados por set
+- `vr_set_errors` - Errores con código y timestamp
+- `vr_set_returned_objects` - Objetos devueltos (Organization)
+
+---
+
 ## 📡 API Endpoints
 
 ### Health & Status
@@ -550,24 +631,42 @@ Swagger UI disponible en: **http://localhost:3001/api-docs**
 
 ## 📝 Requerimientos Implementados
 
-| Código | Descripción | Estado |
-|--------|-------------|--------|
-| RF-SEG-01 | Superadministrador único | ✅ |
-| RF-SEG-02 | Gestión de terapeutas | ✅ |
-| RF-SEG-03 | Permisos de terapeuta | ✅ |
-| RF-SEG-04 | Interfaz visual terapeuta | ✅ (API lista, UI Limpia) |
-| RF-BDD-01 | Estructura de usuarios | ✅ |
-| RF-BDD-02 | Registro de sesiones | ✅ |
-| RF-BDD-03 | Registro de acciones | ✅ |
-| RF-BDD-04 | Aciertos/Errores/Omisiones | ✅ |
-| RF-BDD-08 | Auditoría | ✅ |
+### Módulo de Seguridad (RF-SEG)
 
-### Mejoras Recientes (v1.5.0)
-- **Limpieza de Proyecto:** Eliminación de archivos temporales y scripts obsoletos para reducir deuda técnica.
-- **Seguridad Reforzada:** Actualización de archivos ignorados (.gitignore) y validación de ausencia de datos sensibles.
-- **Configuración del Terapeuta:** Nueva página para que los terapeutas editen su perfil y cambien su contraseña.
-- **Seguridad Mejorada:** Validación estricta en backend para prevenir asignación de pacientes a terapeutas inactivos.
-- **UI Unificada:** Modales de creación y edición con estructura consistente.
+| Código | Descripción | Estado | Notas |
+|--------|-------------|--------|-------|
+| RF-SEG-01 | Creación y configuración del Superusuario | ✅ | Único, creado en `/setup`, bloqueado después |
+| RF-SEG-02 | Gestión de roles y permisos del Superadministrador | ✅ | CRUD terapeutas, reasignación de pacientes |
+| RF-SEG-03 | Gestión de roles y permisos del Terapeuta | ✅ | Solo ve sus pacientes, no puede eliminar |
+| RF-SEG-04 | Interfaz visual del terapeuta para gestión de pacientes | ✅ | Dashboard con filtros, detalle de paciente, informes VR |
+
+### Base de Datos (RF-BDD)
+
+| Código | Descripción | Estado | Notas |
+|--------|-------------|--------|-------|
+| RF-BDD-01 | Estructura central de usuarios | ✅ | usuarios, terapeutas, pacientes, terapeuta_paciente |
+| RF-BDD-02 | Registro de sesiones clínicas | ✅ | vr_session_results con metadatos completos |
+| RF-BDD-03 | Registro detallado de acciones (logging) | ✅ | vr_set_results con sets detallados |
+| RF-BDD-04 | Registro de aciertos/errores/omisiones | ✅ | vr_set_errors con códigos y timestamps |
+| RF-BDD-05 | Almacenamiento de listas de ingredientes | 🚧 | Pendiente: integrar con Unity |
+| RF-BDD-06 | Registro de pantalla de apertura | 🚧 | Pendiente: integrar con Unity |
+| RF-BDD-07 | Configuración global del sistema | 🚧 | Pendiente |
+| RF-BDD-08 | Control de auditoría | ✅ | Tabla auditoria con exportación CSV |
+| RF-BDD-09 | Exportación estructurada | ✅ | CSV desde panel de auditoría |
+
+### Módulo Unity (RF-UNT) - Responsabilidad del equipo Unity
+
+| Código | Descripción | Estado Dashboard |
+|--------|-------------|------------------|
+| RF-UNT-10 | Registro detallado de sesión | ✅ API lista para recibir JSON |
+
+### Mejoras Recientes (v1.6.0)
+
+- **Integración VR Completa:** Endpoint `/api/v1/session-results` para recibir datos de Unity
+- **Visualización de Sesiones VR:** Vista detallada de sesiones con sets, errores y objetos
+- **Diseño Responsivo:** Frontend adaptable a diferentes tamaños de pantalla desktop
+- **Modal de Reasignación Mejorado:** UI expandible con información detallada de pacientes y terapeutas
+- **Limpieza de Código:** Eliminación de rutas y servicios obsoletos (sesiones, eventos, evaluacion, metricas)
 
 
 ---
