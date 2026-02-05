@@ -578,44 +578,46 @@ router.post('/forgot-password', async (req, res) => {
             .single();
 
         if (user) {
-            // Generar token seguro
-            const resetToken = crypto.randomBytes(32).toString('hex');
-            const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
+            if (user) {
+                // Generar código de 6 dígitos
+                const code = Math.floor(100000 + Math.random() * 900000).toString();
+                const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutos
 
-            // Invalidar tokens anteriores del usuario
-            await supabase
-                .from('password_reset_tokens')
-                .update({ used: true })
-                .eq('id_usuario', user.id)
-                .eq('used', false);
+                // Invalidar tokens anteriores del usuario
+                await supabase
+                    .from('password_reset_tokens')
+                    .update({ used: true })
+                    .eq('id_usuario', user.id)
+                    .eq('used', false);
 
-            // Guardar nuevo token
-            const { error: tokenError } = await supabase
-                .from('password_reset_tokens')
-                .insert({
-                    id_usuario: user.id,
-                    token: resetToken,
-                    expires_at: expiresAt.toISOString(),
-                    used: false
-                });
+                // Guardar nuevo código
+                const { error: tokenError } = await supabase
+                    .from('password_reset_tokens')
+                    .insert({
+                        id_usuario: user.id,
+                        token: code,
+                        expires_at: expiresAt.toISOString(),
+                        used: false
+                    });
 
-            if (tokenError) {
-                console.error('Error guardando token:', tokenError.message);
-            } else {
-                // Enviar email con link
-                const emailResult = await sendPasswordResetEmail(email, resetToken);
-
-                // Registrar en auditoría
-                await auditFromRequest(req, AUDIT_TYPES.PASSWORD_RESET_REQUEST || 'PASSWORD_RESET_REQUEST', {
-                    email,
-                    message: 'Solicitud de restablecimiento de contraseña',
-                    emailSent: emailResult.success
-                });
-
-                if (emailResult.success) {
-                    console.log(`📧 Email de reset enviado a: ${email}`);
+                if (tokenError) {
+                    console.error('Error guardando código:', tokenError.message);
                 } else {
-                    console.error(`❌ Error enviando email a ${email}: ${emailResult.error}`);
+                    // Enviar email con el código
+                    const emailResult = await sendVerificationCodeEmail(email, code);
+
+                    // Registrar en auditoría
+                    await auditFromRequest(req, AUDIT_TYPES.PASSWORD_RESET_REQUEST || 'PASSWORD_RESET_REQUEST', {
+                        email,
+                        message: 'Solicitud de restablecimiento de contraseña (código)',
+                        emailSent: emailResult.success
+                    });
+
+                    if (emailResult.success) {
+                        console.log(`📧 Código de recuperación enviado a: ${email}`);
+                    } else {
+                        console.error(`❌ Error enviando email a ${email}: ${emailResult.error}`);
+                    }
                 }
             }
         }
