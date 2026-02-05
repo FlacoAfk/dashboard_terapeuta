@@ -10,24 +10,6 @@ CREATE TABLE public.auditoria (
   CONSTRAINT auditoria_pkey PRIMARY KEY (id),
   CONSTRAINT auditoria_id_usuario_fkey FOREIGN KEY (id_usuario) REFERENCES public.usuarios(id)
 );
-CREATE TABLE public.configuracion_sistema (
-  id integer NOT NULL DEFAULT nextval('configuracion_sistema_id_seq'::regclass),
-  clave character varying NOT NULL UNIQUE,
-  valor text NOT NULL,
-  descripcion text,
-  activo boolean DEFAULT true,
-  CONSTRAINT configuracion_sistema_pkey PRIMARY KEY (id)
-);
-CREATE TABLE public.exportaciones_datos (
-  id integer NOT NULL DEFAULT nextval('exportaciones_datos_id_seq'::regclass),
-  id_terapeuta integer NOT NULL,
-  fecha_exportacion timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-  tipo_exportacion character varying,
-  formato_normativo character varying,
-  descripcion text,
-  CONSTRAINT exportaciones_datos_pkey PRIMARY KEY (id),
-  CONSTRAINT exportaciones_datos_id_terapeuta_fkey FOREIGN KEY (id_terapeuta) REFERENCES public.terapeutas(id)
-);
 CREATE TABLE public.pacientes (
   id integer NOT NULL DEFAULT nextval('pacientes_id_seq'::regclass),
   identificacion character varying UNIQUE,
@@ -82,19 +64,25 @@ CREATE TABLE public.usuarios (
 );
 CREATE TABLE public.vr_session_results (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
-  schema_version text NOT NULL,
+  schema_version text,
   participant_id text NOT NULL,
   activity_id text NOT NULL,
   started_at timestamp with time zone NOT NULL,
   ended_at timestamp with time zone NOT NULL,
   total_seconds double precision NOT NULL CHECK (total_seconds >= 0::double precision),
-  summary_total_errors integer NOT NULL DEFAULT 0 CHECK (summary_total_errors >= 0),
-  summary_total_drops integer NOT NULL DEFAULT 0 CHECK (summary_total_drops >= 0),
-  summary_total_releases integer NOT NULL DEFAULT 0 CHECK (summary_total_releases >= 0),
-  summary_sets_completed integer NOT NULL DEFAULT 0 CHECK (summary_sets_completed >= 0),
+  summary_total_errors integer DEFAULT 0 CHECK (summary_total_errors >= 0),
+  summary_total_drops integer DEFAULT 0 CHECK (summary_total_drops >= 0),
+  summary_total_releases integer DEFAULT 0 CHECK (summary_total_releases >= 0),
+  summary_sets_completed integer DEFAULT 0 CHECK (summary_sets_completed >= 0),
   raw_payload jsonb NOT NULL,
   created_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT vr_session_results_pkey PRIMARY KEY (id)
+  id_paciente_vinculado integer,
+  id_terapeuta_revisor integer,
+  observaciones_terapeuta text,
+  estado_revision character varying DEFAULT 'PENDIENTE_REVISION'::character varying,
+  CONSTRAINT vr_session_results_pkey PRIMARY KEY (id),
+  CONSTRAINT vr_session_results_id_paciente_vinculado_fkey FOREIGN KEY (id_paciente_vinculado) REFERENCES public.pacientes(id),
+  CONSTRAINT vr_session_results_id_terapeuta_revisor_fkey FOREIGN KEY (id_terapeuta_revisor) REFERENCES public.terapeutas(id)
 );
 CREATE TABLE public.vr_set_errors (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -103,6 +91,7 @@ CREATE TABLE public.vr_set_errors (
   message text,
   occurred_at timestamp with time zone NOT NULL,
   created_at timestamp with time zone NOT NULL DEFAULT now(),
+  objeto_contexto text,
   CONSTRAINT vr_set_errors_pkey PRIMARY KEY (id),
   CONSTRAINT vr_set_errors_set_id_fkey FOREIGN KEY (set_id) REFERENCES public.vr_set_results(id)
 );
@@ -116,18 +105,8 @@ CREATE TABLE public.vr_set_results (
   blocked_count integer NOT NULL DEFAULT 0 CHECK (blocked_count >= 0),
   drops_count integer NOT NULL DEFAULT 0 CHECK (drops_count >= 0),
   releases_count integer NOT NULL DEFAULT 0 CHECK (releases_count >= 0),
-  completion_coffee_added boolean,
-  completion_sugar_added boolean,
-  completion_cup_coffee_amount_01 double precision CHECK (completion_cup_coffee_amount_01 IS NULL OR completion_cup_coffee_amount_01 >= 0::double precision AND completion_cup_coffee_amount_01 <= 1::double precision),
   created_at timestamp with time zone NOT NULL DEFAULT now(),
+  errors_count integer DEFAULT 0,
   CONSTRAINT vr_set_results_pkey PRIMARY KEY (id),
   CONSTRAINT vr_set_results_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.vr_session_results(id)
-);
-CREATE TABLE public.vr_set_returned_objects (
-  id uuid NOT NULL DEFAULT gen_random_uuid(),
-  set_id uuid NOT NULL,
-  object_name text NOT NULL,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT vr_set_returned_objects_pkey PRIMARY KEY (id),
-  CONSTRAINT vr_set_returned_objects_set_id_fkey FOREIGN KEY (set_id) REFERENCES public.vr_set_results(id)
 );

@@ -68,8 +68,8 @@ router.post('/session-results', async (req, res) => {
     try {
         const payload = req.body;
 
-        // Validar campos requeridos
-        const requiredFields = ['schemaVersion', 'participantId', 'activityId', 'startedAtIso', 'endedAtIso', 'totalSeconds', 'sets'];
+        // Validar campos requeridos (schemaVersion es opcional)
+        const requiredFields = ['participantId', 'activityId', 'startedAtIso', 'endedAtIso', 'totalSeconds', 'sets'];
         for (const field of requiredFields) {
             if (!payload[field]) {
                 return res.status(400).json({
@@ -91,24 +91,65 @@ router.post('/session-results', async (req, res) => {
             });
         }
 
-        // Extraer summary (con valores por defecto)
-        const summary = payload.summary || {};
+        // Calcular resumen desde los sets si no viene en el payload
+        // Esto es necesario porque Unity puede no enviar el campo summary
+        let calculatedErrors = 0, calculatedDrops = 0, calculatedReleases = 0;
+
+        for (const set of payload.sets) {
+            calculatedDrops += set.dropsCount || 0;
+            calculatedReleases += set.releasesCount || 0;
+            // Contar errores del array errors de cada set
+            if (Array.isArray(set.errors)) {
+                calculatedErrors += set.errors.length;
+            }
+        }
+
+        // Usar summary del payload si existe, sino usar valores calculados
+        const providedSummary = payload.summary || {};
+        const summary = {
+            totalErrors: providedSummary.totalErrors ?? calculatedErrors,
+            totalDrops: providedSummary.totalDrops ?? calculatedDrops,
+            totalReleases: providedSummary.totalReleases ?? calculatedReleases,
+            setsCompleted: providedSummary.setsCompleted ?? payload.sets.length
+        };
+
+        // Buscar paciente por identificación (cédula) para vincular automáticamente
+        // Unity ya verificó que el paciente existe antes de iniciar la sesión
+        let idPacienteVinculado = null;
+
+        if (payload.participantId && payload.participantId !== 'UNKNOWN') {
+            const { data: patient } = await supabase
+                .from('pacientes')
+                .select('id')
+                .eq('identificacion', payload.participantId)
+                .eq('activo', true)
+                .single();
+
+            if (patient) {
+                idPacienteVinculado = patient.id;
+            }
+        }
 
         // 1. Insertar sesión principal
         const { data: sessionData, error: sessionError } = await supabase
             .from('vr_session_results')
             .insert({
-                schema_version: payload.schemaVersion,
+                schema_version: payload.schemaVersion || null,
                 participant_id: payload.participantId,
                 activity_id: payload.activityId,
                 started_at: payload.startedAtIso,
                 ended_at: payload.endedAtIso,
                 total_seconds: payload.totalSeconds,
-                summary_total_errors: summary.totalErrors || 0,
-                summary_total_drops: summary.totalDrops || 0,
-                summary_total_releases: summary.totalReleases || 0,
-                summary_sets_completed: summary.setsCompleted || 0,
-                raw_payload: payload
+                summary_total_errors: summary.totalErrors,
+                summary_total_drops: summary.totalDrops,
+                summary_total_releases: summary.totalReleases,
+                summary_sets_completed: summary.setsCompleted,
+                raw_payload: payload,
+                // Vinculación automática si se encontró el paciente
+                id_paciente_vinculado: idPacienteVinculado,
+                id_terapeuta_revisor: null,
+                observaciones_terapeuta: null,
+                estado_revision: 'PENDIENTE_REVISION'
             })
             .select('id, created_at')
             .single();
@@ -133,8 +174,8 @@ router.post('/session-results', async (req, res) => {
                 continue; // Skip sets inválidos
             }
 
-            // Extraer completion (solo para Preparation)
-            const completion = set.completion || {};
+            // Extraer errorsCount del JSON de Unity
+            const errorsCount = set.errorsCount || (Array.isArray(set.errors) ? set.errors.length : 0);
 
             const { data: setData, error: setError } = await supabase
                 .from('vr_set_results')
@@ -147,9 +188,7 @@ router.post('/session-results', async (req, res) => {
                     blocked_count: set.blockedCount || 0,
                     drops_count: set.dropsCount || 0,
                     releases_count: set.releasesCount || 0,
-                    completion_coffee_added: completion.coffeeAdded ?? null,
-                    completion_sugar_added: completion.sugarAdded ?? null,
-                    completion_cup_coffee_amount_01: completion.cupCoffeeAmount01 ?? null
+                    errors_count: errorsCount
                 })
                 .select('id')
                 .single();
@@ -170,12 +209,18 @@ router.post('/session-results', async (req, res) => {
                             set_id: setId,
                             code: error.code,
                             message: error.message || null,
-                            occurred_at: error.timestampIso
+                            // Unity envía timeIso, no timestampIso
+                            occurred_at: error.timeIso || error.timestampIso,
+                            // Nuevo campo: objeto relacionado al error
+                            objeto_contexto: error.context || null
                         });
                 }
             }
 
-            // 4. Insertar objetos retornados (solo para Organization)
+            // 4. [REMOVED] Insertar objetos retornados
+            // La tabla vr_set_returned_objects fu eliminada del schema.
+            // Si se necesita auditar esto en el futuro, se debe agregar al JSON de vr_set_results o crear la tabla nuevamente.
+            /*
             if (set.returnedObjects && Array.isArray(set.returnedObjects)) {
                 for (const objectName of set.returnedObjects) {
                     await supabase
@@ -186,6 +231,7 @@ router.post('/session-results', async (req, res) => {
                         });
                 }
             }
+            */
         }
 
         // Respuesta exitosa
@@ -316,15 +362,10 @@ router.get('/session-results/:id', async (req, res) => {
                 .eq('set_id', set.id)
                 .order('occurred_at', { ascending: true });
 
-            const { data: returnedObjects } = await supabase
-                .from('vr_set_returned_objects')
-                .select('object_name')
-                .eq('set_id', set.id);
-
             setsWithDetails.push({
                 ...set,
                 errors: errors || [],
-                returnedObjects: (returnedObjects || []).map(o => o.object_name)
+                returnedObjects: [] // Table removed: returnedObjects unused
             });
         }
 
@@ -334,6 +375,136 @@ router.get('/session-results/:id', async (req, res) => {
                 ...session,
                 sets: setsWithDetails
             }
+        });
+
+    } catch (error) {
+        res.status(500).json({
+            error: { code: 'INTERNAL_ERROR', message: error.message }
+        });
+    }
+});
+
+// ========================================
+// ENDPOINT PARA UNITY: Búsqueda de Pacientes
+// ========================================
+// Permite que Unity consulte si un paciente existe usando su cédula.
+// Requiere API Key en el header X-API-Key (configurar UNITY_API_KEY en .env)
+// Devuelve datos mínimos para no comprometer privacidad.
+
+/**
+ * Middleware para validar API Key de Unity
+ */
+const validateUnityApiKey = (req, res, next) => {
+    const apiKey = req.headers['x-api-key'];
+    const expectedKey = process.env.UNITY_API_KEY;
+
+    // Si no hay clave configurada, denegar acceso
+    if (!expectedKey) {
+        console.error('[Security] UNITY_API_KEY no está configurada en .env');
+        return res.status(500).json({
+            error: {
+                code: 'CONFIG_ERROR',
+                message: 'API Key no configurada en el servidor'
+            }
+        });
+    }
+
+    if (!apiKey || apiKey !== expectedKey) {
+        return res.status(401).json({
+            error: {
+                code: 'UNAUTHORIZED',
+                message: 'API Key inválida o no proporcionada'
+            }
+        });
+    }
+
+    next();
+};
+
+/**
+ * @swagger
+ * /api/v1/patients/lookup:
+ *   get:
+ *     summary: Buscar paciente por número de identificación (para Unity)
+ *     tags: [Unity - Pacientes]
+ *     description: |
+ *       Endpoint público para que Unity verifique si un paciente existe.
+ *       Requiere API Key en el header X-API-Key.
+ *       Devuelve datos mínimos sin exponer información sensible.
+ *     parameters:
+ *       - in: header
+ *         name: X-API-Key
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: API Key de Unity (configurada en .env como UNITY_API_KEY)
+ *       - in: query
+ *         name: identificacion
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Número de cédula/identificación del paciente
+ *     responses:
+ *       200:
+ *         description: Resultado de la búsqueda
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 found:
+ *                   type: boolean
+ *                 participant_id:
+ *                   type: string
+ *                 display_name:
+ *                   type: string
+ *       401:
+ *         description: API Key inválida
+ *       400:
+ *         description: Parámetro identificacion faltante
+ */
+router.get('/patients/lookup', validateUnityApiKey, async (req, res) => {
+    try {
+        const { identificacion } = req.query;
+
+        if (!identificacion) {
+            return res.status(400).json({
+                error: {
+                    code: 'MISSING_PARAM',
+                    message: 'El parámetro identificacion es requerido'
+                }
+            });
+        }
+
+        // Buscar paciente por identificación exacta
+        const { data: patient, error } = await supabase
+            .from('pacientes')
+            .select('id, identificacion, nombre, activo')
+            .eq('identificacion', identificacion)
+            .eq('activo', true)  // Solo pacientes activos
+            .single();
+
+        if (error || !patient) {
+            // No encontrado - responder sin revelar si existe o no (seguridad)
+            return res.json({
+                found: false,
+                participant_id: null,
+                display_name: null
+            });
+        }
+
+        // Generar nombre parcial para privacidad (ej: "Juan P.")
+        const nameParts = patient.nombre.split(' ');
+        const displayName = nameParts.length > 1
+            ? `${nameParts[0]} ${nameParts[1].charAt(0)}.`
+            : nameParts[0];
+
+        res.json({
+            found: true,
+            participant_id: patient.identificacion,
+            display_name: displayName,
+            // Opcionalmente podríamos agregar el ID interno si Unity lo necesita
+            internal_id: patient.id
         });
 
     } catch (error) {

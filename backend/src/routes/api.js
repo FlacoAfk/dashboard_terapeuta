@@ -85,7 +85,7 @@ router.get('/db-status', async (req, res) => {
  *     description: RF-SEG-03 - Los terapeutas solo ven sus pacientes asignados.
  */
 router.get('/patients', authenticateToken, requireTerapeuta, async (req, res) => {
-    const { activo, nombre } = req.query;
+    const { activo, nombre, identificacion } = req.query;
 
     try {
         // Para terapeutas, primero obtener sus pacientes asignados
@@ -124,6 +124,11 @@ router.get('/patients', authenticateToken, requireTerapeuta, async (req, res) =>
         // Filtro por nombre
         if (nombre) {
             query = query.ilike('nombre', `%${nombre}%`);
+        }
+
+        // Filtro por documento de identificación (búsqueda exacta o parcial)
+        if (identificacion) {
+            query = query.ilike('identificacion', `%${identificacion}%`);
         }
 
         const { data: patients, error } = await query;
@@ -486,81 +491,115 @@ router.post('/patients/:id/assign', authenticateToken, requireSuperAdmin, valida
 });
 
 // ========================================
-// SESIONES
+// SESIONES VR - Endpoints del Dashboard
 // ========================================
 
 /**
  * @swagger
  * /api/sessions:
  *   get:
- *     summary: Obtener sesiones de terapia
- *     tags: [Sesiones]
+ *     summary: Listar sesiones VR para el dashboard
+ *     tags: [Sesiones VR]
+ *     security:
+ *       - bearerAuth: []
+ *     description: |
+ *       Lista las sesiones VR desde vr_session_results.
+ *       Permite filtrar por estado de revisión y por paciente.
+ *     parameters:
+ *       - in: query
+ *         name: estado_revision
+ *         schema:
+ *           type: string
+ *           enum: [PENDIENTE_REVISION, REVISADA]
+ *         description: Filtrar por estado de revisión
+ *       - in: query
+ *         name: pendientes
+ *         schema:
+ *           type: boolean
+ *         description: Si es true, muestra solo las que tienen id_paciente_vinculado en NULL
+ *       - in: query
+ *         name: id_paciente
+ *         schema:
+ *           type: integer
+ *         description: Filtrar por paciente vinculado
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 50
+ *         description: Límite de resultados
+ *     responses:
+ *       200:
+ *         description: Lista de sesiones VR
  */
 router.get('/sessions', authenticateToken, requireTerapeuta, async (req, res) => {
-    const { id_paciente, estado, limit = 50 } = req.query;
+    const { estado_revision, pendientes, id_paciente, limit = 50 } = req.query;
 
     try {
-        // Para terapeutas, obtener IDs de pacientes asignados
-        let patientIds = null;
-        if (req.user.rol === 'TERAPEUTA' && req.user.id_terapeuta) {
-            const { data: assignments } = await supabase
-                .from('terapeuta_paciente')
-                .select('id_paciente')
-                .eq('id_terapeuta', req.user.id_terapeuta);
-
-            patientIds = assignments?.map(a => a.id_paciente) || [];
-            if (patientIds.length === 0) {
-                return res.json({ success: true, data: [] });
-            }
-        }
-
         let query = supabase
-            .from('sesiones')
+            .from('vr_session_results')
             .select(`
-                *,
-                pacientes(nombre),
-                actividad_juego(nombre, nivel_dificultad),
-                resumen_sesion(total_aciertos, total_errores, total_omisiones, tiempo_total_seg, observaciones)
+                id,
+                participant_id,
+                activity_id,
+                started_at,
+                ended_at,
+                total_seconds,
+                summary_total_errors,
+                summary_total_drops,
+                summary_total_releases,
+                summary_sets_completed,
+                id_paciente_vinculado,
+                id_terapeuta_revisor,
+                observaciones_terapeuta,
+                estado_revision,
+                created_at
             `)
-            .order('fecha_inicio', { ascending: false })
+            .order('created_at', { ascending: false })
             .limit(parseInt(limit));
 
-        if (patientIds) {
-            query = query.in('id_paciente', patientIds);
+        // Filtrar por estado de revisión
+        if (estado_revision) {
+            query = query.eq('estado_revision', estado_revision);
         }
 
+        // Filtrar pendientes (sin paciente vinculado)
+        if (pendientes === 'true') {
+            query = query.is('id_paciente_vinculado', null);
+        }
+
+        // Filtrar por paciente específico
         if (id_paciente) {
-            query = query.eq('id_paciente', parseInt(id_paciente));
-        }
-
-        if (estado) {
-            query = query.eq('estado', estado);
+            query = query.eq('id_paciente_vinculado', parseInt(id_paciente));
         }
 
         const { data: sessions, error } = await query;
         if (error) throw error;
 
-        // Reformatear datos
-        const formattedSessions = sessions.map(s => ({
-            id: s.id,
-            id_paciente: s.id_paciente,
-            paciente_nombre: s.pacientes?.nombre,
-            id_actividad: s.id_actividad,
-            actividad_nombre: s.actividad_juego?.nombre,
-            nivel_dificultad: s.actividad_juego?.nivel_dificultad,
-            fecha_inicio: s.fecha_inicio,
-            fecha_fin: s.fecha_fin,
-            estado: s.estado,
-            num_pausas: s.num_pausas,
-            num_alertas_descanso: s.num_alertas_descanso,
-            total_aciertos: s.resumen_sesion?.total_aciertos,
-            total_errores: s.resumen_sesion?.total_errores,
-            total_omisiones: s.resumen_sesion?.total_omisiones,
-            tiempo_total_seg: s.resumen_sesion?.tiempo_total_seg,
-            observaciones: s.resumen_sesion?.observaciones
-        }));
+        // Obtener nombres de pacientes vinculados si existen
+        const sessionsWithPatients = await Promise.all(
+            sessions.map(async (session) => {
+                let paciente_nombre = null;
+                if (session.id_paciente_vinculado) {
+                    const { data: patient } = await supabase
+                        .from('pacientes')
+                        .select('nombre')
+                        .eq('id', session.id_paciente_vinculado)
+                        .single();
+                    paciente_nombre = patient?.nombre || null;
+                }
+                return {
+                    ...session,
+                    paciente_nombre
+                };
+            })
+        );
 
-        res.json({ success: true, data: formattedSessions });
+        res.json({
+            success: true,
+            data: sessionsWithPatients,
+            count: sessionsWithPatients.length
+        });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
     }
@@ -569,267 +608,75 @@ router.get('/sessions', authenticateToken, requireTerapeuta, async (req, res) =>
 /**
  * @swagger
  * /api/sessions/{id}:
- *   get:
- *     summary: Obtener una sesión con eventos detallados
- *     tags: [Sesiones]
+ *   put:
+ *     summary: Actualizar sesión VR (Observaciones y Asignación)
+ *     tags: [Sesiones VR]
+ *     security:
+ *       - bearerAuth: []
+ *     description: |
+ *       Permite al terapeuta agregar observaciones y, si es necesario,
+ *       corregir o asignar manualmente el paciente vinculado.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               observaciones:
+ *                 type: string
+ *               id_paciente:
+ *                 type: integer
+ *                 description: ID del paciente (opcional, para correcciones)
+ *     responses:
+ *       200:
+ *         description: Sesión actualizada
  */
-router.get('/sessions/:id', async (req, res) => {
+router.put('/sessions/:id', authenticateToken, requireTerapeuta, async (req, res) => {
     const { id } = req.params;
+    const { observaciones, id_paciente } = req.body;
 
     try {
-        const { data: session, error: sessionError } = await supabase
-            .from('sesiones')
-            .select(`
-                *,
-                pacientes(nombre, diagnostico),
-                actividad_juego(nombre, nivel_dificultad, tiempo_max_seg),
-                resumen_sesion(total_aciertos, total_errores, tiempo_total_seg, observaciones)
-            `)
-            .eq('id', id)
-            .single();
+        const updateData = {
+            id_terapeuta_revisor: req.user.id_terapeuta,
+            estado_revision: 'REVISADA'
+        };
 
-        if (sessionError || !session) {
-            return res.status(404).json({
-                success: false,
-                error: 'Sesión no encontrada'
-            });
+        if (observaciones !== undefined) {
+            updateData.observaciones_terapeuta = observaciones;
         }
 
-        const { data: events, error: eventsError } = await supabase
-            .from('eventos_interacciones')
-            .select(`
-                *,
-                evaluacion_cognitiva(clasificacion, puntaje)
-            `)
-            .eq('id_sesion', id)
-            .order('timestamp_evento', { ascending: true });
+        if (id_paciente) {
+            // Verificar que el paciente exista
+            const { data: patient, error: pError } = await supabase
+                .from('pacientes')
+                .select('id')
+                .eq('id', id_paciente)
+                .single();
 
-        if (eventsError) throw eventsError;
-
-        res.json({
-            success: true,
-            data: {
-                session: {
-                    ...session,
-                    paciente_nombre: session.pacientes?.nombre,
-                    paciente_diagnostico: session.pacientes?.diagnostico,
-                    actividad_nombre: session.actividad_juego?.nombre,
-                    nivel_dificultad: session.actividad_juego?.nivel_dificultad,
-                    tiempo_max_seg: session.actividad_juego?.tiempo_max_seg,
-                    total_aciertos: session.resumen_sesion?.total_aciertos,
-                    total_errores: session.resumen_sesion?.total_errores,
-                    tiempo_total_seg: session.resumen_sesion?.tiempo_total_seg,
-                    observaciones: session.resumen_sesion?.observaciones
-                },
-                events: events.map(e => ({
-                    ...e,
-                    clasificacion: e.evaluacion_cognitiva?.clasificacion,
-                    puntaje: e.evaluacion_cognitiva?.puntaje
-                }))
+            if (pError || !patient) {
+                return res.status(404).json({ success: false, error: 'Paciente no encontrado' });
             }
-        });
-    } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
+            updateData.id_paciente_vinculado = id_paciente;
+        }
 
-/**
- * @swagger
- * /api/sessions:
- *   post:
- *     summary: Crear una nueva sesión
- *     tags: [Sesiones]
- */
-router.post('/sessions', authenticateToken, requireTerapeuta, async (req, res) => {
-    const { id_paciente, id_actividad } = req.body;
-
-    if (!id_paciente || !id_actividad) {
-        return res.status(400).json({
-            success: false,
-            error: 'id_paciente y id_actividad son requeridos'
-        });
-    }
-
-    try {
-        const { data: newSession, error } = await supabase
-            .from('sesiones')
-            .insert({
-                id_paciente,
-                id_actividad,
-                estado: 'INICIADA',
-                fecha_inicio: new Date().toISOString()
-            })
+        const { data: updated, error } = await supabase
+            .from('vr_session_results')
+            .update(updateData)
+            .eq('id', id)
             .select()
             .single();
 
         if (error) throw error;
 
-        await auditFromRequest(req, AUDIT_TYPES.SESSION_STARTED, {
-            id_sesion: newSession.id,
-            id_paciente,
-            id_actividad
-        });
-
-        res.status(201).json({
-            success: true,
-            message: 'Sesión creada exitosamente',
-            data: newSession
-        });
-    } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-/**
- * @swagger
- * /api/sessions/{id}/finish:
- *   put:
- *     summary: Finalizar una sesión
- *     tags: [Sesiones]
- */
-router.put('/sessions/:id/finish', authenticateToken, requireTerapeuta, async (req, res) => {
-    const { id } = req.params;
-    const {
-        estado = 'COMPLETADA',
-        total_aciertos = 0,
-        total_errores = 0,
-        total_omisiones = 0,
-        tiempo_total_seg,
-        observaciones,
-        num_pausas = 0,
-        num_alertas_descanso = 0
-    } = req.body;
-
-    try {
-        // Actualizar sesión
-        const { data: updated, error: updateError } = await supabase
-            .from('sesiones')
-            .update({
-                fecha_fin: new Date().toISOString(),
-                estado,
-                num_pausas,
-                num_alertas_descanso
-            })
-            .eq('id', id)
-            .eq('estado', 'INICIADA')
-            .select()
-            .single();
-
-        if (updateError || !updated) {
-            return res.status(404).json({
-                success: false,
-                error: 'Sesión no encontrada o ya finalizada'
-            });
-        }
-
-        // Crear o actualizar resumen
-        await supabase
-            .from('resumen_sesion')
-            .upsert({
-                id_sesion: parseInt(id),
-                total_aciertos,
-                total_errores,
-                tiempo_total_seg,
-                observaciones
-            }, { onConflict: 'id_sesion' });
-
-        const auditType = estado === 'COMPLETADA' ? AUDIT_TYPES.SESSION_FINISHED : AUDIT_TYPES.SESSION_ABANDONED;
-        await auditFromRequest(req, auditType, {
-            id_sesion: id,
-            estado,
-            total_aciertos,
-            total_errores,
-            total_omisiones
-        });
-
-        res.json({
-            success: true,
-            message: `Sesión ${estado.toLowerCase()}`,
-            data: updated
-        });
-    } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-/**
- * @swagger
- * /api/sessions/{id}/events:
- *   post:
- *     summary: Registrar evento de interacción
- *     tags: [Sesiones]
- */
-router.post('/sessions/:id/events', authenticateToken, async (req, res) => {
-    const { id } = req.params;
-    const {
-        tipo_accion,
-        objeto_id,
-        objeto_descripcion,
-        posicion_x,
-        posicion_y,
-        posicion_z,
-        cantidad,
-        metadatos,
-        clasificacion
-    } = req.body;
-
-    if (!tipo_accion) {
-        return res.status(400).json({
-            success: false,
-            error: 'tipo_accion es requerido'
-        });
-    }
-
-    try {
-        // Verificar sesión activa
-        const { data: session } = await supabase
-            .from('sesiones')
-            .select('id')
-            .eq('id', id)
-            .eq('estado', 'INICIADA')
-            .single();
-
-        if (!session) {
-            return res.status(404).json({
-                success: false,
-                error: 'Sesión no encontrada o no está activa'
-            });
-        }
-
-        // Insertar evento
-        const { data: event, error: eventError } = await supabase
-            .from('eventos_interacciones')
-            .insert({
-                id_sesion: parseInt(id),
-                tipo_accion,
-                objeto_id,
-                objeto_descripcion,
-                posicion_x,
-                posicion_y,
-                posicion_z,
-                cantidad,
-                metadatos: metadatos || {}
-            })
-            .select()
-            .single();
-
-        if (eventError) throw eventError;
-
-        // Si hay clasificación, registrarla
-        if (clasificacion) {
-            await supabase
-                .from('evaluacion_cognitiva')
-                .insert({
-                    id_evento: event.id,
-                    clasificacion
-                });
-        }
-
-        res.status(201).json({
-            success: true,
-            message: 'Evento registrado',
-            data: event
-        });
+        res.json({ success: true, data: updated });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
     }
@@ -882,46 +729,47 @@ router.get('/patients/:id/report', authenticateToken, requireTerapeuta, async (r
             .eq('id_paciente', id)
             .single();
 
-        // Obtener sesiones
+        // Obtener sesiones desde la nueva tabla vr_session_results
         const { data: sessions, error: sessionsError } = await supabase
-            .from('sesiones')
+            .from('vr_session_results')
             .select(`
                 id,
-                fecha_inicio,
-                fecha_fin,
-                estado,
-                actividad_juego(nombre, nivel_dificultad),
-                resumen_sesion(total_aciertos, total_errores, tiempo_total_seg, observaciones)
+                started_at,
+                ended_at,
+                activity_id,
+                total_seconds,
+                summary_total_errors,
+                summary_total_drops,
+                summary_total_releases,
+                observaciones_terapeuta,
+                estado_revision
             `)
-            .eq('id_paciente', id)
-            .order('fecha_inicio', { ascending: false });
+            .eq('id_paciente_vinculado', id)
+            .order('started_at', { ascending: false });
 
         if (sessionsError) throw sessionsError;
 
         // Formatear sesiones
         const formattedSessions = sessions.map(s => ({
             id: s.id,
-            actividad: s.actividad_juego?.nombre,
-            nivel_dificultad: s.actividad_juego?.nivel_dificultad,
-            fecha_inicio: s.fecha_inicio,
-            fecha_fin: s.fecha_fin,
-            estado: s.estado,
-            total_aciertos: s.resumen_sesion?.total_aciertos || 0,
-            total_errores: s.resumen_sesion?.total_errores || 0,
-            // TODO: Descomentar cuando la columna exista en BD
-            // total_omisiones: s.resumen_sesion?.total_omisiones || 0,
-            total_omisiones: 0,
-            tiempo_total_seg: s.resumen_sesion?.tiempo_total_seg || 0,
-            observaciones: s.resumen_sesion?.observaciones
+            actividad: s.activity_id, // Usamos activity_id como nombre de actividad por ahora
+            fecha_inicio: s.started_at,
+            fecha_fin: s.ended_at,
+            estado: s.estado_revision, // Usamos estado_revision como estado
+            total_aciertos: s.summary_total_releases, // Asumiendo releases como "aciertos" o completados
+            total_errores: s.summary_total_errors,
+            total_drops: s.summary_total_drops,
+            tiempo_total_seg: s.total_seconds,
+            observaciones: s.observaciones_terapeuta
         }));
 
         // Calcular estadísticas
         const stats = {
             total_sesiones: formattedSessions.length,
-            sesiones_completadas: formattedSessions.filter(s => s.estado === 'COMPLETADA').length,
+            sesiones_completadas: formattedSessions.length, // Todas las que llegan aquí se asumen completadas o intentadas
             total_aciertos: formattedSessions.reduce((sum, s) => sum + s.total_aciertos, 0),
             total_errores: formattedSessions.reduce((sum, s) => sum + s.total_errores, 0),
-            total_omisiones: formattedSessions.reduce((sum, s) => sum + s.total_omisiones, 0),
+            total_drops: formattedSessions.reduce((sum, s) => sum + s.total_drops, 0),
             tiempo_total_minutos: Math.round(formattedSessions.reduce((sum, s) => sum + s.tiempo_total_seg, 0) / 60)
         };
 
@@ -986,85 +834,6 @@ router.get('/terapeutas', async (req, res) => {
     }
 });
 
-// ========================================
-// ACTIVIDADES
-// ========================================
-
-/**
- * @swagger
- * /api/actividades:
- *   get:
- *     summary: Obtener todas las actividades del juego
- *     tags: [Actividades]
- */
-router.get('/actividades', async (req, res) => {
-    try {
-        const { data: activities, error } = await supabase
-            .from('actividad_juego')
-            .select('id, nombre, descripcion, nivel_dificultad, tiempo_max_seg, unity_id')
-            .order('nivel_dificultad')
-            .order('nombre');
-
-        if (error) throw error;
-        res.json({ success: true, data: activities });
-    } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-/**
- * @swagger
- * /api/actividades/{id}:
- *   get:
- *     summary: Obtener actividad con ingredientes y utensilios
- *     tags: [Actividades]
- */
-router.get('/actividades/:id', async (req, res) => {
-    const { id } = req.params;
-
-    try {
-        const { data: activity, error: actError } = await supabase
-            .from('actividad_juego')
-            .select('*')
-            .eq('id', id)
-            .single();
-
-        if (actError || !activity) {
-            return res.status(404).json({
-                success: false,
-                error: 'Actividad no encontrada'
-            });
-        }
-
-        const { data: ingredients } = await supabase
-            .from('ingrediente_actividad')
-            .select('cantidad_requerida, ingrediente(*)')
-            .eq('id_actividad', id);
-
-        const { data: tools } = await supabase
-            .from('utensilio_actividad')
-            .select('utensilio(*)')
-            .eq('id_actividad', id);
-
-        const { data: actions } = await supabase
-            .from('accion_actividad')
-            .select('orden, accion(*)')
-            .eq('id_actividad', id)
-            .order('orden');
-
-        res.json({
-            success: true,
-            data: {
-                activity,
-                ingredients: ingredients?.map(i => ({ ...i.ingrediente, cantidad_requerida: i.cantidad_requerida })) || [],
-                tools: tools?.map(t => t.utensilio) || [],
-                actions: actions?.map(a => ({ ...a.accion, orden: a.orden })) || []
-            }
-        });
-    } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
 
 // ========================================
 // ESTADÍSTICAS / DASHBOARD
@@ -1076,6 +845,9 @@ router.get('/actividades/:id', async (req, res) => {
  *   get:
  *     summary: Obtener estadísticas generales
  *     tags: [Dashboard]
+ *     description: |
+ *       Estadísticas del sistema incluyendo pacientes, terapeutas,
+ *       sesiones VR (desde vr_session_results) y actividades disponibles.
  */
 router.get('/dashboard/stats', async (req, res) => {
     try {
@@ -1084,38 +856,29 @@ router.get('/dashboard/stats', async (req, res) => {
             .from('pacientes')
             .select('id', { count: 'exact', head: true });
 
-        // Contar sesiones
+        // Contar sesiones VR (usando tabla real)
         const { count: totalSesiones } = await supabase
-            .from('sesiones')
+            .from('vr_session_results')
             .select('id', { count: 'exact', head: true });
-
-        // Contar sesiones completadas
-        const { count: sesionesCompletadas } = await supabase
-            .from('sesiones')
-            .select('id', { count: 'exact', head: true })
-            .eq('estado', 'COMPLETADA');
 
         // Contar terapeutas
         const { count: totalTerapeutas } = await supabase
             .from('terapeutas')
             .select('id', { count: 'exact', head: true });
 
-        // Contar actividades
-        const { count: totalActividades } = await supabase
-            .from('actividad_juego')
-            .select('id', { count: 'exact', head: true });
+        // Contar actividades únicas desde sesiones VR
+        const { data: uniqueActivities } = await supabase
+            .from('vr_session_results')
+            .select('activity_id');
+        const totalActividades = uniqueActivities
+            ? new Set(uniqueActivities.map(a => a.activity_id)).size
+            : 0;
 
-        // Sesiones recientes
+        // Sesiones VR recientes
         const { data: recentSessions } = await supabase
-            .from('sesiones')
-            .select(`
-                id,
-                estado,
-                fecha_inicio,
-                pacientes(nombre),
-                actividad_juego(nombre)
-            `)
-            .order('fecha_inicio', { ascending: false })
+            .from('vr_session_results')
+            .select('id, activity_id, participant_id, started_at, total_seconds, summary_total_errors')
+            .order('created_at', { ascending: false })
             .limit(5);
 
         res.json({
@@ -1123,17 +886,17 @@ router.get('/dashboard/stats', async (req, res) => {
             data: {
                 stats: {
                     total_pacientes: totalPacientes || 0,
-                    total_sesiones: totalSesiones || 0,
-                    sesiones_completadas: sesionesCompletadas || 0,
+                    total_sesiones_vr: totalSesiones || 0,
                     total_terapeutas: totalTerapeutas || 0,
-                    total_actividades: totalActividades || 0
+                    total_actividades: totalActividades
                 },
                 recentSessions: recentSessions?.map(s => ({
                     id: s.id,
-                    paciente: s.pacientes?.nombre,
-                    actividad: s.actividad_juego?.nombre,
-                    estado: s.estado,
-                    fecha_inicio: s.fecha_inicio
+                    activity_id: s.activity_id,
+                    participant_id: s.participant_id,
+                    fecha_inicio: s.started_at,
+                    duracion_seg: s.total_seconds,
+                    errores: s.summary_total_errors
                 })) || []
             }
         });
