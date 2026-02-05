@@ -336,13 +336,8 @@ async function seed() {
                     });
                 }
 
-                // Insertar objetos retornados
-                for (const obj of set.returnedObjects) {
-                    await supabase.from('vr_set_returned_objects').insert({
-                        set_id: setResult.id,
-                        object_name: obj
-                    });
-                }
+                // Table vr_set_returned_objects was removed from schema.
+                // Skipping returnedObjects insertion.
             }
 
             vrSessionCount++;

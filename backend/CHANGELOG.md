@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.6.1] - 2026-02-05
+
+### Maintainance
+- **Cleanup**: Removed obsolete scripts (`clear_database.js`, `test_vr_endpoint.js`, etc.) and temporary files.
+- **Scripts**: Updated `seed_complete.js` to be compatible with new schema (removed `vr_set_returned_objects`).
+
 ## [1.6.0] - 2026-02-05
 
 ### Added
