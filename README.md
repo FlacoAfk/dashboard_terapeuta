@@ -1,6 +1,9 @@
 # Dashboard Terapeuta - Cerebro al Fuego 🧠🔥
 
-Sistema de gestión de terapeutas y pacientes para el proyecto de realidad virtual "Cerebro al Fuego". Permite la administración de sesiones terapéuticas, seguimiento de pacientes y análisis de métricas cognitivas.
+Sistema de gestión clínica para el proyecto de realidad virtual "Cerebro al Fuego". Permite la administración de terapeutas, pacientes, sesiones VR con evaluación del desempeño, y auditoría del sistema.
+
+**Versión:** 1.8.0  
+**Última actualización:** 2026-02-09
 
 ---
 
@@ -14,8 +17,10 @@ Sistema de gestión de terapeutas y pacientes para el proyecto de realidad virtu
 - [Uso](#-uso)
 - [Documentación del Backend](#-documentación-del-backend)
 - [API Endpoints](#-api-endpoints)
+- [Integración con Unity](#-integración-con-videojuego-vr-unity)
+- [Evaluación del Desempeño](#-evaluación-del-desempeño)
 - [Roles y Permisos](#-roles-y-permisos)
-- [Para el Equipo de Frontend](#-para-el-equipo-de-frontend)
+- [Seguridad](#-seguridad)
 
 ---
 
@@ -25,8 +30,8 @@ Sistema de gestión de terapeutas y pacientes para el proyecto de realidad virtu
 |-----------|----------------|
 | **Node.js** | v18.0.0+ |
 | **npm** | v9.0.0+ |
-| **PostgreSQL** | v14+ (o Supabase) |
-| **Sistema Operativo** | Windows 10+, macOS 10.15+, Linux |
+| **PostgreSQL** | Supabase (cloud) |
+| **Sistema Operativo** | Windows 10+ |
 
 ---
 
@@ -34,11 +39,12 @@ Sistema de gestión de terapeutas y pacientes para el proyecto de realidad virtu
 
 | Capa | Tecnología | Descripción |
 |------|------------|-------------|
-| **Backend** | Express.js + PostgreSQL | API REST con Supabase |
-| **Frontend** | Electron + Tailwind CSS | Aplicación de escritorio |
-| **Autenticación** | JWT (Bearer Token) | Tokens con expiración de 24h |
-| **Documentación** | Swagger UI | Documentación interactiva de la API |
-| **ORM/Driver** | @supabase/supabase-js | SDK oficial de Supabase |
+| **Backend** | Express.js + Supabase | API REST con PostgreSQL en la nube |
+| **Frontend** | Electron + React + Tailwind CSS v4 | Aplicación de escritorio |
+| **Autenticación** | JWT (Bearer Token) | Tokens con expiración configurable |
+| **Unity API** | API Key (X-API-Key) | Autenticación para videojuego VR |
+| **Documentación** | Swagger UI | Documentación interactiva en `/api-docs` |
+| **Despliegue** | Docker + Google Cloud Run | Contenedor para producción |
 
 ---
 
@@ -55,55 +61,103 @@ dashboard_terapeuta/
 │   │   ├── middleware/
 │   │   │   └── authMiddleware.js   # JWT Auth & Control de Roles
 │   │   ├── routes/
-│   │   │   ├── api.js              # Endpoints: pacientes, sesiones, actividades
-│   │   │   ├── auth.js             # Login, setup, cambio de contraseña
+│   │   │   ├── api.js              # Pacientes, sesiones VR, dashboard, terapeutas
+│   │   │   ├── auth.js             # Login, setup, recuperación de contraseña
 │   │   │   ├── usuarios.js         # CRUD de usuarios (solo Superadmin)
-│   │   │   └── audit.js            # Sistema de auditoría
-│   │   └── utils/
-│   │       └── auditHelper.js      # Helper para registro de auditoría
-│   ├── scripts/                    # Scripts de utilidad
-│   ├── .env                        # Variables de entorno (no incluido)
-│   └── package.json
+│   │   │   ├── audit.js            # Sistema de auditoría
+│   │   │   └── vrResults.js        # Resultados VR desde Unity (API Key)
+│   │   ├── services/
+│   │   │   └── emailService.js     # Envío de emails SMTP
+│   │   ├── validators/
+│   │   │   ├── authValidator.js    # Validación de autenticación
+│   │   │   ├── patientValidator.js # Validación de pacientes
+│   │   │   └── userValidator.js    # Validación de usuarios
+│   │   ├── utils/
+│   │   │   ├── auditHelper.js      # Helper de auditoría (SESSION_REVIEWED, etc.)
+│   │   │   └── validationUtils.js  # Utilidades de validación
+│   │   └── types/
+│   │       └── database.js         # Tipos de datos de BD
+│   ├── migrations/                 # Migraciones SQL
+│   ├── schema/
+│   │   └── bd_schema.sql           # Esquema completo de la BD
+│   ├── scripts/
+│   │   └── seed_complete.js        # Poblar BD con datos iniciales
+│   ├── tests/
+│   │   ├── e2e_validation.js       # Tests E2E automáticos
+│   │   ├── full_endpoint_audit.js  # Auditoría de endpoints
+│   │   └── security_validation.js  # Validación de seguridad
+│   ├── Dockerfile                  # Imagen Docker para Cloud Run
+│   ├── docker-compose.yml          # Docker Compose para desarrollo
+│   ├── API_ENDPOINTS.md            # Documentación detallada de endpoints
+│   └── CHANGELOG.md                # Changelog del backend
 │
 ├── frontend/                       # Aplicación Electron + React
 │   ├── src/
-│   │   ├── main/                   # Proceso principal de Electron
-│   │   │   ├── main.js             # Entry point Electron
+│   │   ├── main/
+│   │   │   ├── main.js             # Proceso principal Electron
 │   │   │   └── preload.js          # Script de preload (seguridad)
+│   │   ├── preload/
+│   │   │   └── preload.js          # Preload para renderer
 │   │   └── renderer/               # Interfaz de usuario (React)
 │   │       ├── App.jsx             # Router principal
 │   │       ├── main.jsx            # Entry point React
-│   │       ├── index.css           # Estilos globales
+│   │       ├── index.css           # Estilos globales (Tailwind v4)
 │   │       ├── context/
-│   │       │   └── AuthContext.jsx # Contexto de autenticación
+│   │       │   └── AuthContext.jsx  # Contexto de autenticación global
 │   │       ├── components/
 │   │       │   ├── layout/
-│   │       │   │   └── AdminLayout.jsx    # Layout del panel admin
+│   │       │   │   ├── AdminLayout.jsx      # Layout panel administrador
+│   │       │   │   └── TherapistLayout.jsx  # Layout panel terapeuta
 │   │       │   ├── modals/
+│   │       │   │   ├── CrearPacienteModal.jsx
+│   │       │   │   ├── EditarPacienteModal.jsx
 │   │       │   │   ├── CrearTerapeutaModal.jsx
 │   │       │   │   ├── EditarTerapeutaModal.jsx
-│   │       │   │   └── ReasignarPacientesModal.jsx
+│   │       │   │   ├── ReasignarPacientesModal.jsx
+│   │       │   │   ├── ResetPasswordModal.jsx
+│   │       │   │   └── VerificarCorreoModal.jsx
 │   │       │   └── ui/
 │   │       │       ├── Button.jsx
 │   │       │       ├── Input.jsx
 │   │       │       ├── Logo.jsx
-│   │       │       └── Modal.jsx
+│   │       │       ├── Modal.jsx
+│   │       │       ├── PasswordStrengthIndicator.jsx
+│   │       │       └── VRSessionCard.jsx    # Card de sesión VR con tabs y evaluación
 │   │       ├── pages/
-│   │       │   ├── Login.jsx       # Página de login
-│   │       │   ├── Dashboard.jsx   # Dashboard terapeuta
-│   │       │   └── admin/          # Panel de administrador
-│   │       │       ├── GestionTerapeutas.jsx
-│   │       │       ├── Auditoria.jsx
-│   │       │       └── index.js
-│   │       └── services/
-│   │           ├── api.js              # Cliente HTTP base
-│   │           ├── authService.js      # Servicio de autenticación
-│   │           ├── therapistService.js # CRUD de terapeutas
-│   │           └── auditService.js     # Consulta de auditoría
+│   │       │   ├── Login.jsx
+│   │       │   ├── Dashboard.jsx
+│   │       │   ├── ForgotPassword.jsx
+│   │       │   ├── ResetPassword.jsx
+│   │       │   ├── SetupPage.jsx
+│   │       │   ├── admin/
+│   │       │   │   ├── GestionTerapeutas.jsx
+│   │       │   │   └── Auditoria.jsx
+│   │       │   └── terapeuta/
+│   │       │       ├── DashboardTerapeuta.jsx
+│   │       │       ├── DetallePaciente.jsx
+│   │       │       └── ConfiguracionTerapeuta.jsx
+│   │       ├── services/
+│   │       │   ├── api.js               # Cliente HTTP base (Axios)
+│   │       │   ├── authService.js       # Servicio de autenticación
+│   │       │   ├── patientService.js    # CRUD de pacientes
+│   │       │   ├── therapistService.js  # CRUD de terapeutas
+│   │       │   ├── vrResultsService.js  # Sesiones VR + evaluación
+│   │       │   └── auditService.js      # Consulta de auditoría
+│   │       └── utils/
+│   │           └── alertUtils.js        # Utilidades de alertas (SweetAlert2)
+│   ├── electron.vite.config.js     # Config de electron-vite
+│   ├── tailwind.config.js          # Config de Tailwind CSS
 │   └── package.json
 │
+├── docs/
+│   ├── POSTMAN_API_DOCS.md         # Documentación completa para Postman
+│   └── manual_screenshots/         # Screenshots del manual de usuario
+│
+├── mockups/                        # Mockups de diseño UI
 ├── .gitignore
 ├── package.json                    # Workspace raíz (npm workspaces)
+├── CHANGELOG.md                    # Changelog global del proyecto
+├── SECURITY.md                     # Guía de seguridad
 └── README.md
 ```
 
@@ -114,164 +168,115 @@ dashboard_terapeuta/
 ### Paso 1: Clonar el Repositorio
 
 ```bash
-git clone https://github.com/tu-usuario/dashboard_terapeuta.git
+git clone https://github.com/FlacoAfk/dashboard_terapeuta.git
 cd dashboard_terapeuta
 ```
 
 ### Paso 2: Instalar Dependencias
 
-Desde la raíz del proyecto, instala todas las dependencias (backend + frontend):
-
 ```bash
 npm install
 ```
 
-> **Nota:** El proyecto usa npm workspaces, este comando instala las dependencias de ambos paquetes.
+> El proyecto usa npm workspaces — instala dependencias de backend y frontend automáticamente.
 
 ### Paso 3: Configurar Variables de Entorno
 
-Crea el archivo `.env` en la carpeta `backend/`:
-
 ```bash
 cd backend
-copy .env.example .env   # Windows
-# cp .env.example .env   # Linux/Mac
+copy .env.example .env
 ```
 
-Edita el archivo `.env` con tus credenciales (ver sección [Configuración](#️-configuración)).
+Edita `backend/.env` con tus credenciales (ver [Configuración](#️-configuración)).
 
-### Paso 4: Verificar Conexión a Base de Datos
+### Paso 4: Iniciar Backend
 
 ```bash
-cd backend
-node scripts/check_db.js
-```
-
-### Paso 5: Iniciar el Backend
-
-**Terminal 1:**
-```bash
-# Desde la raíz del proyecto
+# Desde la raíz
 npm run dev:backend
-
-# O desde la carpeta backend
-cd backend
-npm run dev
 ```
 
-El servidor estará disponible en:
 - **API:** http://localhost:3001
-- **Swagger Docs:** http://localhost:3001/api-docs
-- **Health Check:** http://localhost:3001/health
+- **Swagger:** http://localhost:3001/api-docs
+- **Health:** http://localhost:3001/health
 
-### Paso 6: Compilar CSS de Tailwind (Primera vez)
+### Paso 5: Iniciar Frontend (Electron)
 
-**Terminal 2:**
 ```bash
-# Desde la raíz del proyecto
-npm run build:css
-
-# O desde la carpeta frontend
-cd frontend
-npm run build:css
+# Desde la raíz (en otra terminal)
+npm run dev:frontend
 ```
 
-> Este comando queda en modo watch, recompila automáticamente los cambios.
+### Desarrollo Simultáneo
 
-### Paso 7: Iniciar el Frontend (Electron)
-
-**Terminal 3:**
 ```bash
-# Desde la raíz del proyecto
-npm run dev:frontend
-
-# O desde la carpeta frontend
-cd frontend
-npm run dev
+npm run dev    # Inicia backend + frontend con concurrently
 ```
 
 ---
 
 ## ⚙️ Configuración
 
-### Variables de Entorno del Backend
-
-Crea el archivo `backend/.env` con las siguientes variables:
+### Variables de Entorno (`backend/.env`)
 
 ```env
-# ========================================
-# CONFIGURACIÓN DEL SERVIDOR
-# ========================================
+# Servidor
 PORT=3001
-NODE_ENV=development
 
-# ========================================
-# BASE DE DATOS - PostgreSQL (Supabase)
-# ========================================
-DB_HOST=db.xxxxxxxx.supabase.co
-DB_PORT=5432
-DB_NAME=postgres
-DB_USER=postgres
-DB_PASSWORD=tu_password_seguro
+# Supabase
+SUPABASE_URL=https://tu-proyecto.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=eyJ...
 
-# ========================================
-# JWT - AUTENTICACIÓN
-# ========================================
-JWT_SECRET=tu_clave_secreta_muy_larga_y_segura_aqui_2024
+# JWT
+JWT_SECRET=tu_clave_secreta_muy_larga
 JWT_EXPIRES_IN=24h
 
-# ========================================
-# CONFIGURACIÓN ADICIONAL (OPCIONAL)
-# ========================================
-# LOG_LEVEL=debug
-# CORS_ORIGIN=http://localhost:3000
-```
+# Email SMTP
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=tu_email@gmail.com
+SMTP_PASS=tu_app_password
+SMTP_FROM="Cerebro al Fuego" <tu_email@gmail.com>
 
-### Descripción de Variables
+# Superadmin (para seed)
+SUPERADMIN_EMAIL=admin@tudominio.com
+SUPERADMIN_PASSWORD=TuPassword@Seguro123
+
+# Unity
+UNITY_API_KEY=tu_api_key_para_unity
+```
 
 | Variable | Requerida | Descripción |
 |----------|-----------|-------------|
 | `PORT` | No | Puerto del servidor (default: 3001) |
-| `DB_HOST` | ✅ Sí | Host de PostgreSQL/Supabase |
-| `DB_PORT` | ✅ Sí | Puerto de PostgreSQL (default: 5432) |
-| `DB_NAME` | ✅ Sí | Nombre de la base de datos |
-| `DB_USER` | ✅ Sí | Usuario de PostgreSQL |
-| `DB_PASSWORD` | ✅ Sí | Contraseña de PostgreSQL |
-| `JWT_SECRET` | ✅ Sí | Clave secreta para firmar tokens JWT |
+| `SUPABASE_URL` | ✅ | URL del proyecto Supabase |
+| `SUPABASE_SERVICE_ROLE_KEY` | ✅ | Service Role Key de Supabase |
+| `JWT_SECRET` | ✅ | Clave secreta para tokens JWT |
+| `JWT_EXPIRES_IN` | No | Duración del token (default: 24h) |
+| `SMTP_USER` | ✅ | Email para envío de correos |
+| `SMTP_PASS` | ✅ | Contraseña de aplicación SMTP |
+| `UNITY_API_KEY` | ✅ | API Key para autenticación de Unity |
 
 ---
 
 ## 📖 Uso
 
-### Inicio Rápido
+### Primer Uso — Crear Superadministrador
+
+1. Inicia el backend: `npm run dev:backend`
+2. Inicia el frontend: `npm run dev:frontend`
+3. La app detecta que no hay superadmin y muestra la página de Setup
+4. Crea el superadmin con email, nombre y contraseña segura
+
+> **Contraseña:** mínimo 10 caracteres con mayúsculas, minúsculas, números y símbolos.
+
+### Despliegue con Docker
 
 ```bash
-# Terminal 1: Backend
-npm run dev:backend
-
-# Terminal 2: CSS Watch (solo la primera vez o si editas estilos)
-npm run build:css
-
-# Terminal 3: Frontend Electron
-npm run dev:frontend
+cd backend
+docker build -t cerebro-al-fuego .
+docker run -p 3001:3001 --env-file .env cerebro-al-fuego
 ```
-
-### Primer Uso - Crear Superadministrador
-
-1. Abre Swagger UI: http://localhost:3001/api-docs
-2. Ejecuta `GET /api/auth/check-setup` para verificar si existe un superadmin
-3. Si no existe, ejecuta `POST /api/auth/setup` con los datos del administrador:
-
-```json
-{
-  "nombre": "Administrador",
-  "correo": "admin@clinica.com",
-  "username": "admin",
-  "password": "TuContraseñaSegura123!@"
-}
-```
-
-> **Importante:** La contraseña debe tener mínimo 10 caracteres, incluyendo mayúsculas, minúsculas, números y símbolos.
 
 ---
 
@@ -279,25 +284,23 @@ npm run dev:frontend
 
 ### Arquitectura
 
-El backend sigue una arquitectura por capas:
-
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                     server.js                           │
-│              (Express App & Middlewares)                │
+│              (Express App & Middlewares)                 │
 └───────────────────────┬─────────────────────────────────┘
                         │
         ┌───────────────┼───────────────┐
         ▼               ▼               ▼
 ┌───────────────┐ ┌───────────────┐ ┌───────────────┐
-│   Routes      │ │  Middleware   │ │    Config     │
-│ ────────────  │ │ ────────────  │ │ ────────────  │
-│ • api.js      │ │ authMiddle-   │ │ • database.js │
-│ • auth.js     │ │   ware.js     │ │ • swagger.js  │
-│ • usuarios.js │ │ (JWT + RBAC)  │ │               │
-│ • audit.js    │ │               │ │               │
-└───────┬───────┘ └───────────────┘ └───────┬───────┘
-        │                                   │
+│   Routes      │ │  Middleware   │ │    Config      │
+│ ────────────  │ │ ────────────  │ │ ────────────   │
+│ • api.js      │ │ authMiddle-   │ │ • supabase.js  │
+│ • auth.js     │ │   ware.js     │ │ • swagger.js   │
+│ • usuarios.js │ │ (JWT + RBAC)  │ └───────┬────────┘
+│ • audit.js    │ │               │         │
+│ • vrResults.js│ └───────────────┘         │
+└───────┬───────┘                           │
         └──────────────┬────────────────────┘
                        ▼
               ┌─────────────────┐
@@ -306,76 +309,121 @@ El backend sigue una arquitectura por capas:
               └─────────────────┘
 ```
 
-### Módulos del Backend
+### Módulos
 
-#### 📂 `config/`
+| Carpeta | Archivos | Descripción |
+|---------|----------|-------------|
+| `config/` | `supabase.js`, `swagger.js` | Clientes de Supabase y OpenAPI |
+| `middleware/` | `authMiddleware.js` | JWT, `requireSuperAdmin`, `requireTerapeuta`, `optionalAuth` |
+| `routes/` | `api.js`, `auth.js`, `usuarios.js`, `audit.js`, `vrResults.js` | Todos los endpoints |
+| `validators/` | `authValidator.js`, `patientValidator.js`, `userValidator.js` | express-validator chains |
+| `utils/` | `auditHelper.js`, `validationUtils.js` | Helpers reutilizables |
+| `services/` | `emailService.js` | SMTP con nodemailer |
 
-| Archivo | Descripción |
-|---------|-------------|
-| `supabase.js` | Configuración del cliente Supabase. Exporta instancia `supabase` y `testConnection()`. |
-| `swagger.js` | Configuración de OpenAPI 3.0 para documentación automática de la API. |
+---
 
-#### 📂 `middleware/`
+## 📡 API Endpoints — Resumen (35 endpoints)
 
-| Archivo | Descripción |
-|---------|-------------|
-| `authMiddleware.js` | Middlewares de autenticación y autorización: `authenticateToken`, `requireSuperAdmin`, `requireTerapeuta`, `generateToken`, `optionalAuth`. |
+> Documentación completa en [`backend/API_ENDPOINTS.md`](backend/API_ENDPOINTS.md) y en Swagger: `http://localhost:3001/api-docs`
 
-#### 📂 `routes/`
+### Health & Status (3 — Públicos)
 
-| Archivo | Endpoints | Descripción |
-|---------|-----------|-------------|
-| `api.js` | `/api/patients`, `/api/sessions`, `/api/actividades`, `/api/terapeutas`, `/api/dashboard` | Endpoints principales de la aplicación |
-| `auth.js` | `/api/auth/*` | Login, setup, info de usuario, cambio de contraseña |
-| `usuarios.js` | `/api/usuarios/*` | CRUD de usuarios (solo Superadmin) |
-| `audit.js` | `/api/audit/*` | Consulta de logs de auditoría |
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| GET | `/health` | Estado del servidor |
+| GET | `/api/status` | Estado de la API |
+| GET | `/api/db-status` | Conexión a BD |
 
-#### 📂 `utils/`
+### Autenticación (8 — `/api/auth`)
 
-| Archivo | Descripción |
-|---------|-------------|
-| `auditHelper.js` | Función helper para registrar eventos en la tabla de auditoría. |
+| Método | Endpoint | Auth | Descripción |
+|--------|----------|------|-------------|
+| GET | `/check-setup` | ❌ | Verificar si existe superadmin |
+| POST | `/setup` | ❌ | Crear superadmin (1 vez) |
+| POST | `/login` | ❌ | Iniciar sesión |
+| GET | `/me` | JWT | Info del usuario actual |
+| POST | `/change-password` | JWT | Cambiar contraseña |
+| POST | `/forgot-password` | ❌ | Solicitar recuperación |
+| POST | `/reset-password` | ❌ | Restablecer con token |
+| POST | `/request-verification-code` | JWT | Código por email |
 
-#### 📂 `scripts/`
+### Usuarios (5 — Solo Superadmin)
 
-| Script | Uso | Descripción |
-|--------|-----|-------------|
-| `check_db.js` | `node scripts/check_db.js` | Verifica conexión y lista tablas |
-| `migrate_roles.js` | `node scripts/migrate_roles.js` | Migra roles de usuarios |
-| `add_activo_column.js` | `node scripts/add_activo_column.js` | Agrega columna `activo` a tablas |
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| GET | `/api/usuarios` | Listar usuarios |
+| POST | `/api/usuarios/terapeuta` | Crear terapeuta |
+| PUT | `/api/usuarios/:id` | Actualizar usuario |
+| PUT | `/api/usuarios/:id/toggle-estado` | Activar/desactivar |
+| POST | `/api/usuarios/:id/reset-password` | Reset de contraseña |
+
+### Pacientes (7 — JWT + Terapeuta)
+
+| Método | Endpoint | Ownership | Descripción |
+|--------|----------|-----------|-------------|
+| GET | `/api/patients` | Filtrado | Listar pacientes |
+| POST | `/api/patients` | — | Crear paciente |
+| GET | `/api/patients/:id` | ✅ | Detalle de paciente |
+| PUT | `/api/patients/:id` | ✅ | Actualizar paciente |
+| PUT | `/api/patients/:id/toggle-status` | ✅ | Activar/desactivar |
+| POST | `/api/patients/:id/assign` | SuperAdmin | Asignar terapeuta |
+| GET | `/api/patients/:id/report` | ✅ | Informe con sesiones VR |
+
+### Sesiones VR Dashboard (2 — JWT + Terapeuta)
+
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| GET | `/api/sessions` | Listar sesiones (filtro por ownership) |
+| PUT | `/api/sessions/:id` | **Evaluación + observaciones** (ownership check) |
+
+### Unity / VR Results (4 — API Key + JWT)
+
+| Método | Endpoint | Auth | Descripción |
+|--------|----------|------|-------------|
+| POST | `/api/v1/session-results` | API Key | Recibir datos desde Unity |
+| GET | `/api/v1/session-results` | JWT | Listar sesiones (raw) |
+| GET | `/api/v1/session-results/:id` | JWT | Detalle con sets + errores |
+| GET | `/api/v1/patients/lookup` | API Key | Verificar paciente (Unity) |
+
+### Dashboard & Terapeutas (2 — JWT)
+
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| GET | `/api/dashboard/stats` | Estadísticas generales |
+| GET | `/api/terapeutas` | Listar terapeutas |
+
+### Auditoría (4 — Solo Superadmin)
+
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| GET | `/api/audit` | Eventos con paginación |
+| GET | `/api/audit/types` | Tipos de eventos |
+| GET | `/api/audit/user/:id` | Eventos de un usuario |
+| GET | `/api/audit/export` | Exportar CSV |
 
 ---
 
 ## 🎮 Integración con Videojuego VR (Unity)
 
-El proyecto "Cerebro al Fuego" se divide en dos módulos que se comunican mediante JSON:
-
-| Módulo | Tecnología | Descripción |
-|--------|------------|-------------|
-| **Dashboard Terapeuta** | Electron + Express | Gestión de pacientes, terapeutas y análisis de sesiones |
-| **Videojuego VR** | Unity | Aplicación de realidad virtual con actividades de cocina |
-
-### Flujo de Comunicación
-
 ```
 ┌────────────────────────┐     POST JSON      ┌────────────────────────┐
 │    VIDEOJUEGO VR       │ ─────────────────> │  DASHBOARD BACKEND     │
-│       (Unity)          │                    │    (Express.js)        │
+│       (Unity)          │    X-API-Key       │    (Express.js)        │
 │                        │                    │         │              │
-│  Sets: Ingredients     │                    │         ▼              │
-│        Utensils        │                    │ ┌──────────────────┐   │
-│        Preparation     │                    │ │    SUPABASE      │   │
+│  Sets: Ingredients     │ <───────────────── │         ▼              │
+│        Utensils        │   GET /patients/   │ ┌──────────────────┐   │
+│        Preparation     │     lookup         │ │    SUPABASE      │   │
 │        Organization    │                    │ │  (PostgreSQL)    │   │
 └────────────────────────┘                    │ └──────────────────┘   │
                                               └────────────────────────┘
 ```
 
-### Formato JSON de Sesión VR
+### JSON de Sesión VR
 
 ```json
 {
   "schemaVersion": "1.0",
-  "participantId": "PACIENTE_001",
+  "participantId": "CEDULA_PACIENTE",
   "activityId": "tinto_easy_01",
   "startedAtIso": "2026-01-21T05:13:26.428Z",
   "endedAtIso": "2026-01-21T05:19:21.598Z",
@@ -389,116 +437,70 @@ El proyecto "Cerebro al Fuego" se divide en dos módulos que se comunican median
   "sets": [
     {
       "setName": "Ingredients",
-      "durationSeconds": 40.18,
+      "startedAtIso": "2026-01-21T05:13:26.428Z",
+      "endedAtIso": "2026-01-21T05:15:00.000Z",
+      "durationSeconds": 93.57,
       "blockedCount": 1,
       "dropsCount": 0,
       "releasesCount": 1,
-      "errors": [{ "code": "STOVE_ON_NO_POT", "message": "...", "timestampIso": "..." }]
+      "errors": [
+        {
+          "code": "STOVE_ON_NO_POT",
+          "message": "Estufa encendida sin olla",
+          "timeIso": "2026-01-21T05:14:12.000Z",
+          "context": "Olla"
+        }
+      ]
     }
   ]
 }
 ```
 
-> **Nota:** No existen estrellas ni puntajes visibles al usuario. Toda la información es para evaluación terapéutica.
+### Tablas de BD
 
-### Sets de Evaluación
-
-| Set | Descripción | Campos especiales |
-|-----|-------------|-------------------|
-| **Ingredients** | Recolección de ingredientes | - |
-| **Utensils** | Selección de utensilios | - |
-| **Preparation** | Preparación del café | `completion` (coffeeAdded, sugarAdded) |
-| **Organization** | Organización y limpieza | `returnedObjects` (lista de objetos) |
-
-### Endpoint Principal
-
-| Método | Endpoint | Descripción |
-|--------|----------|-------------|
-| POST | `/api/v1/session-results` | Recibe datos completos de sesión VR |
-| GET | `/api/v1/session-results` | Lista todas las sesiones |
-| GET | `/api/v1/session-results/:id` | Obtiene sesión con detalles |
-
-### Tablas en Supabase
-
-- `vr_session_results` - Sesión principal con raw JSON
-- `vr_set_results` - Resultados por set
-- `vr_set_errors` - Errores con código y timestamp
-- `vr_set_returned_objects` - Objetos devueltos (Organization)
+| Tabla | Descripción |
+|-------|-------------|
+| `usuarios` | Usuarios del sistema (login, roles) |
+| `terapeutas` | Datos de terapeutas |
+| `pacientes` | Datos de pacientes |
+| `terapeuta_paciente` | Relación terapeuta↔paciente |
+| `vr_session_results` | Sesión principal con métricas y evaluación |
+| `vr_set_results` | Resultados por etapa (set) |
+| `vr_set_errors` | Errores con código, timestamp y contexto |
+| `auditoria` | Registro de eventos del sistema |
+| `password_reset_tokens` | Tokens de recuperación de contraseña |
 
 ---
 
-## 📡 API Endpoints
+## ⭐ Evaluación del Desempeño
 
-### Health & Status
+El terapeuta puede asignar una calificación de desempeño (1-5) a cada sesión VR revisada:
 
-| Método | Endpoint | Auth | Descripción |
-|--------|----------|------|-------------|
-| GET | `/health` | ❌ | Estado del servidor |
-| GET | `/api/status` | ❌ | Estado de la API |
-| GET | `/api/db-status` | ❌ | Estado de la base de datos |
+| Valor | Etiqueta | Descripción |
+|-------|----------|-------------|
+| 1 | Muy bajo | Dificultades significativas en la mayoría de las áreas |
+| 2 | Bajo | Desempeño por debajo de lo esperado con errores frecuentes |
+| 3 | Aceptable | Desempeño adecuado con áreas de mejora identificables |
+| 4 | Bueno | Buen desempeño con errores menores o esporádicos |
+| 5 | Excelente | Desempeño sobresaliente con mínimos errores |
 
-### Autenticación (`/api/auth`)
+La calificación se almacena como prefijo en `observaciones_terapeuta`:
+```
+[Calificación: 4/5 - Bueno]
+Paciente mostró mejoría en tiempo de reacción y coordinación motora.
+```
 
-| Método | Endpoint | Auth | Descripción |
-|--------|----------|------|-------------|
-| GET | `/check-setup` | ❌ | Verificar si existe superadmin |
-| POST | `/setup` | ❌ | Crear superadmin inicial (solo 1 vez) |
-| POST | `/login` | ❌ | Iniciar sesión |
-| GET | `/me` | ✅ | Obtener usuario actual |
-| POST | `/change-password` | ✅ | Cambiar contraseña |
+### VRSessionCard — Vista Detallada
 
-### Usuarios (`/api/usuarios`) - Solo Superadmin
+El componente `VRSessionCard.jsx` presenta la información en 5 pestañas:
 
-| Método | Endpoint | Descripción |
-|--------|----------|-------------|
-| GET | `/` | Listar usuarios |
-| POST | `/terapeuta` | Crear terapeuta |
-| PUT | `/:id` | Actualizar usuario |
-| PUT | `/:id/toggle-estado` | Activar/desactivar |
-| POST | `/:id/reset-password` | Resetear contraseña |
-
-### Pacientes (`/api/patients`)
-
-| Método | Endpoint | Rol | Descripción |
-|--------|----------|-----|-------------|
-| GET | `/` | Terapeuta+ | Listar pacientes (filtrado por rol) |
-| GET | `/:id` | Terapeuta+ | Obtener paciente |
-| POST | `/` | Terapeuta+ | Crear paciente |
-| PUT | `/:id` | Terapeuta+ | Actualizar paciente |
-| DELETE | `/:id` | Superadmin | Eliminar paciente |
-| POST | `/:id/assign` | Superadmin | Asignar a terapeuta |
-| GET | `/:id/report` | Terapeuta+ | Informe completo |
-
-### Sesiones (`/api/sessions`)
-
-| Método | Endpoint | Descripción |
-|--------|----------|-------------|
-| GET | `/` | Listar sesiones |
-| GET | `/:id` | Obtener sesión con eventos |
-| POST | `/` | Crear sesión (desde Unity) |
-| PUT | `/:id/finish` | Finalizar con resumen |
-| POST | `/:id/events` | Registrar evento |
-
-### Actividades (`/api/actividades`)
-
-| Método | Endpoint | Descripción |
-|--------|----------|-------------|
-| GET | `/` | Listar actividades (niveles) |
-| GET | `/:id` | Actividad con detalles |
-
-### Dashboard (`/api/dashboard`)
-
-| Método | Endpoint | Descripción |
-|--------|----------|-------------|
-| GET | `/stats` | Estadísticas generales |
-
-### Auditoría (`/api/audit`) - Solo Superadmin
-
-| Método | Endpoint | Descripción |
-|--------|----------|-------------|
-| GET | `/` | Listar eventos (con filtros) |
-| GET | `/user/:id` | Eventos de un usuario |
-| GET | `/types` | Tipos de eventos |
+| Pestaña | Contenido |
+|---------|-----------|
+| **Resumen** | Score circular (0-100), métricas globales, timeline, distribución de tiempo |
+| **Etapas** | Cards expandibles por etapa con métricas, errores y timestamps |
+| **Errores** | Agrupación por tipo, timeline cronológico, distribución por etapa |
+| **Motricidad** | Eficiencia motora, análisis de drops/releases/blocks por etapa |
+| **Evaluación** | Escala 1-5, observaciones clínicas, datos de referencia |
 
 ---
 
@@ -506,126 +508,26 @@ El proyecto "Cerebro al Fuego" se divide en dos módulos que se comunican median
 
 | Rol | Permisos |
 |-----|----------|
-| **SUPERADMIN** | Acceso total: crear/editar terapeutas, asignar pacientes, eliminar registros, ver auditoría |
-| **TERAPEUTA** | Ver/crear pacientes asignados, gestionar sesiones propias, ver informes de sus pacientes |
+| **SUPERADMIN** | Acceso total: CRUD terapeutas, asignar pacientes, ver auditoría, gestionar todos los datos |
+| **TERAPEUTA** | Ver/crear pacientes asignados, revisar y evaluar sesiones VR de sus pacientes, configurar perfil |
 
 ---
 
-## 🔐 Autenticación
+## 🔐 Seguridad
 
-Todos los endpoints (excepto `/health`, `/login` y `/check-setup`) requieren un **Bearer Token**.
+| Característica | Implementación |
+|----------------|----------------|
+| **JWT** | Tokens con expiración configurable, verificación de estado activo |
+| **bcrypt** | Hash de contraseñas con salt de 12 rounds |
+| **RBAC** | `requireSuperAdmin`, `requireTerapeuta` + ownership checks |
+| **API Key** | Header `X-API-Key` para endpoints de Unity |
+| **Validación** | UUID, longitud, tipos de datos en todos los inputs |
+| **Ownership** | Terapeutas solo acceden a datos de pacientes asignados |
+| **Anti-bruteforce** | Bloqueo temporal tras 5 intentos fallidos de login |
+| **Auditoría** | Registro de todas las operaciones críticas (SESSION_REVIEWED, etc.) |
+| **CORS** | Configurado para orígenes permitidos |
 
-### Flujo de Autenticación
-
-```javascript
-// 1. Verificar si hay superadmin configurado
-GET /api/auth/check-setup
-// Respuesta: { setupComplete: true/false }
-
-// 2. Si no hay superadmin, crear uno (solo una vez)
-POST /api/auth/setup
-{
-  "nombre": "Administrador",
-  "correo": "admin@clinica.com",
-  "username": "admin",
-  "password": "TuContraseñaSegura123!@"
-}
-
-// 3. Login
-POST /api/auth/login
-{
-  "username": "admin",
-  "password": "TuContraseñaSegura123!@"
-}
-// Respuesta: { success: true, data: { token: "eyJhbG...", user: {...} } }
-
-// 4. Usar token en todas las peticiones
-headers: {
-  "Authorization": "Bearer eyJhbG..."
-}
-```
-
----
-
-## 🔧 Para el Equipo de Frontend
-
-### Cliente API Recomendado
-
-```javascript
-// services/api.js
-const API_URL = 'http://localhost:3001/api';
-
-const api = {
-  token: null,
-  
-  setToken(token) {
-    this.token = token;
-    localStorage.setItem('auth_token', token);
-  },
-  
-  getHeaders() {
-    return {
-      'Content-Type': 'application/json',
-      ...(this.token && { 'Authorization': `Bearer ${this.token}` })
-    };
-  },
-  
-  async get(endpoint) {
-    const res = await fetch(`${API_URL}${endpoint}`, {
-      headers: this.getHeaders()
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return res.json();
-  },
-  
-  async post(endpoint, data) {
-    const res = await fetch(`${API_URL}${endpoint}`, {
-      method: 'POST',
-      headers: this.getHeaders(),
-      body: JSON.stringify(data)
-    });
-    return res.json();
-  },
-  
-  async put(endpoint, data) {
-    const res = await fetch(`${API_URL}${endpoint}`, {
-      method: 'PUT',
-      headers: this.getHeaders(),
-      body: JSON.stringify(data)
-    });
-    return res.json();
-  },
-  
-  async delete(endpoint) {
-    const res = await fetch(`${API_URL}${endpoint}`, {
-      method: 'DELETE',
-      headers: this.getHeaders()
-    });
-    return res.json();
-  }
-};
-
-export default api;
-```
-
-### Ejemplo de Login
-
-```javascript
-async function login(username, password) {
-  const result = await api.post('/auth/login', { username, password });
-  if (result.success) {
-    api.setToken(result.data.token);
-    return result.data.user;
-  }
-  throw new Error(result.error);
-}
-```
-
----
-
-## 📖 Documentación Interactiva
-
-Swagger UI disponible en: **http://localhost:3001/api-docs**
+> Ver [`SECURITY.md`](SECURITY.md) para guía completa de seguridad.
 
 ---
 
@@ -633,53 +535,22 @@ Swagger UI disponible en: **http://localhost:3001/api-docs**
 
 ### Módulo de Seguridad (RF-SEG)
 
-| Código | Descripción | Estado | Notas |
-|--------|-------------|--------|-------|
-| RF-SEG-01 | Creación y configuración del Superusuario | ✅ | Único, creado en `/setup`, bloqueado después |
-| RF-SEG-02 | Gestión de roles y permisos del Superadministrador | ✅ | CRUD terapeutas, reasignación de pacientes |
-| RF-SEG-03 | Gestión de roles y permisos del Terapeuta | ✅ | Solo ve sus pacientes, no puede eliminar |
-| RF-SEG-04 | Interfaz visual del terapeuta para gestión de pacientes | ✅ | Dashboard con filtros, detalle de paciente, informes VR |
+| Código | Descripción | Estado |
+|--------|-------------|--------|
+| RF-SEG-01 | Superusuario único | ✅ |
+| RF-SEG-02 | Gestión de roles Superadmin | ✅ |
+| RF-SEG-03 | Gestión de roles Terapeuta | ✅ |
+| RF-SEG-04 | Interfaz visual terapeuta | ✅ |
 
 ### Base de Datos (RF-BDD)
 
-| Código | Descripción | Estado | Notas |
-|--------|-------------|--------|-------|
-| RF-BDD-01 | Estructura central de usuarios | ✅ | usuarios, terapeutas, pacientes, terapeuta_paciente |
-| RF-BDD-02 | Registro de sesiones clínicas | ✅ | vr_session_results con metadatos completos |
-| RF-BDD-03 | Registro detallado de acciones (logging) | ✅ | vr_set_results con sets detallados |
-| RF-BDD-04 | Registro de aciertos/errores/omisiones | ✅ | vr_set_errors con códigos y timestamps |
-| RF-BDD-05 | Almacenamiento de listas de ingredientes | 🚧 | Pendiente: integrar con Unity |
-| RF-BDD-06 | Registro de pantalla de apertura | 🚧 | Pendiente: integrar con Unity |
-| RF-BDD-07 | Configuración global del sistema | 🚧 | Pendiente |
-| RF-BDD-08 | Control de auditoría | ✅ | Tabla auditoria con exportación CSV |
-| RF-BDD-09 | Exportación estructurada | ✅ | CSV desde panel de auditoría |
-
-### Módulo Unity (RF-UNT) - Responsabilidad del equipo Unity
-
-| Código | Descripción | Estado Dashboard |
-|--------|-------------|------------------|
-| RF-UNT-10 | Registro detallado de sesión | ✅ API lista para recibir JSON |
-
-### Mejoras Recientes (v1.6.0)
-
-- **Integración VR Completa:** Endpoint `/api/v1/session-results` para recibir datos de Unity
-- **Visualización de Sesiones VR:** Vista detallada de sesiones con sets, errores y objetos
-- **Diseño Responsivo:** Frontend adaptable a diferentes tamaños de pantalla desktop
-- **Modal de Reasignación Mejorado:** UI expandible con información detallada de pacientes y terapeutas
-- **Limpieza de Código:** Eliminación de rutas y servicios obsoletos (sesiones, eventos, evaluacion, metricas)
-
-
----
-
-## 🎨 Tema Visual (Tailwind)
-
-La paleta de colores personalizada está configurada en `frontend/tailwind.config.js`:
-
-| Clase | Uso |
-|-------|-----|
-| `primary-*` | Azul (botones principales) |
-| `accent-*` | Púrpura (destacados) |
-| `surface-*` | Grises oscuros (fondos) |
+| Código | Descripción | Estado |
+|--------|-------------|--------|
+| RF-BDD-01 | Estructura central de usuarios | ✅ |
+| RF-BDD-02 | Registro de sesiones clínicas | ✅ |
+| RF-BDD-03 | Registro detallado de acciones | ✅ |
+| RF-BDD-04 | Registro de aciertos/errores/omisiones | ✅ |
+| RF-BDD-08 | Control de auditoría con exportación | ✅ |
 
 ---
 

@@ -57,7 +57,10 @@ const CrearTerapeutaModal = ({ isOpen, onClose, onSubmit }) => {
         password: '',
         nombre: '',
         apellido: '',
-        correo: ''
+        correo: '',
+        username: '',
+        especialidad: '',
+        telefono: ''
     });
     const [showPassword, setShowPassword] = useState(false);
     const [errors, setErrors] = useState({});
@@ -110,9 +113,12 @@ const CrearTerapeutaModal = ({ isOpen, onClose, onSubmit }) => {
         setIsSubmitting(true);
         try {
             await onSubmit({
+                nombre: `${formData.nombre} ${formData.apellido}`,
                 correo: formData.correo,
+                username: formData.username,
                 password: formData.password,
-                nombre: `${formData.nombre} ${formData.apellido}`
+                especialidad: formData.especialidad || 'General',
+                telefono: formData.telefono || null
             });
             handleClose();
         } catch (error) {
@@ -123,7 +129,7 @@ const CrearTerapeutaModal = ({ isOpen, onClose, onSubmit }) => {
     };
 
     const handleClose = () => {
-        setFormData({ password: '', nombre: '', apellido: '', correo: '' });
+        setFormData({ password: '', nombre: '', apellido: '', correo: '', username: '', especialidad: '', telefono: '' });
         setErrors({});
         setShowPassword(false);
         onClose();
@@ -187,11 +193,36 @@ const CrearTerapeutaModal = ({ isOpen, onClose, onSubmit }) => {
                             />
                         </FormField>
 
+                        {/* Especialidad y Teléfono */}
+                        <div className="grid grid-cols-2 gap-4">
+                            <FormField label="Especialidad" hint="Ej: Neuropsicología">
+                                <input
+                                    type="text"
+                                    name="especialidad"
+                                    value={formData.especialidad}
+                                    onChange={handleChange}
+                                    placeholder="General"
+                                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-colors"
+                                />
+                            </FormField>
+
+                            <FormField label="Teléfono" hint="Opcional">
+                                <input
+                                    type="tel"
+                                    name="telefono"
+                                    value={formData.telefono}
+                                    onChange={handleChange}
+                                    placeholder="3001234567"
+                                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-colors"
+                                />
+                            </FormField>
+                        </div>
+
                         {/* Contraseña */}
                         <FormField
                             label="Contraseña"
                             required
-                            hint="Mín. 1 mayúscula y 8 caracteres"
+                            hint="Mín. 10 caracteres, mayúsculas, minúsculas, números y símbolos"
                             error={errors.password}
                         >
                             <div className="relative">

@@ -35,7 +35,13 @@ const PORT = process.env.PORT || 3001;
 
 // Permitir peticiones desde Electron y Vite dev server
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:5174', 'file://'],
+  origin: [
+    'http://localhost:3000',
+    'http://localhost:5173',
+    'http://localhost:5174',
+    'file://',
+    'https://cerebro-al-fuego-image-482550109792.us-central1.run.app'
+  ],
   credentials: true
 }));
 
@@ -63,12 +69,23 @@ app.get('/api-docs.json', (req, res) => {
 // ========================================
 
 // Verificar que el servidor está funcionando
+/**
+ * @swagger
+ * /health:
+ *   get:
+ *     summary: Estado del servidor
+ *     tags: [Health]
+ *     responses:
+ *       200:
+ *         description: Servidor funcionando correctamente
+ */
 app.get('/health', (req, res) => {
+  const baseUrl = `${req.protocol}://${req.get('host')}`;
   res.json({
     status: 'ok',
     message: 'Backend funcionando correctamente',
     timestamp: new Date().toISOString(),
-    docs: `http://localhost:${PORT}/api-docs`
+    docs: `${baseUrl}/api-docs`
   });
 });
 

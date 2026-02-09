@@ -182,6 +182,25 @@ router.get('/', authenticateToken, requireSuperAdmin, async (req, res) => {
  *   get:
  *     summary: Obtener eventos de un usuario específico
  *     tags: [Auditoría]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID del usuario
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 50
+ *     responses:
+ *       200:
+ *         description: Eventos del usuario
+ *       403:
+ *         description: Acceso denegado
  */
 router.get('/user/:id', authenticateToken, requireSuperAdmin, async (req, res) => {
     const { id } = req.params;
@@ -224,6 +243,13 @@ router.get('/user/:id', authenticateToken, requireSuperAdmin, async (req, res) =
  *   get:
  *     summary: Obtener tipos de eventos disponibles
  *     tags: [Auditoría]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Lista de tipos de eventos con conteo
+ *       403:
+ *         description: Acceso denegado
  */
 router.get('/types', authenticateToken, requireSuperAdmin, async (req, res) => {
     try {
@@ -260,6 +286,28 @@ router.get('/types', authenticateToken, requireSuperAdmin, async (req, res) => {
  *   get:
  *     summary: Exportar auditoría a CSV
  *     tags: [Auditoría]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: mes
+ *         schema:
+ *           type: integer
+ *         description: Mes (1-12)
+ *       - in: query
+ *         name: anio
+ *         schema:
+ *           type: integer
+ *         description: Año (ej. 2026)
+ *     responses:
+ *       200:
+ *         description: Archivo CSV descargable
+ *         content:
+ *           text/csv:
+ *             schema:
+ *               type: string
+ *       403:
+ *         description: Acceso denegado
  */
 router.get('/export', authenticateToken, requireSuperAdmin, async (req, res) => {
     const { mes, anio } = req.query;

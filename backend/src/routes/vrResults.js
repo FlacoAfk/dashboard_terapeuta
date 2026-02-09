@@ -16,6 +16,36 @@
 const express = require('express');
 const router = express.Router();
 const { supabase } = require('../config/supabase');
+const { authenticateToken, requireTerapeuta } = require('../middleware/authMiddleware');
+
+/**
+ * Middleware para validar API Key de Unity
+ */
+const validateUnityApiKey = (req, res, next) => {
+    const apiKey = req.headers['x-api-key'];
+    const expectedKey = process.env.UNITY_API_KEY;
+
+    if (!expectedKey) {
+        console.error('[Security] UNITY_API_KEY no está configurada en .env');
+        return res.status(500).json({
+            error: {
+                code: 'CONFIG_ERROR',
+                message: 'API Key no configurada en el servidor'
+            }
+        });
+    }
+
+    if (!apiKey || apiKey !== expectedKey) {
+        return res.status(401).json({
+            error: {
+                code: 'UNAUTHORIZED',
+                message: 'API Key inválida o no proporcionada'
+            }
+        });
+    }
+
+    next();
+};
 
 /**
  * @swagger
@@ -23,6 +53,11 @@ const { supabase } = require('../config/supabase');
  *   post:
  *     summary: Recibe y persiste el resultado de una sesión VR
  *     tags: [VR Results]
+ *     security:
+ *       - apiKeyAuth: []
+ *     description: |
+ *       Endpoint para Unity. Requiere API Key en el header X-API-Key.
+ *       Vincula automáticamente al paciente si participantId coincide con una identificación en BD.
  *     requestBody:
  *       required: true
  *       content:
@@ -64,7 +99,7 @@ const { supabase } = require('../config/supabase');
  *       422:
  *         description: Validación semántica fallida
  */
-router.post('/session-results', async (req, res) => {
+router.post('/session-results', validateUnityApiKey, async (req, res) => {
     try {
         const payload = req.body;
 
@@ -257,6 +292,8 @@ router.post('/session-results', async (req, res) => {
  *   get:
  *     summary: Lista todas las sesiones VR
  *     tags: [VR Results]
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: query
  *         name: participantId
@@ -272,7 +309,7 @@ router.post('/session-results', async (req, res) => {
  *       200:
  *         description: Lista de sesiones
  */
-router.get('/session-results', async (req, res) => {
+router.get('/session-results', authenticateToken, requireTerapeuta, async (req, res) => {
     try {
         const { participantId, activityId } = req.query;
 
@@ -316,6 +353,8 @@ router.get('/session-results', async (req, res) => {
  *   get:
  *     summary: Obtiene una sesión VR con todos sus sets, errores y objetos
  *     tags: [VR Results]
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -329,7 +368,7 @@ router.get('/session-results', async (req, res) => {
  *       404:
  *         description: Sesión no encontrada
  */
-router.get('/session-results/:id', async (req, res) => {
+router.get('/session-results/:id', authenticateToken, requireTerapeuta, async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -392,41 +431,13 @@ router.get('/session-results/:id', async (req, res) => {
 // Devuelve datos mínimos para no comprometer privacidad.
 
 /**
- * Middleware para validar API Key de Unity
- */
-const validateUnityApiKey = (req, res, next) => {
-    const apiKey = req.headers['x-api-key'];
-    const expectedKey = process.env.UNITY_API_KEY;
-
-    // Si no hay clave configurada, denegar acceso
-    if (!expectedKey) {
-        console.error('[Security] UNITY_API_KEY no está configurada en .env');
-        return res.status(500).json({
-            error: {
-                code: 'CONFIG_ERROR',
-                message: 'API Key no configurada en el servidor'
-            }
-        });
-    }
-
-    if (!apiKey || apiKey !== expectedKey) {
-        return res.status(401).json({
-            error: {
-                code: 'UNAUTHORIZED',
-                message: 'API Key inválida o no proporcionada'
-            }
-        });
-    }
-
-    next();
-};
-
-/**
  * @swagger
  * /api/v1/patients/lookup:
  *   get:
  *     summary: Buscar paciente por número de identificación (para Unity)
  *     tags: [Unity - Pacientes]
+ *     security:
+ *       - apiKeyAuth: []
  *     description: |
  *       Endpoint público para que Unity verifique si un paciente existe.
  *       Requiere API Key en el header X-API-Key.

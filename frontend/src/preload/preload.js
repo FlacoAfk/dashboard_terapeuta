@@ -29,5 +29,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
 // Exponer información del entorno
 contextBridge.exposeInMainWorld('env', {
     isDevelopment: process.env.NODE_ENV === 'development',
-    apiUrl: process.env.API_URL || 'http://localhost:3001'
+    apiUrl: process.env.API_URL || 'http://localhost:3001',
+    appVersion: require('../../package.json').version
 });

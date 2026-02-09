@@ -174,12 +174,11 @@ const DashboardTerapeuta = () => {
             // Fetch patient stats
             const patientStats = await patientService.getStats();
 
-            // Calculate VR session stats (from today and this week)
-            const patients = patientsResult.data || [];
+            // Fetch ALL VR sessions in a single request (the backend filters by therapist)
             let sessionsToday = 0;
             let sessionsThisWeek = 0;
-            let totalAciertos = 0;
-            let totalEventos = 0;
+            let totalSetsCompleted = 0;
+            let totalErrors = 0;
 
             const today = new Date();
             today.setHours(0, 0, 0, 0);
@@ -187,29 +186,25 @@ const DashboardTerapeuta = () => {
             weekAgo.setDate(weekAgo.getDate() - 7);
             weekAgo.setHours(0, 0, 0, 0);
 
-            // Get VR sessions for all patients
-            for (const patient of patients.slice(0, 10)) { // Limit to first 10 for performance
-                if (patient.identificacion) {
-                    const sessions = await vrResultsService.getSessionsByParticipant(patient.identificacion);
-                    if (sessions.success && sessions.data) {
-                        sessions.data.forEach(session => {
-                            const sessionDate = new Date(session.started_at_iso);
-                            if (sessionDate >= today) sessionsToday++;
-                            if (sessionDate >= weekAgo) sessionsThisWeek++;
-                            // Calculate total sets for performance metrics
-                            if (session.sets && session.sets.length > 0) {
-                                session.sets.forEach(set => {
-                                    const errorsCount = set.errors_count || 0;
-                                    totalAciertos += set.total_objects_returned - errorsCount;
-                                    totalEventos += set.total_objects_returned;
-                                });
-                            }
-                        });
-                    }
+            try {
+                const sessionsResult = await vrResultsService.getAllSessions();
+                if (sessionsResult.success && sessionsResult.data) {
+                    sessionsResult.data.forEach(session => {
+                        const sessionDate = new Date(session.started_at || session.started_at_iso);
+                        if (sessionDate >= today) sessionsToday++;
+                        if (sessionDate >= weekAgo) sessionsThisWeek++;
+                        // Use summary fields from the session for performance metrics
+                        totalSetsCompleted += session.summary_sets_completed || 0;
+                        totalErrors += session.summary_total_errors || 0;
+                    });
                 }
+            } catch (vrErr) {
+                console.error('[DashboardTerapeuta] Error cargando sesiones VR:', vrErr);
             }
 
-            const rendimiento = totalEventos > 0 ? Math.round((totalAciertos / totalEventos) * 100) : 0;
+            // Calculate rendimiento: percentage of sets completed without errors
+            const totalEventos = totalSetsCompleted + totalErrors;
+            const rendimiento = totalEventos > 0 ? Math.round((totalSetsCompleted / totalEventos) * 100) : 0;
 
             setStats({
                 activos: patientStats.success ? patientStats.data.activos : 0,

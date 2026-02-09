@@ -127,7 +127,7 @@ const SetupPage = () => {
         setLoading(true);
         try {
             const result = await authService.checkSetup();
-            console.log('[SetupPage] Verificando setup manual:', result);
+            
             
             // Usar 'configured' que viene de la API, o ver si result.setupComplete (backup)
             const isConfigured = result.configured || result.setupComplete;

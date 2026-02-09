@@ -31,7 +31,9 @@ const MESES = [
     'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
 ];
 
-const AÑOS = [2024, 2025, 2026];
+// Generar rango de años dinámicamente desde 2024 hasta el año actual + 1
+const currentYear = new Date().getFullYear();
+const AÑOS = Array.from({ length: currentYear - 2024 + 2 }, (_, i) => 2024 + i);
 
 /**
  * Badge de tipo de evento

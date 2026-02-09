@@ -141,7 +141,7 @@ const ResetPasswordModal = ({ isOpen, onClose, onSubmit, therapist }) => {
                         <FormField
                             label="Nueva Contraseña"
                             required
-                            hint="Mín. 1 mayúscula y 8 caracteres"
+                            hint="Mín. 10 caracteres, mayúsculas, minúsculas, números y símbolos"
                             error={errors.newPassword}
                         >
                             <div className="relative">

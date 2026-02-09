@@ -41,6 +41,7 @@ const AUDIT_TYPES = {
     SESSION_STARTED: 'SESSION_STARTED',
     SESSION_FINISHED: 'SESSION_FINISHED',
     SESSION_ABANDONED: 'SESSION_ABANDONED',
+    SESSION_REVIEWED: 'SESSION_REVIEWED',
 
     // Configuración
     CONFIG_UPDATED: 'CONFIG_UPDATED',
@@ -72,6 +73,7 @@ const AUDIT_TYPE_LABELS = {
     SESSION_STARTED: 'Sesión iniciada',
     SESSION_FINISHED: 'Sesión finalizada',
     SESSION_ABANDONED: 'Sesión abandonada',
+    SESSION_REVIEWED: 'Sesión VR revisada',
     CONFIG_UPDATED: 'Configuración actualizada',
     DATA_EXPORTED: 'Datos exportados'
 };

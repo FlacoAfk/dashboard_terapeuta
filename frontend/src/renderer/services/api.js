@@ -101,8 +101,6 @@ const api = {
         const url = `${API_URL}${endpoint}`;
 
         try {
-            console.log(`[API] ${options.method} ${url}`);
-
             const response = await fetch(url, {
                 ...options,
                 headers: {

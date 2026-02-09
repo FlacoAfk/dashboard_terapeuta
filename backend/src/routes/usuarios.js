@@ -99,12 +99,11 @@ router.get('/', authenticateToken, requireSuperAdmin, async (req, res) => {
  *         application/json:
  *           schema:
  *             type: object
- *             required: [nombre, correo, username, password, especialidad]
+ *             required: [nombre, correo, password]
  *             properties:
  *               nombre: { type: string, example: "Dr. Juan García" }
  *               correo: { type: string, example: "juan@clinica.com" }
- *               username: { type: string, example: "terapeuta_juan" }
- *               password: { type: string, example: "Terapeuta2024!@" }
+ *               password: { type: string, example: "Terapeuta@2024!" }
  *               especialidad: { type: string, example: "Neuropsicología" }
  *               telefono: { type: string, example: "3001234567" }
  *     responses:
@@ -233,19 +232,11 @@ router.post('/terapeuta', authenticateToken, requireSuperAdmin, validateUserCrea
  *       200:
  *         description: Usuario actualizado
  */
-router.put('/:id', authenticateToken, validateUserUpdate, async (req, res) => {
+router.put('/:id', authenticateToken, requireSuperAdmin, validateUserUpdate, async (req, res) => {
     const { id } = req.params;
-    const { nombre, correo, especialidad, telefono, password } = req.body; // Added password support for self-edit
+    const { nombre, correo, especialidad, telefono } = req.body;
 
     try {
-        // Verificar permisos: SuperAdmin O el mismo usuario
-        if (req.user.rol !== 'SUPERADMIN' && req.user.id !== parseInt(id)) {
-            return res.status(403).json({
-                success: false,
-                error: 'No tiene permiso para editar este usuario'
-            });
-        }
-
         // Buscar terapeuta existente
         const { data: existing } = await supabase
             .from('terapeutas')
@@ -258,27 +249,6 @@ router.put('/:id', authenticateToken, validateUserUpdate, async (req, res) => {
                 success: false,
                 error: 'Usuario no encontrado'
             });
-        }
-
-        // Si se envía password y es el mismo usuario o superadmin
-        if (password) {
-            // Validar contraseña
-            const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{10,}$/;
-            if (!passwordRegex.test(password)) {
-                return res.status(400).json({
-                    success: false,
-                    error: 'La contraseña debe tener mínimo 10 caracteres, mayúsculas, minúsculas, números y símbolos'
-                });
-            }
-
-            // Hash de nueva contraseña
-            const salt = await bcrypt.genSalt(12);
-            const passwordHash = await bcrypt.hash(password, salt);
-
-            await supabase
-                .from('usuarios')
-                .update({ password_hash: passwordHash })
-                .eq('id', id);
         }
 
         // Actualizar terapeuta
@@ -300,7 +270,7 @@ router.put('/:id', authenticateToken, validateUserUpdate, async (req, res) => {
         await auditFromRequest(req, AUDIT_TYPES.USER_UPDATED, {
             id_usuario: id,
             autor: req.user.email,
-            cambios: { nombre, correo, especialidad, telefono, password_changed: !!password }
+            cambios: { nombre, correo, especialidad, telefono }
         });
 
         res.json({

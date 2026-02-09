@@ -180,7 +180,8 @@ const GestionTerapeutas = () => {
                 nombre: data.nombre,
                 correo: data.correo,
                 password: data.password,
-                especialidad: 'General'
+                especialidad: data.especialidad || 'General',
+                telefono: data.telefono
             });
 
             if (result.success) {
@@ -205,8 +206,10 @@ const GestionTerapeutas = () => {
         setActionLoading(true);
         try {
             const result = await therapistService.update(data.id, {
-                nombre: `${data.nombre} ${data.apellido || ''}`.trim(),
-                correo: data.correo
+                nombre: data.nombre,
+                correo: data.correo,
+                especialidad: data.especialidad,
+                telefono: data.telefono
             });
 
             if (result.success) {
@@ -292,13 +295,6 @@ const GestionTerapeutas = () => {
             setActionLoading(false);
         }
     };
-    
-    // ... (rendering code) ... (Note: This replace block covers functions, need to ensure return is handled locally or I do smaller targets. 
-    // Wait, the block is contiguous. I will leave the return alone.
-    // The previous block ended at handleReasignarSubmit end. 
-    // I also need to update ResetPasswordModal implementation which is inline in the return. 
-    // It is safer to do ResetPasswordModal in a separate call or carefully constructing this one.)
-
 
     return (
         <AdminLayout>

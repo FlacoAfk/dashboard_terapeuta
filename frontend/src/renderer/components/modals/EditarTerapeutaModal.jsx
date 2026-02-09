@@ -55,7 +55,9 @@ const EditarTerapeutaModal = ({ isOpen, onClose, onSubmit, therapist }) => {
         password: '',
         nombre: '',
         apellido: '',
-        correo: ''
+        correo: '',
+        especialidad: '',
+        telefono: ''
     });
     const [showPassword, setShowPassword] = useState(false);
     const [errors, setErrors] = useState({});
@@ -74,7 +76,9 @@ const EditarTerapeutaModal = ({ isOpen, onClose, onSubmit, therapist }) => {
                 password: '',  // No mostramos la contraseña actual
                 nombre: nombre,
                 apellido: apellido,
-                correo: therapist.correo || ''
+                correo: therapist.correo || '',
+                especialidad: therapist.especialidad || '',
+                telefono: therapist.telefono || ''
             });
         }
     }, [therapist, isOpen]);
@@ -91,10 +95,16 @@ const EditarTerapeutaModal = ({ isOpen, onClose, onSubmit, therapist }) => {
         const newErrors = {};
 
         // Contraseña es opcional en edición (solo si se quiere cambiar)
-        if (formData.password && formData.password.length < 8) {
-            newErrors.password = 'Mínimo 8 caracteres';
+        if (formData.password && formData.password.length < 10) {
+            newErrors.password = 'Mínimo 10 caracteres';
         } else if (formData.password && !/[A-Z]/.test(formData.password)) {
             newErrors.password = 'Debe contener al menos 1 mayúscula';
+        } else if (formData.password && !/[a-z]/.test(formData.password)) {
+            newErrors.password = 'Debe contener al menos 1 minúscula';
+        } else if (formData.password && !/\d/.test(formData.password)) {
+            newErrors.password = 'Debe contener al menos 1 número';
+        } else if (formData.password && !/[@$!%*?&]/.test(formData.password)) {
+            newErrors.password = 'Debe contener al menos 1 símbolo (@$!%*?&)';
         }
 
         if (!formData.nombre.trim()) {
@@ -129,7 +139,9 @@ const EditarTerapeutaModal = ({ isOpen, onClose, onSubmit, therapist }) => {
                 // Si el backend espera 'username', podemos enviar el correo también.
                 // Asumiremos que el backend maneja actualización sin 'username' explícito o que el correo funge como tal.
                 nombre: `${formData.nombre} ${formData.apellido}`,
-                correo: formData.correo
+                correo: formData.correo,
+                especialidad: formData.especialidad,
+                telefono: formData.telefono
             };
             
             // Solo incluir password si se cambió
@@ -147,7 +159,7 @@ const EditarTerapeutaModal = ({ isOpen, onClose, onSubmit, therapist }) => {
     };
 
     const handleClose = () => {
-        setFormData({ password: '', nombre: '', apellido: '', correo: '' });
+        setFormData({ password: '', nombre: '', apellido: '', correo: '', especialidad: '', telefono: '' });
         setErrors({});
         setShowPassword(false);
         onClose();
@@ -209,6 +221,30 @@ const EditarTerapeutaModal = ({ isOpen, onClose, onSubmit, therapist }) => {
                             />
                         </FormField>
 
+                        {/* Especialidad y Teléfono */}
+                        <div className="grid grid-cols-2 gap-4">
+                            <FormField label="Especialidad" hint="Ej: Neuropsicología">
+                                <input
+                                    type="text"
+                                    name="especialidad"
+                                    value={formData.especialidad}
+                                    onChange={handleChange}
+                                    placeholder="General"
+                                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-colors"
+                                />
+                            </FormField>
+
+                            <FormField label="Teléfono" hint="Opcional">
+                                <input
+                                    type="tel"
+                                    name="telefono"
+                                    value={formData.telefono}
+                                    onChange={handleChange}
+                                    placeholder="3001234567"
+                                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-colors"
+                                />
+                            </FormField>
+                        </div>
 
 
                         <p className="text-xs text-gray-400">* Campos obligatorios</p>

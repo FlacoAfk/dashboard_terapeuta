@@ -49,6 +49,15 @@ const vrResultsService = {
     },
 
     /**
+     * Actualizar una sesión VR (observaciones, vinculación de paciente, etc.)
+     * @param {string} sessionId - UUID de la sesión
+     * @param {object} data - Datos a actualizar { observaciones, id_paciente }
+     */
+    async updateSession(sessionId, data) {
+        return api.put(`/api/sessions/${sessionId}`, data);
+    },
+
+    /**
      * Formatear duración en segundos a formato legible
      * @param {number} seconds - Segundos
      */

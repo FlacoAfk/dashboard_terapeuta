@@ -42,10 +42,11 @@ const createWindow = () => {
 
     // Limpiar almacenamiento al cargar para evitar problemas de estado obsoleto
     mainWindow.webContents.on('did-finish-load', () => {
+        const apiUrl = process.env.API_URL || 'http://localhost:3001';
         mainWindow.webContents.executeJavaScript(`
             // Evitar loops infinitos de recarga
             if (!sessionStorage.getItem('__electron_cleaned__')) {
-                fetch('http://localhost:3001/api/auth/check-setup')
+                fetch('${apiUrl}/api/auth/check-setup')
                     .then(r => r.json())
                     .then(data => {
                         if (data.success && data.data && !data.data.configured) {

@@ -21,9 +21,9 @@ const ConfiguracionTerapeuta = () => {
     const currentTherapist = {
         id: user.id, // El ID del usuario en la tabla usuarios (que es lo que usa el endpoint PUT /api/usuarios/:id)
         nombre: user.nombre,
-        correo: user.email,
-        usuario: user.email, // El modal usa 'usuario' a veces, pero lo quitamos recientemente.
-        // Otros campos si estuvieran en el user context...
+        correo: user.correo || user.email,
+        especialidad: user.especialidad || '',
+        telefono: user.telefono || '',
     };
 
     const handleUpdate = async (updateData) => {

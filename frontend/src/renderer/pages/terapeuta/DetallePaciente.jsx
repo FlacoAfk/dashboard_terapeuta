@@ -236,6 +236,9 @@ const DetallePaciente = () => {
                                         <VRSessionCard
                                             key={vrSession.id}
                                             session={vrSession}
+                                            onSessionUpdated={(updated) => {
+                                                setVrSessions(prev => prev.map(s => s.id === updated.id ? { ...s, ...updated } : s));
+                                            }}
                                         />
                                     ))}
                                 </div>

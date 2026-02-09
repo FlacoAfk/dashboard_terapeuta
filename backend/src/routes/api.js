@@ -43,6 +43,11 @@ router.get('/status', (req, res) => {
  *   get:
  *     summary: Verificar conexión a base de datos
  *     tags: [Health]
+ *     responses:
+ *       200:
+ *         description: Conexión exitosa
+ *       500:
+ *         description: Error de conexión
  */
 router.get('/db-status', async (req, res) => {
     try {
@@ -83,6 +88,27 @@ router.get('/db-status', async (req, res) => {
  *     security:
  *       - bearerAuth: []
  *     description: RF-SEG-03 - Los terapeutas solo ven sus pacientes asignados.
+ *     parameters:
+ *       - in: query
+ *         name: activo
+ *         schema:
+ *           type: boolean
+ *         description: Filtrar por estado (true/false)
+ *       - in: query
+ *         name: nombre
+ *         schema:
+ *           type: string
+ *         description: Buscar por nombre (parcial)
+ *       - in: query
+ *         name: identificacion
+ *         schema:
+ *           type: string
+ *         description: Buscar por identificación (parcial)
+ *     responses:
+ *       200:
+ *         description: Lista de pacientes
+ *       401:
+ *         description: No autenticado
  */
 router.get('/patients', authenticateToken, requireTerapeuta, async (req, res) => {
     const { activo, nombre, identificacion } = req.query;
@@ -163,6 +189,22 @@ router.get('/patients', authenticateToken, requireTerapeuta, async (req, res) =>
  *   get:
  *     summary: Obtener un paciente por ID
  *     tags: [Pacientes]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID del paciente
+ *     responses:
+ *       200:
+ *         description: Datos del paciente
+ *       403:
+ *         description: Sin acceso a este paciente
+ *       404:
+ *         description: Paciente no encontrado
  */
 router.get('/patients/:id', authenticateToken, requireTerapeuta, async (req, res) => {
     const { id } = req.params;
@@ -225,6 +267,35 @@ router.get('/patients/:id', authenticateToken, requireTerapeuta, async (req, res
  *   post:
  *     summary: Crear un nuevo paciente
  *     tags: [Pacientes]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [nombre]
+ *             properties:
+ *               identificacion:
+ *                 type: string
+ *                 example: "1234567890"
+ *               nombre:
+ *                 type: string
+ *                 example: "Juan Pérez"
+ *               edad:
+ *                 type: integer
+ *                 example: 65
+ *               diagnostico:
+ *                 type: string
+ *                 example: "Deterioro cognitivo leve"
+ *     responses:
+ *       201:
+ *         description: Paciente creado
+ *       400:
+ *         description: Datos inválidos
+ *       401:
+ *         description: No autenticado
  */
 router.post('/patients', authenticateToken, requireTerapeuta, validatePatient, async (req, res) => {
     const { identificacion, nombre, edad, diagnostico } = req.body;
@@ -300,12 +371,60 @@ router.post('/patients', authenticateToken, requireTerapeuta, validatePatient, a
  *   put:
  *     summary: Actualizar un paciente
  *     tags: [Pacientes]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID del paciente
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               identificacion:
+ *                 type: string
+ *               nombre:
+ *                 type: string
+ *               edad:
+ *                 type: integer
+ *               diagnostico:
+ *                 type: string
+ *               activo:
+ *                 type: boolean
+ *     responses:
+ *       200:
+ *         description: Paciente actualizado
+ *       404:
+ *         description: Paciente no encontrado
  */
 router.put('/patients/:id', authenticateToken, requireTerapeuta, validatePatient, async (req, res) => {
     const { id } = req.params;
     const { identificacion, nombre, edad, diagnostico, activo } = req.body;
 
     try {
+        // F8: Verificar acceso del terapeuta al paciente
+        if (req.user.rol === 'TERAPEUTA' && req.user.id_terapeuta) {
+            const { data: assignment } = await supabase
+                .from('terapeuta_paciente')
+                .select('id_terapeuta')
+                .eq('id_paciente', id)
+                .eq('id_terapeuta', req.user.id_terapeuta)
+                .single();
+
+            if (!assignment) {
+                return res.status(403).json({
+                    success: false,
+                    error: 'Sin acceso a este paciente'
+                });
+            }
+        }
+
         const updateData = {};
         if (identificacion !== undefined) updateData.identificacion = identificacion;
         if (nombre !== undefined) updateData.nombre = nombre;
@@ -351,11 +470,42 @@ router.put('/patients/:id', authenticateToken, requireTerapeuta, validatePatient
  *   put:
  *     summary: Activar/desactivar paciente
  *     tags: [Pacientes]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID del paciente
+ *     responses:
+ *       200:
+ *         description: Estado actualizado
+ *       404:
+ *         description: Paciente no encontrado
  */
 router.put('/patients/:id/toggle-status', authenticateToken, requireTerapeuta, async (req, res) => {
     const { id } = req.params;
 
     try {
+        // F9: Verificar acceso del terapeuta al paciente
+        if (req.user.rol === 'TERAPEUTA' && req.user.id_terapeuta) {
+            const { data: assignment } = await supabase
+                .from('terapeuta_paciente')
+                .select('id_terapeuta')
+                .eq('id_paciente', id)
+                .eq('id_terapeuta', req.user.id_terapeuta)
+                .single();
+
+            if (!assignment) {
+                return res.status(403).json({
+                    success: false,
+                    error: 'Sin acceso a este paciente'
+                });
+            }
+        }
+
         // Obtener estado actual
         const { data: patient, error: fetchError } = await supabase
             .from('pacientes')
@@ -402,6 +552,34 @@ router.put('/patients/:id/toggle-status', authenticateToken, requireTerapeuta, a
  *   post:
  *     summary: Asignar paciente a terapeuta (solo Superadmin)
  *     tags: [Pacientes]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID del paciente
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [id_terapeuta]
+ *             properties:
+ *               id_terapeuta:
+ *                 type: integer
+ *                 example: 1
+ *                 description: ID del terapeuta a asignar
+ *     responses:
+ *       200:
+ *         description: Paciente asignado
+ *       400:
+ *         description: Terapeuta inactivo o dato inválido
+ *       404:
+ *         description: Paciente o terapeuta no encontrado
  */
 router.post('/patients/:id/assign', authenticateToken, requireSuperAdmin, validatePatientAssign, async (req, res) => {
     const { id } = req.params;
@@ -536,6 +714,16 @@ router.get('/sessions', authenticateToken, requireTerapeuta, async (req, res) =>
     const { estado_revision, pendientes, id_paciente, limit = 50 } = req.query;
 
     try {
+        // F7: Filtrar por pacientes asignados si es TERAPEUTA
+        let allowedPatientIds = null;
+        if (req.user.rol === 'TERAPEUTA' && req.user.id_terapeuta) {
+            const { data: assignments } = await supabase
+                .from('terapeuta_paciente')
+                .select('id_paciente')
+                .eq('id_terapeuta', req.user.id_terapeuta);
+            allowedPatientIds = (assignments || []).map(a => a.id_paciente);
+        }
+
         let query = supabase
             .from('vr_session_results')
             .select(`
@@ -557,6 +745,11 @@ router.get('/sessions', authenticateToken, requireTerapeuta, async (req, res) =>
             `)
             .order('created_at', { ascending: false })
             .limit(parseInt(limit));
+
+        // TERAPEUTA: solo sesiones de sus pacientes asignados
+        if (allowedPatientIds !== null) {
+            query = query.in('id_paciente_vinculado', allowedPatientIds);
+        }
 
         // Filtrar por estado de revisión
         if (estado_revision) {
@@ -609,13 +802,22 @@ router.get('/sessions', authenticateToken, requireTerapeuta, async (req, res) =>
  * @swagger
  * /api/sessions/{id}:
  *   put:
- *     summary: Actualizar sesión VR (Observaciones y Asignación)
+ *     summary: Actualizar sesión VR (Evaluación, Observaciones y Asignación)
  *     tags: [Sesiones VR]
  *     security:
  *       - bearerAuth: []
  *     description: |
- *       Permite al terapeuta agregar observaciones y, si es necesario,
- *       corregir o asignar manualmente el paciente vinculado.
+ *       Permite al terapeuta agregar evaluación del desempeño, observaciones clínicas
+ *       y, si es necesario, corregir o asignar manualmente el paciente vinculado.
+ *       
+ *       **Seguridad:**
+ *       - Requiere JWT válido con rol TERAPEUTA o SUPERADMIN
+ *       - Validación de formato UUID en el parámetro id
+ *       - Ownership check: TERAPEUTA solo puede actualizar sesiones de sus pacientes asignados
+ *       - SUPERADMIN puede actualizar cualquier sesión
+ *       - Validación de longitud máxima en observaciones (2000 caracteres)
+ *       - Verificación de existencia de la sesión antes de actualizar
+ *       - Registro de auditoría (SESSION_REVIEWED)
  *     parameters:
  *       - in: path
  *         name: id
@@ -623,6 +825,7 @@ router.get('/sessions', authenticateToken, requireTerapeuta, async (req, res) =>
  *         schema:
  *           type: string
  *           format: uuid
+ *         description: UUID de la sesión VR
  *     requestBody:
  *       required: true
  *       content:
@@ -632,18 +835,121 @@ router.get('/sessions', authenticateToken, requireTerapeuta, async (req, res) =>
  *             properties:
  *               observaciones:
  *                 type: string
+ *                 maxLength: 2000
+ *                 description: |
+ *                   Observaciones clínicas del terapeuta. Puede incluir prefijo de evaluación
+ *                   del desempeño en formato `[Calificación: X/5 - Label]` seguido de las observaciones.
+ *                 example: "[Calificación: 4/5 - Bueno]\nPaciente mostró mejoría en tiempo de reacción."
  *               id_paciente:
  *                 type: integer
- *                 description: ID del paciente (opcional, para correcciones)
+ *                 description: ID del paciente para vinculación manual (opcional, para correcciones)
+ *                 example: 14
  *     responses:
  *       200:
- *         description: Sesión actualizada
+ *         description: Sesión actualizada exitosamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   $ref: '#/components/schemas/VRSessionResult'
+ *       400:
+ *         description: Validación fallida (UUID inválido, observaciones demasiado largas, etc.)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       401:
+ *         description: Token de autenticación requerido o inválido
+ *       403:
+ *         description: Sin acceso a esta sesión (TERAPEUTA no asignado al paciente)
+ *       404:
+ *         description: Sesión VR no encontrada o paciente no encontrado
  */
 router.put('/sessions/:id', authenticateToken, requireTerapeuta, async (req, res) => {
     const { id } = req.params;
     const { observaciones, id_paciente } = req.body;
 
     try {
+        // ── Validación de formato UUID ──
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (!uuidRegex.test(id)) {
+            return res.status(400).json({
+                success: false,
+                error: 'El ID de sesión debe ser un UUID válido',
+                code: 'INVALID_UUID'
+            });
+        }
+
+        // ── Validación de inputs ──
+        if (observaciones !== undefined) {
+            if (typeof observaciones !== 'string') {
+                return res.status(400).json({
+                    success: false,
+                    error: 'Las observaciones deben ser texto',
+                    code: 'INVALID_INPUT'
+                });
+            }
+            if (observaciones.length > 2000) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'Las observaciones no pueden exceder 2000 caracteres',
+                    code: 'INPUT_TOO_LONG'
+                });
+            }
+        }
+
+        if (id_paciente !== undefined && id_paciente !== null) {
+            if (!Number.isInteger(id_paciente) || id_paciente <= 0) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'El ID del paciente debe ser un número entero positivo',
+                    code: 'INVALID_INPUT'
+                });
+            }
+        }
+
+        // ── Verificar que la sesión existe ──
+        const { data: session, error: sessionError } = await supabase
+            .from('vr_session_results')
+            .select('id, id_paciente_vinculado, participant_id')
+            .eq('id', id)
+            .single();
+
+        if (sessionError || !session) {
+            return res.status(404).json({
+                success: false,
+                error: 'Sesión VR no encontrada',
+                code: 'SESSION_NOT_FOUND'
+            });
+        }
+
+        // ── Ownership check: TERAPEUTA solo puede editar sesiones de sus pacientes ──
+        if (req.user.rol === 'TERAPEUTA' && req.user.id_terapeuta) {
+            if (session.id_paciente_vinculado) {
+                const { data: assignment } = await supabase
+                    .from('terapeuta_paciente')
+                    .select('id_terapeuta')
+                    .eq('id_paciente', session.id_paciente_vinculado)
+                    .eq('id_terapeuta', req.user.id_terapeuta)
+                    .single();
+
+                if (!assignment) {
+                    return res.status(403).json({
+                        success: false,
+                        error: 'Sin acceso a esta sesión. El paciente no está asignado a usted.',
+                        code: 'ACCESS_DENIED'
+                    });
+                }
+            }
+            // Si la sesión no tiene paciente vinculado, cualquier terapeuta puede revisarla
+        }
+
+        // ── Construir datos de actualización ──
         const updateData = {
             id_terapeuta_revisor: req.user.id_terapeuta,
             estado_revision: 'REVISADA'
@@ -654,19 +960,44 @@ router.put('/sessions/:id', authenticateToken, requireTerapeuta, async (req, res
         }
 
         if (id_paciente) {
-            // Verificar que el paciente exista
+            // Verificar que el paciente exista y esté activo
             const { data: patient, error: pError } = await supabase
                 .from('pacientes')
-                .select('id')
+                .select('id, nombre')
                 .eq('id', id_paciente)
+                .eq('activo', true)
                 .single();
 
             if (pError || !patient) {
-                return res.status(404).json({ success: false, error: 'Paciente no encontrado' });
+                return res.status(404).json({
+                    success: false,
+                    error: 'Paciente no encontrado o inactivo',
+                    code: 'PATIENT_NOT_FOUND'
+                });
             }
+
+            // Si es TERAPEUTA, verificar que el paciente le esté asignado
+            if (req.user.rol === 'TERAPEUTA' && req.user.id_terapeuta) {
+                const { data: patientAssignment } = await supabase
+                    .from('terapeuta_paciente')
+                    .select('id_terapeuta')
+                    .eq('id_paciente', id_paciente)
+                    .eq('id_terapeuta', req.user.id_terapeuta)
+                    .single();
+
+                if (!patientAssignment) {
+                    return res.status(403).json({
+                        success: false,
+                        error: 'No puede vincular un paciente que no le está asignado',
+                        code: 'ACCESS_DENIED'
+                    });
+                }
+            }
+
             updateData.id_paciente_vinculado = id_paciente;
         }
 
+        // ── Ejecutar actualización ──
         const { data: updated, error } = await supabase
             .from('vr_session_results')
             .update(updateData)
@@ -675,6 +1006,14 @@ router.put('/sessions/:id', authenticateToken, requireTerapeuta, async (req, res
             .single();
 
         if (error) throw error;
+
+        // ── Registrar auditoría ──
+        await auditFromRequest(req, AUDIT_TYPES.SESSION_REVIEWED, {
+            session_id: id,
+            participant_id: session.participant_id,
+            id_paciente_vinculado: updated.id_paciente_vinculado,
+            tiene_evaluacion: observaciones ? observaciones.startsWith('[Calificación:') : false
+        });
 
         res.json({ success: true, data: updated });
     } catch (error) {
@@ -692,6 +1031,22 @@ router.put('/sessions/:id', authenticateToken, requireTerapeuta, async (req, res
  *   get:
  *     summary: Obtener informe completo de un paciente
  *     tags: [Pacientes]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID del paciente
+ *     responses:
+ *       200:
+ *         description: Informe con estadísticas y sesiones
+ *       403:
+ *         description: Sin acceso a este paciente
+ *       404:
+ *         description: Paciente no encontrado
  */
 router.get('/patients/:id/report', authenticateToken, requireTerapeuta, async (req, res) => {
     const { id } = req.params;
@@ -800,8 +1155,13 @@ router.get('/patients/:id/report', authenticateToken, requireTerapeuta, async (r
  *   get:
  *     summary: Obtener todos los terapeutas
  *     tags: [Terapeutas]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Lista de terapeutas con estado
  */
-router.get('/terapeutas', async (req, res) => {
+router.get('/terapeutas', authenticateToken, requireTerapeuta, async (req, res) => {
     try {
         const { data: therapists, error } = await supabase
             .from('terapeutas')
@@ -845,11 +1205,16 @@ router.get('/terapeutas', async (req, res) => {
  *   get:
  *     summary: Obtener estadísticas generales
  *     tags: [Dashboard]
+ *     security:
+ *       - bearerAuth: []
  *     description: |
  *       Estadísticas del sistema incluyendo pacientes, terapeutas,
  *       sesiones VR (desde vr_session_results) y actividades disponibles.
+ *     responses:
+ *       200:
+ *         description: Estadísticas del sistema y sesiones recientes
  */
-router.get('/dashboard/stats', async (req, res) => {
+router.get('/dashboard/stats', authenticateToken, requireTerapeuta, async (req, res) => {
     try {
         // Contar pacientes
         const { count: totalPacientes } = await supabase

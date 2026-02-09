@@ -195,7 +195,7 @@ const Login = () => {
 
             {/* Versión */}
             <div className="absolute bottom-4 right-4 text-gray-500 text-sm">
-                v1.3.0
+                v{window.env?.appVersion || '1.5.0'}
             </div>
         </div>
     );

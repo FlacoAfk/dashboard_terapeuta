@@ -14,43 +14,64 @@ const options = {
         openapi: '3.0.0',
         info: {
             title: 'Dashboard Terapeuta - API',
-            version: '1.0.0',
+            version: '1.8.0',
             description: `
-## API para el Dashboard de Terapeutas
+## API para el Dashboard de Terapeutas - Cerebro al Fuego
 
 Esta API proporciona endpoints para gestionar:
+- **Autenticación**: Login, setup, recuperación de contraseña
+- **Usuarios**: Gestión de terapeutas (solo Superadmin)
 - **Pacientes**: CRUD completo de pacientes
-- **Sesiones**: Registro y seguimiento de sesiones de terapia
+- **Sesiones VR**: Visualización, evaluación del desempeño y revisión de sesiones del videojuego Unity
+- **VR Results**: Recepción de resultados desde Unity (API Key)
 - **Terapeutas**: Información de terapeutas
-- **Actividades**: Actividades del juego terapéutico
 - **Dashboard**: Estadísticas generales
-- **VR Results**: Resultados de sesiones del videojuego Unity
+- **Auditoría**: Registro y exportación de eventos del sistema
+
+### Evaluación del Desempeño
+Los terapeutas pueden asignar una calificación de desempeño (1-5) a cada sesión VR,
+junto con observaciones clínicas. La calificación se almacena como prefijo en el campo
+\`observaciones_terapeuta\` con formato \`[Calificación: X/5 - Label]\`.
+
+### Seguridad
+- JWT Bearer para endpoints autenticados
+- API Key (X-API-Key) para endpoints de Unity
+- Validación de ownership: terapeutas solo acceden a datos de sus pacientes
+- Validación de inputs (UUID, longitud, tipos)
+- Registro de auditoría para operaciones críticas
 
 ### Base de Datos
 Conectada a **Supabase PostgreSQL**
+
+### Variables de Entorno
+El backend utiliza: PORT, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, JWT_SECRET, JWT_EXPIRES_IN, SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM, SUPERADMIN_EMAIL, SUPERADMIN_PASSWORD, UNITY_API_KEY
       `,
             contact: {
-                name: 'Soporte',
-                email: 'admin@clinica.com'
+                name: 'Cerebro al Fuego',
+                email: 'cerebroalfuego@gmail.com'
             }
         },
         servers: [
             {
+                url: 'https://cerebro-al-fuego-image-482550109792.us-central1.run.app',
+                description: 'Producción - Google Cloud Run'
+            },
+            {
                 url: 'http://localhost:3001',
-                description: 'Servidor de Desarrollo'
+                description: 'Desarrollo Local'
             }
         ],
         tags: [
             { name: 'Health', description: 'Estado del servidor' },
-            { name: 'Autenticación', description: 'Login, setup y sesión' },
-            { name: 'Usuarios', description: 'Gestión de usuarios (solo Superadmin)' },
-            { name: 'Pacientes', description: 'Gestión de pacientes' },
-            { name: 'Sesiones', description: 'Sesiones de terapia' },
+            { name: 'Autenticación', description: 'Login, setup, recuperación de contraseña y sesión' },
+            { name: 'Usuarios', description: 'Gestión de usuarios y terapeutas (solo Superadmin)' },
+            { name: 'Pacientes', description: 'CRUD de pacientes e informes' },
+            { name: 'Sesiones VR', description: 'Visualización, evaluación del desempeño y revisión de sesiones VR en el dashboard' },
             { name: 'Terapeutas', description: 'Información de terapeutas' },
-            { name: 'Actividades', description: 'Actividades del juego' },
             { name: 'Dashboard', description: 'Estadísticas generales' },
-            { name: 'Auditoría', description: 'Eventos de auditoría (solo Superadmin)' },
-            { name: 'VR Results', description: 'Resultados de sesiones VR (Unity)' }
+            { name: 'Auditoría', description: 'Eventos de auditoría y exportación CSV (solo Superadmin)' },
+            { name: 'VR Results', description: 'Recepción y consulta de resultados de sesiones VR (Unity)' },
+            { name: 'Unity - Pacientes', description: 'Endpoints públicos para Unity (requiere API Key)' }
         ],
         components: {
             securitySchemes: {
@@ -59,6 +80,12 @@ Conectada a **Supabase PostgreSQL**
                     scheme: 'bearer',
                     bearerFormat: 'JWT',
                     description: 'Token JWT obtenido del endpoint /api/auth/login'
+                },
+                apiKeyAuth: {
+                    type: 'apiKey',
+                    in: 'header',
+                    name: 'X-API-Key',
+                    description: 'API Key para endpoints de Unity (UNITY_API_KEY)'
                 }
             },
             schemas: {
@@ -118,17 +145,6 @@ Conectada a **Supabase PostgreSQL**
                         telefono: { type: 'string' },
                         email: { type: 'string' },
                         activo: { type: 'boolean' }
-                    }
-                },
-                Actividad: {
-                    type: 'object',
-                    properties: {
-                        id: { type: 'integer' },
-                        nombre: { type: 'string' },
-                        descripcion: { type: 'string' },
-                        nivel_dificultad: { type: 'integer', minimum: 1, maximum: 5 },
-                        tiempo_max_seg: { type: 'integer' },
-                        unity_id: { type: 'string' }
                     }
                 },
                 DashboardStats: {
@@ -242,7 +258,7 @@ Conectada a **Supabase PostgreSQL**
             }
         }
     },
-    apis: ['./src/routes/*.js']
+    apis: ['./src/routes/*.js', './src/server.js']
 };
 
 const swaggerSpec = swaggerJsdoc(options);

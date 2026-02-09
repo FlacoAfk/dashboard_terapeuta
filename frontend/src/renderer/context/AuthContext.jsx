@@ -36,7 +36,6 @@ export const AuthProvider = ({ children }) => {
     const checkSetupStatus = async () => {
         try {
             const result = await authService.checkSetup();
-            console.log('[AuthContext] checkSetup result:', result);
 
             // Si el backend devuelve success: true, usamos el valor de 'configured'
             // Si falla, asumimos configurado para no bloquear error, o no configurado si es 404/etc
@@ -46,7 +45,6 @@ export const AuthProvider = ({ children }) => {
                 // Si el sistema NO está configurado pero hay tokens viejos, limpiarlos
                 // Esto evita el problema de pantalla en blanco por datos obsoletos
                 if (!result.configured && authService.getToken()) {
-                    console.log('[AuthContext] Sistema sin configurar pero hay token viejo. Limpiando...');
                     authService.removeToken();
                     setUser(null);
                 }

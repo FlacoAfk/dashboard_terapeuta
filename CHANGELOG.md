@@ -2,6 +2,93 @@
 
 Todos los cambios notables de este proyecto serán documentados en este archivo.
 
+## [1.8.0] - 2026-02-09
+
+### ✨ Nuevas Funcionalidades
+
+- **Evaluación del Desempeño VR**
+  - Calificación 1-5 (Muy bajo → Excelente) para cada sesión VR revisada
+  - Almacenada como prefijo `[Calificación: X/5 - Label]` en `observaciones_terapeuta`
+  - Panel de referencia con datos de la sesión para evaluar con contexto
+
+- **VRSessionCard Reescrito — Vista con Pestañas**
+  - **Resumen**: Score circular (0-100), 6 métricas globales, timeline, distribución de tiempo activo/inactivo
+  - **Etapas**: Cards expandibles por etapa con duración, blocks, drops, releases, errores con timestamps
+  - **Errores**: Agrupación por tipo, timeline cronológico visual, distribución por etapa
+  - **Motricidad**: Eficiencia motora circular, análisis de interacciones por etapa con barras proporcionales
+  - **Evaluación**: Escala 1-5 con botones de color, textarea de observaciones clínicas, panel de referencia
+
+- **Service `updateSession()`**
+  - Agregado método faltante en `vrResultsService.js` para actualizar sesiones VR
+
+### 🔒 Seguridad
+
+- **PUT `/api/sessions/:id`** — Validaciones completas:
+  - Validación de formato UUID → 400 `INVALID_UUID`
+  - Verificación de existencia de sesión → 404 `SESSION_NOT_FOUND`
+  - Ownership check: terapeuta solo edita sesiones de sus pacientes → 403 `ACCESS_DENIED`
+  - Validación de tipo (string) y longitud (2000 chars) en observaciones
+  - Paciente debe existir y estar activo para vinculación
+  - Terapeuta no puede vincular paciente no asignado
+  - Auditoría: evento `SESSION_REVIEWED` registrado
+
+### 🧹 Limpieza
+
+- **Archivos eliminados**:
+  - `frontend/clean_db.js` — referenciaba tablas obsoletas
+  - `frontend/generate_screenshots.js` — script utilitario de desarrollo
+  - `frontend/vite.config.verifier.js` — config de testing no utilizada
+  - `frontend/build_final.log` — log de build
+  - `backend/scripts/generate_test_token.js` — contenía credenciales hardcodeadas (riesgo de seguridad)
+  - `backend/scripts/token.txt`, `token_output.txt` — archivos sensibles
+  - `frontend/dist-electron/` — build output que no debe estar en repo
+  - `frontend/build/`, `frontend/release/`, `frontend/playwright-report/` — artefactos de build
+
+- **Dependencias limpiadas**:
+  - Eliminado `pg` (^8.17.1) del backend — no se usa, todo utiliza Supabase SDK
+
+- **`.gitignore` actualizado**:
+  - Agregados: `dist-electron/`, `release/`
+  - Limpiados patrones duplicados
+
+### 📝 Documentación
+
+- **README.md**: Reescrito completamente — estructura actualizada, endpoints correctos, sección de Evaluación del Desempeño, tablas de BD, seguridad, VRSessionCard tabs
+- **Swagger**: v1.8.0 — documentación detallada del PUT sessions con todos los códigos de error, formato de evaluación, ownership check
+- **API_ENDPOINTS.md**: v1.8.1 — PUT sessions actualizado con validaciones de seguridad, ownership, formato de evaluación y errores detallados
+- **POSTMAN_API_DOCS.md**: v1.8.0 — endpoints actualizados
+- **SECURITY.md**: Actualizado con nuevas características de seguridad
+- **Backend CHANGELOG.md**: Agregada entrada v1.8.0
+
+### 🔄 Versionamiento
+
+- Root: `1.7.0` → `1.8.0`
+- Backend: `1.6.1` → `1.8.0`
+- Frontend: `1.5.0` → `1.8.0`
+- Swagger: `1.7.1` → `1.8.0`
+
+---
+
+## [1.7.1] - 2026-02-08
+
+### 🔧 Mejoras
+
+- **Limpieza de Variables de Entorno**
+  - Eliminadas variables no utilizadas del `.env`: `NODE_ENV`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`
+  - `JWT_EXPIRES_IN` ahora se lee desde `process.env` en vez de estar hardcodeado
+
+- **Swagger Actualizado (v1.7.1)**
+  - Eliminados tags legacy (`Sesiones`, `Actividades`) y schema `Actividad`
+  - Agregados tags faltantes (`Sesiones VR`, `Unity - Pacientes`)
+  - Actualizado contacto y descripciones
+
+- **Documentación Sincronizada**
+  - `API_ENDPOINTS.md` actualizado con tabla de variables de entorno
+  - `README.md` actualizado: estructura del proyecto, endpoints, variables de entorno, diagrama de arquitectura
+  - Eliminadas referencias a tablas/endpoints legacy
+
+---
+
 ## [1.7.0] - 2026-02-02
 
 ### ✨ Nuevas Funcionalidades

@@ -10,8 +10,10 @@ backend/.env
 
 # Build outputs
 dist/
+dist-electron/
 build/
 out/
+release/
 
 # Tailwind compiled output
 frontend/src/renderer/output.css
@@ -22,7 +24,6 @@ frontend/src/renderer/output.css
 # Logs
 logs/
 *.log
-npm-debug.log*
 
 # OS files
 .DS_Store

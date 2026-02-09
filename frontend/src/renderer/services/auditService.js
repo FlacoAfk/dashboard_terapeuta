@@ -133,7 +133,6 @@ const auditService = {
                 }, 100);
             }, 0);
 
-            console.log('[AuditService] CSV download initiated:', filename);
             return true;
         } catch (error) {
             console.error('[AuditService] Error downloading CSV:', error);

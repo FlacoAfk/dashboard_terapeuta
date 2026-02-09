@@ -70,7 +70,7 @@ const authService = {
             const response = await api.get('/api/auth/check-setup');
             return response.data || response;
         } catch (error) {
-            return { setupComplete: false };
+            return { configured: false };
         }
     },
 

@@ -10,7 +10,7 @@
 const jwt = require('jsonwebtoken');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'cerebro_al_fuego_secret_key_2024';
-const JWT_EXPIRES_IN = '24h';
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h';
 
 /**
  * Middleware para verificar el token JWT

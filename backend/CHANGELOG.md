@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.8.0] - 2026-02-09
+
+### Added
+- **Evaluación del Desempeño**: Soporte para calificación 1-5 en sesiones VR via `PUT /api/sessions/:id`. La calificación se almacena como prefijo `[Calificación: X/5 - Label]` en `observaciones_terapeuta`.
+- **Auditoría de Sesiones**: Nuevo tipo de auditoría `SESSION_REVIEWED` registra cada revisión de sesión VR con detalles (session_id, participant_id, tiene_evaluacion).
+
+### Security
+- **Validación UUID**: `PUT /api/sessions/:id` ahora valida formato UUID del parámetro `id` → 400 `INVALID_UUID`.
+- **Validación de inputs**: Observaciones limitadas a 2000 caracteres, validación de tipo string/integer → 400 `INVALID_INPUT` / `INPUT_TOO_LONG`.
+- **Ownership check**: Terapeutas solo pueden actualizar sesiones de pacientes asignados a ellos (vía `terapeuta_paciente`) → 403 `ACCESS_DENIED`.
+- **Verificación de existencia**: Verifica que la sesión exista antes de actualizar → 404 `SESSION_NOT_FOUND`.
+- **Paciente activo**: Al vincular paciente, verifica que exista y esté activo → 404 `PATIENT_NOT_FOUND`.
+- **Ownership en vinculación**: Terapeuta no puede vincular un paciente que no le esté asignado → 403 `ACCESS_DENIED`.
+
+### Changed
+- **Swagger**: Actualizado a v1.8.0 — documentación detallada de `PUT /api/sessions/:id` con todos los códigos de error, ejemplos de evaluación y descripción de seguridad.
+- **API_ENDPOINTS.md**: Actualizado `PUT /api/sessions/:id` con validaciones de seguridad, formato de evaluación del desempeño, ownership check y códigos de error detallados.
+
+## [1.7.1] - 2026-02-08
+
+### Changed
+- **Environment Variables**: Removed unused variables (`NODE_ENV`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`) from `.env`.
+- **JWT Config**: `JWT_EXPIRES_IN` now reads from `process.env.JWT_EXPIRES_IN` instead of being hardcoded in `authMiddleware.js`.
+- **Swagger**: Updated to v1.7.1 — removed legacy tags (`Sesiones`, `Actividades`), added missing tags (`Sesiones VR`, `Unity - Pacientes`), removed `Actividad` schema, updated contact and descriptions.
+- **API_ENDPOINTS.md**: Added environment variables reference table, improved audit/export documentation.
+
 ## [1.6.1] - 2026-02-05
 
 ### Maintainance

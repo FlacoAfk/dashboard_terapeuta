@@ -51,7 +51,8 @@ const therapistService = {
                 nombre: data.nombre,
                 correo: data.correo,
                 password: data.password,
-                especialidad: data.especialidad || 'General'
+                especialidad: data.especialidad || 'General',
+                telefono: data.telefono || null
             });
             return { success: true, data: response.data };
         } catch (error) {
