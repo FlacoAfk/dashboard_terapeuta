@@ -176,6 +176,12 @@ const TherapistLayout = ({ children }) => {
                                 collapsed={sidebarCollapsed}
                             />
                             <NavItem
+                                to="/terapeuta/sesiones"
+                                icon={Icons.Sesiones}
+                                label="Sesiones VR"
+                                collapsed={sidebarCollapsed}
+                            />
+                            <NavItem
                                 to="/terapeuta/configuracion"
                                 icon={Icons.Configuracion}
                                 label="Configuración"

@@ -91,6 +91,13 @@ const DashboardTerapeuta = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [filter, setFilter] = useState('todos'); // todos, activos, inactivos
     const [stats, setStats] = useState({ activos: 0, hoy: 0, semana: 0, rendimiento: 0 });
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(10);
+
+    // Reset pagination when items per page changes
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [itemsPerPage]);
 
     // Modal states
     const [showCreateModal, setShowCreateModal] = useState(false);
@@ -175,6 +182,11 @@ const DashboardTerapeuta = () => {
             (filter === 'inactivos' && p.activo === false);
         return matchesSearch && matchesFilter;
     });
+
+    // Paginación
+    const totalPages = Math.ceil(filteredPatients.length / itemsPerPage) || 1;
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const paginatedPatients = filteredPatients.slice(startIndex, startIndex + itemsPerPage);
 
     const handleViewPatient = (patient) => {
         navigate(`/terapeuta/paciente/${patient.id}`);
@@ -354,7 +366,7 @@ const DashboardTerapeuta = () => {
                                             </td>
                                         </tr>
                                     ) : (
-                                        filteredPatients.map((patient) => (
+                                        paginatedPatients.map((patient) => (
                                             <tr key={patient.id} className="hover:bg-gray-50">
                                                 <td className="px-6 py-4">
                                                     <div className="flex items-center gap-3">
@@ -412,6 +424,52 @@ const DashboardTerapeuta = () => {
                             </table>
                         </div>
                     )}
+
+                    {/* Pagination */}
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 lg:p-6 border-t border-gray-200">
+                        <div className="flex flex-col sm:flex-row items-center gap-4">
+                            <span className="text-sm text-gray-500">
+                                Mostrando {Math.min(startIndex + 1, filteredPatients.length)} - {Math.min(startIndex + itemsPerPage, filteredPatients.length)} de {filteredPatients.length}
+                            </span>
+                            <select
+                                value={itemsPerPage}
+                                onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                                className="text-sm border-gray-300 rounded-lg focus:ring-[#2AA87E] focus:border-[#2AA87E] p-1.5 bg-white shadow-sm"
+                            >
+                                <option value={10}>10 por página</option>
+                                <option value={20}>20 por página</option>
+                                <option value={50}>50 por página</option>
+                            </select>
+                        </div>
+                        <div className="flex items-center gap-1 sm:gap-2 flex-wrap justify-center">
+                            <button
+                                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                disabled={currentPage === 1}
+                                className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <Icons.ChevronLeft />
+                            </button>
+                            {[...Array(totalPages)].map((_, i) => (
+                                <button
+                                    key={i + 1}
+                                    onClick={() => setCurrentPage(i + 1)}
+                                    className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg text-sm font-medium transition-colors ${currentPage === i + 1
+                                        ? 'bg-[#2AA87E] text-white'
+                                        : 'text-gray-600 hover:bg-gray-100'
+                                        }`}
+                                >
+                                    {i + 1}
+                                </button>
+                            ))}
+                            <button
+                                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                disabled={currentPage === totalPages}
+                                className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <Icons.ChevronRight />
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
 

@@ -377,10 +377,10 @@ const GestionTerapeutas = () => {
                                                     />
 
                                                     <ActionButton
-                                                        icon={Icons.Power}
+                                                        icon={therapist.activo ? Icons.Deactivate : Icons.Activate}
                                                         onClick={() => handleToggleStatus(therapist)}
                                                         title={therapist.activo ? 'Desactivar' : 'Activar'}
-                                                        variant="danger"
+                                                        variant={therapist.activo ? 'danger' : 'default'}
                                                     />
                                                     <ActionButton
                                                         icon={Icons.Key}

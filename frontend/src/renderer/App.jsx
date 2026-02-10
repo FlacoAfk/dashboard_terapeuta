@@ -6,7 +6,7 @@ import SetupPage from './pages/SetupPage';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import { GestionTerapeutas, Auditoria } from './pages/admin';
-import { DashboardTerapeuta, DetallePaciente } from './pages/terapeuta';
+import { DashboardTerapeuta, DetallePaciente, SesionesVR } from './pages/terapeuta';
 import ConfiguracionTerapeuta from './pages/terapeuta/ConfiguracionTerapeuta';
 import { AuthProvider, useAuth } from './context/AuthContext';
 
@@ -176,6 +176,14 @@ function App() {
                                 element={
                                     <TherapistRoute>
                                         <DashboardTerapeuta />
+                                    </TherapistRoute>
+                                }
+                            />
+                            <Route
+                                path="/terapeuta/sesiones"
+                                element={
+                                    <TherapistRoute>
+                                        <SesionesVR />
                                     </TherapistRoute>
                                 }
                             />

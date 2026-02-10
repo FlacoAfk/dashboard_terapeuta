@@ -300,48 +300,6 @@ const formatTimestamp = (isoDate) => {
 };
 
 // ========================================
-// Escalas de evaluación del desempeño
-// ========================================
-
-const PERFORMANCE_RATINGS = [
-    {
-        value: 1,
-        label: 'Muy bajo',
-        description: 'El paciente presenta dificultades significativas. Se necesita intervención y práctica guiada en niveles más básicos.',
-        color: 'red',
-        emoji: '🔴'
-    },
-    {
-        value: 2,
-        label: 'Bajo',
-        description: 'Desempeño por debajo de lo esperado. Se recomienda reforzar habilidades fundamentales con actividades de menor complejidad.',
-        color: 'orange',
-        emoji: '🟠'
-    },
-    {
-        value: 3,
-        label: 'Regular',
-        description: 'Desempeño aceptable con áreas de mejora. Continuar practicando en el mismo nivel antes de avanzar.',
-        color: 'yellow',
-        emoji: '🟡'
-    },
-    {
-        value: 4,
-        label: 'Bueno',
-        description: 'Buen desempeño con errores menores. El paciente muestra progreso y puede intentar niveles de mayor dificultad.',
-        color: 'emerald',
-        emoji: '🟢'
-    },
-    {
-        value: 5,
-        label: 'Excelente',
-        description: 'Desempeño sobresaliente. El paciente domina esta actividad y se recomienda avanzar al siguiente nivel de dificultad.',
-        color: 'green',
-        emoji: '🌟'
-    }
-];
-
-// ========================================
 // Modal de detalle completo
 // ========================================
 
@@ -351,7 +309,6 @@ const VRSessionDetailModal = ({ session, onClose, onSessionUpdated }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [localSession, setLocalSession] = useState(session);
     const [activeTab, setActiveTab] = useState('resumen');
-    const [selectedRating, setSelectedRating] = useState(null);
 
     const isReviewed = localSession.estado_revision === 'REVISADA';
 
@@ -478,11 +435,11 @@ const VRSessionDetailModal = ({ session, onClose, onSessionUpdated }) => {
     const recipe = getRecipeName(localSession.activity_id);
 
     const handleSaveEvaluation = async () => {
-        if (!observaciones.trim() && !selectedRating) {
+        if (!observaciones.trim()) {
             Swal.fire({
                 icon: 'warning',
-                title: 'Evaluación vacía',
-                text: 'Debe escribir sus observaciones o seleccionar una calificación antes de guardar.',
+                title: 'Observaciones vacías',
+                text: 'Debe escribir sus observaciones clínicas antes de guardar.',
                 confirmButtonColor: '#2AA87E'
             });
             return;
@@ -490,14 +447,7 @@ const VRSessionDetailModal = ({ session, onClose, onSessionUpdated }) => {
 
         setSaving(true);
         try {
-            let fullObservaciones = '';
-            if (selectedRating) {
-                const rating = PERFORMANCE_RATINGS.find(r => r.value === selectedRating);
-                fullObservaciones += `[Calificación: ${rating.value}/5 - ${rating.label}]\n`;
-            }
-            if (observaciones.trim()) {
-                fullObservaciones += observaciones.trim();
-            }
+            const fullObservaciones = observaciones.trim();
 
             const result = await vrResultsService.updateSession(localSession.id, {
                 observaciones: fullObservaciones
@@ -540,19 +490,6 @@ const VRSessionDetailModal = ({ session, onClose, onSessionUpdated }) => {
             setSaving(false);
         }
     };
-
-    // Extraer calificación guardada
-    const savedRating = useMemo(() => {
-        const obs = localSession.observaciones_terapeuta || '';
-        const match = obs.match(/\[Calificación: (\d)\/5/);
-        return match ? parseInt(match[1]) : null;
-    }, [localSession.observaciones_terapeuta]);
-
-    // Extraer texto sin la línea de calificación
-    const savedObservacionesText = useMemo(() => {
-        const obs = localSession.observaciones_terapeuta || '';
-        return obs.replace(/\[Calificación: \d\/5 - [^\]]+\]\n?/, '').trim();
-    }, [localSession.observaciones_terapeuta]);
 
     const tabs = [
         { id: 'resumen', label: 'Resumen', icon: '📊' },
@@ -662,10 +599,6 @@ const VRSessionDetailModal = ({ session, onClose, onSessionUpdated }) => {
                             setIsEditing={setIsEditing}
                             observaciones={observaciones}
                             setObservaciones={setObservaciones}
-                            selectedRating={selectedRating}
-                            setSelectedRating={setSelectedRating}
-                            savedRating={savedRating}
-                            savedObservacionesText={savedObservacionesText}
                             saving={saving}
                             handleSaveEvaluation={handleSaveEvaluation}
                             localSession={localSession}
@@ -1247,155 +1180,130 @@ const TabMotricidad = ({ analytics, session }) => {
 const TabEvaluacion = ({
     isReviewed, isEditing, setIsEditing,
     observaciones, setObservaciones,
-    selectedRating, setSelectedRating,
-    savedRating, savedObservacionesText,
     saving, handleSaveEvaluation,
     localSession, analytics
 }) => {
+    // Texto de observaciones guardadas (sin prefijo de calificación legacy)
+    const savedObservacionesText = useMemo(() => {
+        const obs = localSession.observaciones_terapeuta || '';
+        return obs.replace(/\[Calificación: \d\/5 - [^\]]+\]\n?/, '').trim();
+    }, [localSession.observaciones_terapeuta]);
 
     return (
         <>
+            {/* Resumen de datos automáticos (solo lectura) */}
             <section>
-                <SectionHeader title="Evaluación del Desempeño" subtitle="Calificación del terapeuta sobre el desempeño del paciente en esta sesión" />
+                <SectionHeader
+                    title="Datos de la Sesión (Automáticos)"
+                    subtitle="Información generada por el videojuego — no se puede modificar"
+                />
+                <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <div className="text-center p-3 bg-white rounded-lg border border-gray-100">
+                            <p className="text-2xl font-bold text-gray-800">{analytics.score}<span className="text-sm font-normal text-gray-400">/100</span></p>
+                            <p className="text-xs text-gray-500 mt-1">Puntuación</p>
+                        </div>
+                        <div className="text-center p-3 bg-white rounded-lg border border-gray-100">
+                            <p className={`text-2xl font-bold ${analytics.totalErrors === 0 ? 'text-green-600' : 'text-red-600'}`}>{analytics.totalErrors}</p>
+                            <p className="text-xs text-gray-500 mt-1">Errores</p>
+                        </div>
+                        <div className="text-center p-3 bg-white rounded-lg border border-gray-100">
+                            <p className="text-2xl font-bold text-blue-600">{analytics.setsCompleted}<span className="text-sm font-normal text-gray-400">/4</span></p>
+                            <p className="text-xs text-gray-500 mt-1">Etapas completadas</p>
+                        </div>
+                        <div className="text-center p-3 bg-white rounded-lg border border-gray-100">
+                            <p className="text-2xl font-bold text-purple-600">{analytics.efficiencyPct}%</p>
+                            <p className="text-xs text-gray-500 mt-1">Eficiencia</p>
+                        </div>
+                    </div>
+                    <p className="text-xs text-gray-400 text-center mt-3 flex items-center justify-center gap-1">
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                        Estos datos son generados por el videojuego y no pueden editarse
+                    </p>
+                </div>
+            </section>
 
-                <div className="bg-gray-50 border border-gray-200 rounded-xl p-5">
+            {/* Observaciones del terapeuta (editable) */}
+            <section>
+                <SectionHeader
+                    title="Observaciones Clínicas del Terapeuta"
+                    subtitle="Este es el único campo que puedes completar desde el dashboard"
+                />
+
+                <div className="bg-white border-2 border-[#2AA87E]/30 rounded-xl p-5">
                     {/* Badge de estado */}
                     <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-2">
-                            <span className={`w-2.5 h-2.5 rounded-full ${isReviewed ? 'bg-blue-500' : 'bg-orange-400'}`}></span>
+                            <span className={`w-2.5 h-2.5 rounded-full ${isReviewed ? 'bg-[#2AA87E]' : 'bg-orange-400'}`}></span>
                             <span className="text-sm font-medium text-gray-700">
                                 {isReviewed
-                                    ? 'Sesión evaluada por el terapeuta'
-                                    : 'Esta sesión aún no ha sido evaluada'}
+                                    ? 'Sesión revisada — observaciones guardadas'
+                                    : 'Sesión pendiente de revisión'}
                             </span>
                         </div>
                         {isReviewed && !isEditing && (
                             <button
                                 onClick={() => {
                                     setIsEditing(true);
-                                    setSelectedRating(savedRating);
                                     setObservaciones(savedObservacionesText);
                                 }}
-                                className="text-sm text-[#2AA87E] hover:text-[#239469] font-medium flex items-center gap-1"
+                                className="text-sm text-[#2AA87E] hover:text-[#239469] font-medium flex items-center gap-1 px-3 py-1.5 rounded-lg hover:bg-[#2AA87E]/10 transition-colors"
                             >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                 </svg>
-                                Editar evaluación
+                                Editar observaciones
                             </button>
                         )}
                     </div>
 
-                    {/* Vista de evaluación guardada */}
+                    {/* Vista guardada */}
                     {isReviewed && !isEditing ? (
-                        <div className="space-y-4">
-                            {savedRating && (
-                                <div className="bg-white border border-gray-200 rounded-xl p-4">
-                                    <p className="text-xs text-gray-500 mb-3 font-medium uppercase tracking-wider">Calificación del desempeño</p>
-                                    <div className="flex items-center gap-3">
-                                        <div className="flex gap-1">
-                                            {[1, 2, 3, 4, 5].map(star => (
-                                                <span key={star} className={`text-2xl ${star <= savedRating ? 'opacity-100' : 'opacity-20'}`}>
-                                                    {PERFORMANCE_RATINGS[star - 1].emoji}
-                                                </span>
-                                            ))}
-                                        </div>
-                                        <div>
-                                            <p className="font-bold text-gray-800">{savedRating}/5 — {PERFORMANCE_RATINGS[savedRating - 1].label}</p>
-                                            <p className="text-xs text-gray-500">{PERFORMANCE_RATINGS[savedRating - 1].description}</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            <div className="bg-white border border-blue-100 rounded-xl p-4">
-                                <p className="text-xs text-gray-500 mb-2 font-medium uppercase tracking-wider">Observaciones del terapeuta</p>
-                                <p className="text-gray-800 whitespace-pre-wrap leading-relaxed">
-                                    {savedObservacionesText || 'Sin observaciones adicionales.'}
-                                </p>
-                            </div>
+                        <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
+                            <p className="text-xs text-gray-500 mb-2 font-medium uppercase tracking-wider flex items-center gap-1.5">
+                                <span>📝</span> Observaciones registradas
+                            </p>
+                            <p className="text-gray-800 whitespace-pre-wrap leading-relaxed text-sm">
+                                {savedObservacionesText || 'Sin observaciones adicionales.'}
+                            </p>
                         </div>
                     ) : (
-                        /* Formulario de evaluación */
-                        <div className="space-y-5">
-                            {/* Datos de referencia */}
-                            <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
-                                <p className="text-xs font-semibold text-blue-700 mb-2">📊 Datos de referencia para la evaluación:</p>
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs text-blue-600">
-                                    <span>Puntuación: <strong>{analytics.score}/100</strong></span>
-                                    <span>Errores: <strong>{analytics.totalErrors}</strong></span>
-                                    <span>Etapas: <strong>{analytics.setsCompleted}/4</strong></span>
-                                    <span>Eficiencia: <strong>{analytics.efficiencyPct}%</strong></span>
-                                </div>
+                        /* Formulario de observaciones */
+                        <div className="space-y-4">
+                            {/* Guía para el terapeuta */}
+                            <div className="bg-[#2AA87E]/5 border border-[#2AA87E]/20 rounded-lg p-3">
+                                <p className="text-xs font-medium text-[#2AA87E] mb-1.5">💡 Sugerencias para las observaciones:</p>
+                                <ul className="text-xs text-gray-600 space-y-0.5 list-disc list-inside">
+                                    <li>Describa el desempeño general del paciente en esta sesión</li>
+                                    <li>Señale dificultades observadas y posibles causas</li>
+                                    <li>Incluya recomendaciones terapéuticas o plan de acción</li>
+                                    <li>Compare con sesiones anteriores si es relevante</li>
+                                </ul>
                             </div>
 
-                            {/* Selector de calificación */}
+                            {/* Textarea de observaciones */}
                             <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-3">
-                                    Calificación del Desempeño
-                                </label>
-                                <div className="grid grid-cols-5 gap-2">
-                                    {PERFORMANCE_RATINGS.map(rating => {
-                                        const isSelected = selectedRating === rating.value;
-                                        const bgMap = {
-                                            red: isSelected ? 'border-red-500 bg-red-100 ring-2 ring-red-300' : 'border-red-200 bg-red-50 hover:shadow-md',
-                                            orange: isSelected ? 'border-orange-500 bg-orange-100 ring-2 ring-orange-300' : 'border-orange-200 bg-orange-50 hover:shadow-md',
-                                            yellow: isSelected ? 'border-yellow-500 bg-yellow-100 ring-2 ring-yellow-300' : 'border-yellow-200 bg-yellow-50 hover:shadow-md',
-                                            emerald: isSelected ? 'border-emerald-500 bg-emerald-100 ring-2 ring-emerald-300' : 'border-emerald-200 bg-emerald-50 hover:shadow-md',
-                                            green: isSelected ? 'border-green-500 bg-green-100 ring-2 ring-green-300' : 'border-green-200 bg-green-50 hover:shadow-md'
-                                        };
-
-                                        return (
-                                            <button
-                                                key={rating.value}
-                                                onClick={() => setSelectedRating(rating.value)}
-                                                className={`border-2 rounded-xl p-3 text-center transition-all hover:scale-105 ${bgMap[rating.color]}`}
-                                            >
-                                                <div className="text-2xl mb-1">{rating.emoji}</div>
-                                                <p className="text-sm font-bold text-gray-800">{rating.value}</p>
-                                                <p className="text-xs text-gray-600">{rating.label}</p>
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                                {selectedRating && (
-                                    <div className="mt-2 p-3 bg-gray-100 rounded-lg">
-                                        <p className="text-sm text-gray-700">
-                                            <strong>{PERFORMANCE_RATINGS[selectedRating - 1].label}:</strong>{' '}
-                                            {PERFORMANCE_RATINGS[selectedRating - 1].description}
-                                        </p>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Observaciones */}
-                            <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                    Observaciones Clínicas
-                                </label>
-                                <p className="text-xs text-gray-400 mb-2">
-                                    Describa el desempeño del paciente, dificultades observadas, recomendaciones terapéuticas y plan de acción.
-                                </p>
                                 <textarea
                                     value={observaciones}
                                     onChange={(e) => setObservaciones(e.target.value)}
-                                    placeholder="Ej: El paciente mostró dificultad en la etapa de ingredientes, confundiendo el azúcar con la sal. Se recomienda reforzar la identificación de objetos antes de avanzar a actividades de mayor dificultad. La coordinación motora mostró mejora respecto a la sesión anterior..."
-                                    className="w-full border border-gray-300 rounded-xl p-4 text-sm min-h-[150px] resize-y focus:ring-2 focus:ring-[#2AA87E] focus:border-[#2AA87E] outline-none transition-colors"
+                                    placeholder="Ej: El paciente mostró dificultad en la etapa de ingredientes, confundiendo el azúcar con la sal. Se recomienda reforzar la identificación de objetos antes de avanzar a actividades de mayor dificultad..."
+                                    className="w-full border-2 border-gray-200 rounded-xl p-4 text-sm min-h-[160px] resize-y focus:ring-2 focus:ring-[#2AA87E]/30 focus:border-[#2AA87E] outline-none transition-colors placeholder:text-gray-300"
                                     maxLength={2000}
                                 />
-                                <div className="flex items-center justify-between mt-2">
+                                <div className="flex items-center justify-between mt-1.5">
                                     <span className="text-xs text-gray-400">{observaciones.length}/2000 caracteres</span>
                                 </div>
                             </div>
 
                             {/* Botones de acción */}
-                            <div className="flex gap-2 pt-2">
+                            <div className="flex gap-2 pt-1">
                                 {isEditing && (
                                     <button
                                         onClick={() => {
                                             setIsEditing(false);
                                             setObservaciones(localSession.observaciones_terapeuta || '');
-                                            setSelectedRating(null);
                                         }}
                                         className="px-5 py-3 text-sm text-gray-600 hover:text-gray-800 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors"
                                     >
@@ -1404,7 +1312,7 @@ const TabEvaluacion = ({
                                 )}
                                 <button
                                     onClick={handleSaveEvaluation}
-                                    disabled={saving || (!observaciones.trim() && !selectedRating)}
+                                    disabled={saving || !observaciones.trim()}
                                     className="flex-1 px-5 py-3 bg-[#2AA87E] hover:bg-[#239469] disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-2"
                                 >
                                     {saving ? (
@@ -1417,7 +1325,7 @@ const TabEvaluacion = ({
                                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                                             </svg>
-                                            {isReviewed ? 'Actualizar evaluación' : 'Guardar evaluación y marcar como revisada'}
+                                            {isReviewed ? 'Actualizar observaciones' : 'Guardar observaciones y marcar como revisada'}
                                         </>
                                     )}
                                 </button>

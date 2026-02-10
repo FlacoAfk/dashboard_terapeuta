@@ -3,11 +3,17 @@
  * SCRIPT: Seed Database con Datos Realistas
  * ========================================
  * 
- * Crea datos realistas de prueba para el sistema:
- * - 1 Superadmin
- * - 3 Terapeutas activos
- * - 12 Pacientes con datos demográficos colombianos
- * - Sesiones VR del videojuego
+ * Crea datos realistas de prueba para el sistema
+ * "Cerebro al Fuego" — Videojuego VR de cocina colombiana
+ * 
+ * Contenido:
+ * - 1 Superadmin (desde .env)
+ * - 3 Terapeutas activos (incluye cuenta de prueba julianmonj45@gmail.com)
+ * - 12 Pacientes adultos mayores con datos demográficos colombianos
+ * - ~40-70 Sesiones VR del videojuego con sets, errores y observaciones
+ * - Eventos de auditoría realistas en formato JSON
+ * 
+ * Compatible con schema actual (bd_schema.sql v1.8.1)
  */
 
 require('dotenv').config();
@@ -19,65 +25,149 @@ const supabase = createClient(
     process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-// Datos realistas colombianos
+// ========================================
+// DATOS REALISTAS COLOMBIANOS
+// ========================================
+
 const NOMBRES_MASCULINOS = ['Carlos', 'José', 'Luis', 'Andrés', 'Jorge', 'Miguel', 'Rafael', 'Pedro', 'Fernando', 'Ricardo'];
 const NOMBRES_FEMENINOS = ['María', 'Ana', 'Luz', 'Carmen', 'Rosa', 'Patricia', 'Claudia', 'Gloria', 'Sandra', 'Martha'];
-const APELLIDOS = ['García', 'Rodríguez', 'Martínez', 'López', 'González', 'Hernández', 'Pérez', 'Sánchez', 'Ramírez', 'Torres', 'Díaz', 'Moreno', 'Vargas', 'Castro', 'Ortiz'];
+const APELLIDOS = ['García', 'Rodríguez', 'Martínez', 'López', 'González', 'Hernández', 'Pérez', 'Sánchez', 'Ramírez', 'Torres', 'Díaz', 'Moreno', 'Vargas', 'Castro', 'Ortiz', 'Restrepo', 'Mejía', 'Ospina'];
 
 const DIAGNOSTICOS = [
-    'Deterioro Cognitivo Leve',
-    'Alzheimer etapa temprana',
-    'Demencia vascular leve',
+    'Deterioro Cognitivo Leve (DCL amnésico)',
+    'Alzheimer etapa temprana — seguimiento neuropsicológico',
+    'Demencia vascular leve — programa de estimulación',
     'Deterioro cognitivo asociado a la edad',
-    'DCL amnésico',
-    'Enfermedad de Parkinson con deterioro cognitivo',
-    'Traumatismo craneoencefálico - rehabilitación',
-    'ACV - rehabilitación cognitiva'
+    'DCL multidominio — estimulación cognitiva integral',
+    'Enfermedad de Parkinson con deterioro cognitivo leve',
+    'Traumatismo craneoencefálico — rehabilitación cognitiva',
+    'ACV isquémico — rehabilitación de funciones ejecutivas',
+    'Deterioro cognitivo post-COVID — seguimiento',
+    'DCL amnésico de dominio múltiple'
 ];
 
+// Actividades del videojuego VR — cocina colombiana
 const ACTIVIDADES_VR = [
     { id: 'tinto_easy_01', nombre: 'Preparar Tinto - Fácil' },
     { id: 'tinto_medium_01', nombre: 'Preparar Tinto - Medio' },
     { id: 'tinto_hard_01', nombre: 'Preparar Tinto - Difícil' },
-    { id: 'huevos_easy_01', nombre: 'Preparar Huevos - Fácil' },
-    { id: 'arepa_easy_01', nombre: 'Preparar Arepa - Fácil' }
+    { id: 'huevos_easy_01', nombre: 'Preparar Huevos Pericos - Fácil' },
+    { id: 'huevos_medium_01', nombre: 'Preparar Huevos Pericos - Medio' },
+    { id: 'arepa_easy_01', nombre: 'Preparar Arepa con Queso - Fácil' },
+    { id: 'arepa_medium_01', nombre: 'Preparar Arepa con Queso - Medio' }
 ];
 
+// Códigos de error del videojuego
 const ERROR_CODES = [
-    { code: 'STOVE_ON_NO_POT', message: 'Estufa encendida sin olla' },
-    { code: 'WRONG_INGREDIENT', message: 'Ingrediente incorrecto agregado' },
-    { code: 'SPILL_COFFEE', message: 'Café derramado' },
-    { code: 'FORGOT_SUGAR', message: 'Olvidó agregar azúcar' },
-    { code: 'BURNT_FOOD', message: 'Comida quemada' },
-    { code: 'WRONG_ORDER', message: 'Orden de pasos incorrecto' }
+    { code: 'WRONG_INGREDIENT', message: 'Ingrediente incorrecto seleccionado', contextos: ['Sal', 'Azúcar', 'Harina', 'Aceite'] },
+    { code: 'WRONG_ORDER', message: 'Orden de pasos incorrecto', contextos: ['Estufa', 'Olla', 'Sartén', 'Taza'] },
+    { code: 'STOVE_ON_NO_POT', message: 'Estufa encendida sin recipiente', contextos: ['Estufa'] },
+    { code: 'SPILL', message: 'Líquido derramado', contextos: ['Café', 'Agua', 'Aceite'] },
+    { code: 'BURNT_FOOD', message: 'Alimento quemado por tiempo excesivo', contextos: ['Huevos', 'Arepa', 'Café'] },
+    { code: 'FORGOT_STEP', message: 'Paso omitido en la secuencia', contextos: ['Cuchara', 'Taza', 'Plato'] },
+    { code: 'WRONG_UTENSIL', message: 'Utensilio incorrecto utilizado', contextos: ['Tenedor', 'Cuchillo', 'Espátula'] }
 ];
 
-// Generar número de cédula colombiano realista
+// Observaciones clínicas realistas para sesiones revisadas
+const OBSERVACIONES_CLINICAS = [
+    'Paciente completó la actividad sin dificultades significativas. Buena orientación espacial y secuenciación de pasos. Se recomienda avanzar a nivel medio.',
+    'Se observó lentitud en la identificación de utensilios. La memoria de trabajo parece afectada — confunde ingredientes similares. Mantener nivel fácil por 2 semanas más.',
+    'Mejoría notable respecto a sesión anterior. Redujo errores de secuenciación. La estimulación cognitiva muestra efecto positivo en funciones ejecutivas.',
+    'Paciente mostró frustración al no recordar la lista de ingredientes. Se sugiere mayor acompañamiento del terapeuta durante las primeras sesiones.',
+    'Desempeño estable. Tiempo de reacción adecuado. Aciertos en selección de ingredientes. Continuar con frecuencia actual de sesiones.',
+    'Dificultad en la planificación de pasos. El paciente tiende a manipular objetos sin seguir la secuencia lógica. Trabajar flexibilidad cognitiva.',
+    'Excelente sesión. El paciente demostró buena memoria prospectiva y completó todos los pasos en orden. Se recomienda probar nivel intermedio.',
+    'Se evidencia deterioro respecto a la línea base. Aumentaron los errores de omisión. Evaluar posible ajuste farmacológico con neurología.',
+    'Primera sesión del paciente. Se observa buena disposición pero dificultad con los controles VR. Adaptar próxima sesión para familiarización.',
+    'Paciente completó la actividad pero con múltiples errores de secuencia. La atención sostenida se ve comprometida después del minuto 3.',
+    'Sesión interrumpida por fatiga del paciente (alerta de descanso activada). Lo completado muestra rendimiento dentro de lo esperado.',
+    'Buen manejo de objetos y reconocimiento de utensilios. Errores mínimos. El paciente reporta sentirse cómodo con el entorno virtual.'
+];
+
+// Sets/etapas del videojuego
+const SET_NAMES = ['Reconocimiento', 'Recolección', 'Preparación', 'Organización'];
+
+// ========================================
+// FUNCIONES UTILITARIAS
+// ========================================
+
 function generarCedula() {
     const prefijo = Math.floor(Math.random() * 90) + 10;
     const resto = Math.floor(Math.random() * 9000000) + 1000000;
     return `${prefijo}${resto}`;
 }
 
-// Generar edad entre rango
 function generarEdad(min, max) {
     return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-// Seleccionar aleatorio de array
 function random(arr) {
     return arr[Math.floor(Math.random() * arr.length)];
 }
 
-// Generar fecha aleatoria en los últimos N días
+function generarTelefonoColombia() {
+    const prefijos = ['300', '301', '302', '310', '311', '312', '313', '314', '315', '316', '317', '318', '319', '320', '321', '322', '323', '350'];
+    return `${random(prefijos)}${Math.floor(Math.random() * 9000000 + 1000000)}`;
+}
+
+// Genera fecha aleatoria en los últimos N días, con opción de forzar "hoy" o "esta semana"
 function randomDate(daysBack) {
     const date = new Date();
     date.setDate(date.getDate() - Math.floor(Math.random() * daysBack));
-    date.setHours(Math.floor(Math.random() * 8) + 8, Math.floor(Math.random() * 60), 0);
+    date.setHours(Math.floor(Math.random() * 8) + 8, Math.floor(Math.random() * 60), Math.floor(Math.random() * 60));
     return date;
 }
 
-// Generar sesión VR realista
+function todayDate() {
+    const date = new Date();
+    date.setHours(Math.floor(Math.random() * 4) + 8, Math.floor(Math.random() * 60), Math.floor(Math.random() * 60));
+    return date;
+}
+
+function thisWeekDate() {
+    const date = new Date();
+    const dayOfWeek = date.getDay();
+    const daysBack = Math.floor(Math.random() * Math.max(dayOfWeek, 1));
+    date.setDate(date.getDate() - daysBack);
+    date.setHours(Math.floor(Math.random() * 8) + 8, Math.floor(Math.random() * 60), Math.floor(Math.random() * 60));
+    return date;
+}
+
+// Crear evento de auditoría en formato JSON correcto
+function crearEventoAuditoria(idUsuario, tipo, actorEmail, detalle = {}, fecha = null) {
+    const descripcionCompleta = {
+        ...detalle,
+        _actor_email: actorEmail || 'sistema',
+        _ip_origen: '192.168.1.' + Math.floor(Math.random() * 254 + 1),
+        _tipo_label: AUDIT_LABELS[tipo] || tipo
+    };
+
+    return {
+        id_usuario: idUsuario,
+        tipo_accion: tipo,
+        descripcion: JSON.stringify(descripcionCompleta),
+        fecha: (fecha || new Date()).toISOString()
+    };
+}
+
+const AUDIT_LABELS = {
+    LOGIN_SUCCESS: 'Login exitoso',
+    LOGIN_FAILED: 'Login fallido',
+    SUPERADMIN_CREATED: 'Superadmin creado',
+    TERAPEUTA_CREATED: 'Terapeuta creado',
+    PATIENT_CREATED: 'Paciente creado',
+    PATIENT_UPDATED: 'Paciente actualizado',
+    PATIENT_ASSIGNED: 'Paciente asignado',
+    SESSION_REVIEWED: 'Sesión VR revisada',
+    PASSWORD_CHANGE: 'Cambio de contraseña',
+    USER_ACTIVATED: 'Usuario activado',
+    DATA_EXPORTED: 'Datos exportados'
+};
+
+// ========================================
+// GENERADOR DE SESIONES VR
+// ========================================
+
 function generarSesionVR(participantId, fecha) {
     const actividad = random(ACTIVIDADES_VR);
     const startTime = new Date(fecha);
@@ -85,45 +175,43 @@ function generarSesionVR(participantId, fecha) {
     const endTime = new Date(startTime.getTime() + totalSeconds * 1000);
 
     const sets = [];
-    const setNames = ['Ingredients', 'Utensils', 'Preparation', 'Organization'];
     let currentTime = new Date(startTime);
+    const setDurationBase = Math.floor(totalSeconds / SET_NAMES.length);
 
-    for (const setName of setNames) {
-        const setDuration = Math.floor(totalSeconds / 4) + Math.floor(Math.random() * 30) - 15;
-        const setEnd = new Date(currentTime.getTime() + setDuration * 1000);
+    for (let i = 0; i < SET_NAMES.length; i++) {
+        const setName = SET_NAMES[i];
+        const setDuration = setDurationBase + Math.floor(Math.random() * 30) - 15;
+        const setEnd = new Date(currentTime.getTime() + Math.max(setDuration, 10) * 1000);
 
-        const numErrors = Math.random() > 0.7 ? Math.floor(Math.random() * 3) : 0;
+        const numErrors = Math.random() > 0.6 ? Math.floor(Math.random() * 3) + 1 : 0;
         const errors = [];
-        for (let i = 0; i < numErrors; i++) {
+        for (let j = 0; j < numErrors; j++) {
             const err = random(ERROR_CODES);
             errors.push({
                 code: err.code,
                 message: err.message,
-                timestampIso: new Date(currentTime.getTime() + Math.random() * setDuration * 1000).toISOString()
+                timestampIso: new Date(currentTime.getTime() + Math.random() * setDuration * 1000).toISOString(),
+                context: random(err.contextos)
             });
         }
 
         sets.push({
             setName,
+            setIndex: i,
             startedAtIso: currentTime.toISOString(),
             endedAtIso: setEnd.toISOString(),
-            durationSeconds: setDuration,
+            durationSeconds: Math.max(setDuration, 10),
             blockedCount: Math.floor(Math.random() * 3),
             dropsCount: Math.floor(Math.random() * 2),
-            releasesCount: Math.floor(Math.random() * 5),
-            errors,
-            completion: {
-                coffeeAdded: setName === 'Preparation',
-                sugarAdded: setName === 'Preparation' && Math.random() > 0.3,
-                cupCoffeeAmount01: setName === 'Preparation' ? Math.random() * 0.3 + 0.7 : 0
-            },
-            returnedObjects: setName === 'Organization' ? ['Cuchara', 'Taza', 'Azucarera'] : []
+            releasesCount: Math.floor(Math.random() * 5) + 1,
+            errorsCount: numErrors,
+            errors
         });
 
         currentTime = setEnd;
     }
 
-    const totalErrors = sets.reduce((sum, s) => sum + s.errors.length, 0);
+    const totalErrors = sets.reduce((sum, s) => sum + s.errorsCount, 0);
     const totalDrops = sets.reduce((sum, s) => sum + s.dropsCount, 0);
     const totalReleases = sets.reduce((sum, s) => sum + s.releasesCount, 0);
 
@@ -138,31 +226,68 @@ function generarSesionVR(participantId, fecha) {
             totalErrors,
             totalDrops,
             totalReleases,
-            setsCompleted: 4
+            setsCompleted: SET_NAMES.length
         },
         sets
     };
 }
 
-async function seed() {
-    console.log('🌱 Iniciando seed de base de datos...\n');
+// ========================================
+// SEED PRINCIPAL
+// ========================================
 
-    // Obtener credenciales del superadmin desde .env
-    const superadminEmail = process.env.SUPERADMIN_EMAIL || 'admin@cerebroalfuego.com';
+async function seed() {
+    console.log('🌱 Iniciando seed de base de datos...');
+    console.log('⚠️  Se eliminarán todos los datos existentes.\n');
+
+    // ────────────────────────────────────
+    // 0. LIMPIAR BD (orden por dependencias FK)
+    // ────────────────────────────────────
+    console.log('🧹 Limpiando base de datos...');
+    const tablesToClean = [
+        'vr_set_errors',
+        'vr_set_results',
+        'vr_session_results',
+        'auditoria',
+        'password_reset_tokens',
+        'terapeuta_paciente',
+        'pacientes',
+        'terapeutas',
+        'usuarios'
+    ];
+
+    for (const table of tablesToClean) {
+        // UUID tables need a different filter — use gte on id to match everything
+        // For integer-ID tables, use neq('id', -99999)
+        const uuidTables = ['vr_set_errors', 'vr_set_results', 'vr_session_results', 'password_reset_tokens'];
+        let result;
+        if (uuidTables.includes(table)) {
+            result = await supabase.from(table).delete().gte('created_at', '1970-01-01T00:00:00Z');
+        } else if (table === 'terapeuta_paciente') {
+            result = await supabase.from(table).delete().gte('id_terapeuta', 0);
+        } else {
+            result = await supabase.from(table).delete().neq('id', -99999);
+        }
+        if (result.error) {
+            console.warn(`   ⚠️  ${table}: ${result.error.message}`);
+        } else {
+            console.log(`   ✅ ${table} limpiada`);
+        }
+    }
+
+    // ────────────────────────────────────
+    // 1. SUPERADMIN
+    // ────────────────────────────────────
+    console.log('\n👤 Creando Superadministrador...');
+    const superadminEmail = process.env.SUPERADMIN_EMAIL || 'cerebroalfuego@gmail.com';
     const superadminPassword = process.env.SUPERADMIN_PASSWORD || 'Admin@123456';
 
-    // 1. Crear Superadmin (borrar existente primero si hay)
-    console.log('👤 Creando Superadministrador...');
-
-    // Intentar borrar si ya existe
-    await supabase.from('usuarios').delete().eq('email', superadminEmail);
-
-    const adminPassword = await bcrypt.hash(superadminPassword, 10);
+    const adminPasswordHash = await bcrypt.hash(superadminPassword, 10);
     const { data: admin, error: adminError } = await supabase
         .from('usuarios')
         .insert({
             email: superadminEmail,
-            password_hash: adminPassword,
+            password_hash: adminPasswordHash,
             rol: 'SUPERADMIN',
             activo: true
         })
@@ -173,36 +298,55 @@ async function seed() {
         console.error('❌ Error creando admin:', adminError.message);
         return;
     }
-    console.log('✅ Superadmin creado:', admin.email);
+    console.log(`   ✅ Superadmin: ${admin.email} (ID: ${admin.id})`);
 
-    // 2. Crear Terapeutas
+    // ────────────────────────────────────
+    // 2. TERAPEUTAS
+    // ────────────────────────────────────
     console.log('\n👨‍⚕️ Creando Terapeutas...');
     const terapeutasData = [
-        { nombre: 'Dra. Carolina Mejía Ospina', email: 'carolina.mejia@cerebroalfuego.com', especialidad: 'Neuropsicología' },
-        { nombre: 'Dr. Alejandro Restrepo Gómez', email: 'alejandro.restrepo@cerebroalfuego.com', especialidad: 'Geriatría Cognitiva' },
-        { nombre: 'Dra. Valentina Castro Ruiz', email: 'valentina.castro@cerebroalfuego.com', especialidad: 'Terapia Ocupacional' }
+        {
+            nombre: 'Dr. Julian Medina Monje',
+            email: 'julianmonj45@gmail.com',
+            password: 'Julianmed45@',
+            especialidad: 'Neuropsicología',
+            telefono: generarTelefonoColombia()
+        },
+        {
+            nombre: 'Dra. Carolina Mejía Ospina',
+            email: 'carolina.mejia@cerebroalfuego.com',
+            password: 'Terapeuta@123',
+            especialidad: 'Geriatría Cognitiva',
+            telefono: generarTelefonoColombia()
+        },
+        {
+            nombre: 'Dr. Alejandro Restrepo Gómez',
+            email: 'alejandro.restrepo@cerebroalfuego.com',
+            password: 'Terapeuta@123',
+            especialidad: 'Terapia Ocupacional',
+            telefono: generarTelefonoColombia()
+        }
     ];
 
     const terapeutas = [];
-    const terapeutaPassword = await bcrypt.hash('Terapeuta@123', 10);
 
     for (const t of terapeutasData) {
-        // Borrar usuario existente si hay
-        await supabase.from('usuarios').delete().eq('email', t.email);
+        const passwordHash = await bcrypt.hash(t.password, 10);
 
         const { data: usuario, error: userError } = await supabase
             .from('usuarios')
             .insert({
                 email: t.email,
-                password_hash: terapeutaPassword,
+                password_hash: passwordHash,
                 rol: 'TERAPEUTA',
-                activo: true
+                activo: true,
+                creado_por: admin.id
             })
             .select()
             .single();
 
         if (userError) {
-            console.error(`❌ Error creando usuario ${t.email}:`, userError.message);
+            console.error(`   ❌ Error creando usuario ${t.email}:`, userError.message);
             continue;
         }
 
@@ -213,74 +357,123 @@ async function seed() {
                 nombre: t.nombre,
                 especialidad: t.especialidad,
                 correo: t.email,
-                telefono: `3${Math.floor(Math.random() * 100000000 + 100000000)}`
+                telefono: t.telefono
             })
             .select()
             .single();
 
         if (terapError) {
-            console.error(`❌ Error creando terapeuta:`, terapError.message);
+            console.error(`   ❌ Error creando terapeuta:`, terapError.message);
             continue;
         }
 
-        terapeutas.push({ ...terapeuta, nombre: t.nombre, email: t.email });
-        console.log(`✅ Terapeuta: ${t.nombre}`);
+        terapeutas.push({ ...terapeuta, nombre: t.nombre, email: t.email, userId: usuario.id });
+        console.log(`   ✅ ${t.nombre} — ${t.especialidad} (${t.email})`);
     }
 
-    // 3. Crear Pacientes
+    if (terapeutas.length === 0) {
+        console.error('❌ No se crearon terapeutas. Abortando.');
+        return;
+    }
+
+    // ────────────────────────────────────
+    // 3. PACIENTES
+    // ────────────────────────────────────
     console.log('\n🧑‍🦳 Creando Pacientes...');
     const pacientes = [];
 
-    for (let i = 0; i < 12; i++) {
-        const esMujer = Math.random() > 0.5;
-        const nombre = esMujer ? random(NOMBRES_FEMENINOS) : random(NOMBRES_MASCULINOS);
-        const apellido1 = random(APELLIDOS);
-        const apellido2 = random(APELLIDOS);
-        const nombreCompleto = `${nombre} ${apellido1} ${apellido2}`;
-        const edad = generarEdad(60, 85);
-        const cedula = generarCedula();
-        const terapeuta = random(terapeutas);
+    // Distribución: 5 para el primer terapeuta, 4 para el segundo, 3 para el tercero
+    const distribucion = [5, 4, 3];
 
-        const { data: paciente, error: pacError } = await supabase
-            .from('pacientes')
-            .insert({
-                nombre: nombreCompleto,
-                identificacion: cedula,
-                edad: edad,
-                diagnostico: random(DIAGNOSTICOS),
-                activo: true
-            })
-            .select()
-            .single();
+    let pacienteIndex = 0;
+    for (let tIdx = 0; tIdx < terapeutas.length; tIdx++) {
+        const terapeuta = terapeutas[tIdx];
+        const numPacientes = distribucion[tIdx] || 3;
 
-        if (pacError) {
-            console.error(`❌ Error creando paciente:`, pacError.message);
-            continue;
+        for (let i = 0; i < numPacientes; i++) {
+            const esMujer = Math.random() > 0.5;
+            const nombre = esMujer ? random(NOMBRES_FEMENINOS) : random(NOMBRES_MASCULINOS);
+            const apellido1 = random(APELLIDOS);
+            const apellido2 = random(APELLIDOS);
+            const nombreCompleto = `${nombre} ${apellido1} ${apellido2}`;
+            const edad = generarEdad(60, 85);
+            const cedula = generarCedula();
+            // Todos activos excepto el último paciente (para verificar filtro)
+            const activo = pacienteIndex < 11;
+
+            const { data: paciente, error: pacError } = await supabase
+                .from('pacientes')
+                .insert({
+                    nombre: nombreCompleto,
+                    identificacion: cedula,
+                    edad,
+                    diagnostico: random(DIAGNOSTICOS),
+                    activo
+                })
+                .select()
+                .single();
+
+            if (pacError) {
+                console.error(`   ❌ Error creando paciente:`, pacError.message);
+                continue;
+            }
+
+            // Vincular paciente con terapeuta
+            const { error: vincError } = await supabase.from('terapeuta_paciente').insert({
+                id_terapeuta: terapeuta.id,
+                id_paciente: paciente.id,
+                estado: 'ACTIVO'
+            });
+
+            if (vincError) {
+                console.error(`   ❌ Error vinculando paciente:`, vincError.message);
+            }
+
+            pacientes.push({
+                ...paciente,
+                cedula,
+                id_terapeuta: terapeuta.id,
+                terapeuta_nombre: terapeuta.nombre,
+                terapeuta_email: terapeuta.email,
+                terapeuta_userId: terapeuta.userId
+            });
+            console.log(`   ✅ ${nombreCompleto} (${edad} años, ${activo ? 'activo' : 'inactivo'}) → ${terapeuta.nombre}`);
+            pacienteIndex++;
         }
-
-        // Vincular paciente con terapeuta
-        await supabase.from('terapeuta_paciente').insert({
-            id_terapeuta: terapeuta.id,
-            id_paciente: paciente.id,
-            estado: 'ACTIVO'
-        });
-
-        pacientes.push({ ...paciente, cedula });
-        console.log(`✅ Paciente: ${nombreCompleto} (${edad} años) → ${terapeuta.nombre}`);
     }
 
-    // 4. Crear Sesiones VR
+    // ────────────────────────────────────
+    // 4. SESIONES VR
+    // ────────────────────────────────────
     console.log('\n🎮 Creando Sesiones VR...');
     let vrSessionCount = 0;
+    let vrRevisadas = 0;
+    let vrPendientes = 0;
+    const sesionesCreadas = []; // Para auditoría
 
-    for (const paciente of pacientes) {
-        const numSesiones = Math.floor(Math.random() * 5) + 2; // 2-6 sesiones por paciente
+    const pacientesActivos = pacientes.filter(p => p.activo);
+
+    for (const paciente of pacientesActivos) {
+        const numSesiones = Math.floor(Math.random() * 4) + 3; // 3-6 sesiones por paciente
 
         for (let i = 0; i < numSesiones; i++) {
-            const fecha = randomDate(60); // Últimos 60 días
+            let fecha;
+            // Asegurar que hay sesiones "hoy" y "esta semana"
+            if (i === 0 && vrSessionCount < 4) {
+                fecha = todayDate(); // Primeras sesiones son de hoy
+            } else if (i === 1 && vrSessionCount < 10) {
+                fecha = thisWeekDate(); // Segundas son de esta semana
+            } else {
+                fecha = randomDate(60); // Resto son de los últimos 60 días
+            }
+
             const sessionData = generarSesionVR(paciente.identificacion, fecha);
 
             // Insertar sesión principal
+            const esRevisada = Math.random() > 0.4; // ~60% revisadas
+            const terapeutaRevisorId = esRevisada ? paciente.id_terapeuta : null;
+            const observaciones = esRevisada ? random(OBSERVACIONES_CLINICAS) : null;
+
             const { data: session, error: sessError } = await supabase
                 .from('vr_session_results')
                 .insert({
@@ -294,17 +487,23 @@ async function seed() {
                     summary_total_drops: sessionData.summary.totalDrops,
                     summary_total_releases: sessionData.summary.totalReleases,
                     summary_sets_completed: sessionData.summary.setsCompleted,
-                    raw_payload: sessionData
+                    raw_payload: sessionData,
+                    // Vincular con paciente
+                    id_paciente_vinculado: paciente.id,
+                    // Estado de revisión
+                    id_terapeuta_revisor: terapeutaRevisorId,
+                    observaciones_terapeuta: observaciones,
+                    estado_revision: esRevisada ? 'REVISADA' : 'PENDIENTE_REVISION'
                 })
                 .select()
                 .single();
 
             if (sessError) {
-                console.error(`❌ Error creando sesión VR:`, sessError.message);
+                console.error(`   ❌ Error creando sesión VR:`, sessError.message);
                 continue;
             }
 
-            // Insertar sets
+            // Insertar sets (sin columnas completion_*, con errors_count)
             for (const set of sessionData.sets) {
                 const { data: setResult, error: setError } = await supabase
                     .from('vr_set_results')
@@ -317,57 +516,165 @@ async function seed() {
                         blocked_count: set.blockedCount,
                         drops_count: set.dropsCount,
                         releases_count: set.releasesCount,
-                        completion_coffee_added: set.completion.coffeeAdded,
-                        completion_sugar_added: set.completion.sugarAdded,
-                        completion_cup_coffee_amount_01: set.completion.cupCoffeeAmount01
+                        errors_count: set.errorsCount
                     })
                     .select()
                     .single();
 
-                if (setError) continue;
+                if (setError) {
+                    console.error(`   ❌ Error insertando set:`, setError.message);
+                    continue;
+                }
 
-                // Insertar errores
+                // Insertar errores del set (con objeto_contexto)
                 for (const error of set.errors) {
                     await supabase.from('vr_set_errors').insert({
                         set_id: setResult.id,
                         code: error.code,
                         message: error.message,
-                        occurred_at: error.timestampIso
+                        occurred_at: error.timestampIso,
+                        objeto_contexto: error.context || null
                     });
                 }
-
-                // Table vr_set_returned_objects was removed from schema.
-                // Skipping returnedObjects insertion.
             }
 
+            if (esRevisada) {
+                vrRevisadas++;
+                sesionesCreadas.push({ sessionId: session.id, paciente, fecha: sessionData.startedAtIso });
+            } else {
+                vrPendientes++;
+            }
             vrSessionCount++;
         }
     }
-    console.log(`✅ Creadas ${vrSessionCount} sesiones VR`);
 
-    // 5. Crear eventos de auditoría
+    console.log(`   ✅ Sesiones VR creadas: ${vrSessionCount} (${vrRevisadas} revisadas, ${vrPendientes} pendientes)`);
+
+    // ────────────────────────────────────
+    // 5. EVENTOS DE AUDITORÍA
+    // ────────────────────────────────────
     console.log('\n📋 Creando eventos de auditoría...');
-    await supabase.from('auditoria').insert([
-        { id_usuario: admin.id, tipo_accion: 'SISTEMA_INICIADO', descripcion: 'Sistema inicializado correctamente' },
-        { id_usuario: admin.id, tipo_accion: 'SEED_EJECUTADO', descripcion: `Pacientes: ${pacientes.length}, Terapeutas: ${terapeutas.length}, Sesiones VR: ${vrSessionCount}` }
-    ]);
-    console.log('✅ Eventos de auditoría creados');
+    const eventosAuditoria = [];
 
-    // Resumen final
-    console.log('\n' + '='.repeat(50));
-    console.log('🎉 SEED COMPLETADO');
-    console.log('='.repeat(50));
+    // Evento: Superadmin creado
+    eventosAuditoria.push(crearEventoAuditoria(
+        admin.id, 'SUPERADMIN_CREATED', superadminEmail,
+        { id_usuario: admin.id, rol: 'SUPERADMIN' },
+        new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) // Hace 30 días
+    ));
+
+    // Eventos: Login exitoso del superadmin (varias veces)
+    for (let i = 0; i < 3; i++) {
+        eventosAuditoria.push(crearEventoAuditoria(
+            admin.id, 'LOGIN_SUCCESS', superadminEmail,
+            { metodo: 'email+password' },
+            randomDate(30)
+        ));
+    }
+
+    // Eventos: Terapeutas creados
+    for (const t of terapeutas) {
+        eventosAuditoria.push(crearEventoAuditoria(
+            admin.id, 'TERAPEUTA_CREATED', superadminEmail,
+            { id_terapeuta: t.id, nombre: t.nombre, correo: t.email },
+            new Date(Date.now() - 28 * 24 * 60 * 60 * 1000)
+        ));
+    }
+
+    // Eventos: Login de terapeutas
+    for (const t of terapeutas) {
+        const numLogins = Math.floor(Math.random() * 3) + 2;
+        for (let i = 0; i < numLogins; i++) {
+            eventosAuditoria.push(crearEventoAuditoria(
+                t.userId, 'LOGIN_SUCCESS', t.email,
+                { metodo: 'email+password' },
+                randomDate(14)
+            ));
+        }
+    }
+
+    // Eventos: Pacientes creados
+    for (const p of pacientes.slice(0, 6)) {
+        eventosAuditoria.push(crearEventoAuditoria(
+            p.terapeuta_userId, 'PATIENT_CREATED', p.terapeuta_email,
+            { id_paciente: p.id, nombre: p.nombre },
+            new Date(Date.now() - 25 * 24 * 60 * 60 * 1000)
+        ));
+    }
+
+    // Eventos: Pacientes asignados
+    for (const p of pacientes.slice(0, 4)) {
+        eventosAuditoria.push(crearEventoAuditoria(
+            admin.id, 'PATIENT_ASSIGNED', superadminEmail,
+            { id_paciente: p.id.toString(), terapeuta_nombre: p.terapeuta_nombre },
+            new Date(Date.now() - 24 * 24 * 60 * 60 * 1000)
+        ));
+    }
+
+    // Eventos: Sesiones VR revisadas
+    for (const s of sesionesCreadas.slice(0, 5)) {
+        eventosAuditoria.push(crearEventoAuditoria(
+            s.paciente.terapeuta_userId, 'SESSION_REVIEWED', s.paciente.terapeuta_email,
+            { id_sesion: s.sessionId, paciente: s.paciente.nombre },
+            randomDate(14)
+        ));
+    }
+
+    // Evento: Login fallido (para variedad)
+    eventosAuditoria.push(crearEventoAuditoria(
+        null, 'LOGIN_FAILED', 'desconocido@test.com',
+        { motivo: 'Credenciales inválidas' },
+        randomDate(7)
+    ));
+
+    // Evento: Paciente actualizado
+    if (pacientes.length > 0) {
+        eventosAuditoria.push(crearEventoAuditoria(
+            terapeutas[0].userId, 'PATIENT_UPDATED', terapeutas[0].email,
+            { id_paciente: pacientes[0].id, campo: 'diagnostico' },
+            randomDate(10)
+        ));
+    }
+
+    // Insertar todos los eventos
+    const { error: auditError } = await supabase.from('auditoria').insert(eventosAuditoria);
+    if (auditError) {
+        console.error('   ❌ Error creando auditoría:', auditError.message);
+    } else {
+        console.log(`   ✅ ${eventosAuditoria.length} eventos de auditoría creados`);
+    }
+
+    // ────────────────────────────────────
+    // 6. RESUMEN FINAL
+    // ────────────────────────────────────
+    console.log('\n' + '='.repeat(60));
+    console.log('🎉 SEED COMPLETADO EXITOSAMENTE');
+    console.log('='.repeat(60));
     console.log(`
 📊 RESUMEN:
-   👤 Superadmin: ${superadminEmail} / ${superadminPassword}
-   👨‍⚕️ Terapeutas: ${terapeutas.length} (contraseña: Terapeuta@123)
-      - carolina.mejia@cerebroalfuego.com
-      - alejandro.restrepo@cerebroalfuego.com
-      - valentina.castro@cerebroalfuego.com
-   🧑‍🦳 Pacientes: ${pacientes.length}
+   👤 Superadmin:
+      Email: ${superadminEmail}
+      Pass:  ${superadminPassword}
+
+   👨‍⚕️ Terapeutas (${terapeutas.length}):
+      ${terapeutasData.map(t => `${t.nombre} → ${t.email} / ${t.password}`).join('\n      ')}
+
+   🧑‍🦳 Pacientes: ${pacientes.length} (${pacientes.filter(p => p.activo).length} activos, ${pacientes.filter(p => !p.activo).length} inactivos)
+      Distribución: ${terapeutas.map((t, i) => `${t.nombre}: ${distribucion[i]}`).join(' | ')}
+
    🎮 Sesiones VR: ${vrSessionCount}
+      ✅ Revisadas: ${vrRevisadas}
+      ⏳ Pendientes: ${vrPendientes}
+
+   📋 Auditoría: ${eventosAuditoria.length} eventos
+
+   🔑 Para probar como terapeuta:
+      Email: julianmonj45@gmail.com
+      Pass:  Julianmed45@
 `);
 }
 
-seed().catch(console.error);
-
+seed().catch(err => {
+    console.error('❌ Error fatal:', err);
+    process.exit(1);
+});
