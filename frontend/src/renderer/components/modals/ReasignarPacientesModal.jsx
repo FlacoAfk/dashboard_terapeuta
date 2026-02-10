@@ -1,41 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Modal from '../ui/Modal';
-
-/**
- * Iconos SVG
- */
-const Icons = {
-    Warning: () => (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-        </svg>
-    ),
-    User: () => (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-        </svg>
-    ),
-    Info: () => (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-    ),
-    Check: () => (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-        </svg>
-    ),
-    ChevronDown: () => (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
-    ),
-    ChevronUp: () => (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-        </svg>
-    )
-};
+import { Icons } from '../ui/Icons';
 
 /**
  * Avatar con iniciales
@@ -72,13 +37,13 @@ const Avatar = ({ nombre, size = 'md' }) => {
  */
 const PatientRow = ({ patient, assignment, onAssign, therapists, isExpanded, onExpand }) => {
     const selectedTherapist = therapists.find(t => String(t.id_terapeuta) === String(assignment));
-    
+
     return (
         <div className={`border rounded-lg transition-all ${isExpanded ? 'border-blue-300 bg-blue-50/30' : 'border-gray-200 hover:border-gray-300 bg-white'}`}>
             {/* Fila principal */}
             <div className="flex items-center gap-4 p-4">
                 <Avatar nombre={patient.nombre} size="sm" />
-                
+
                 {/* Info del paciente */}
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
@@ -96,17 +61,16 @@ const PatientRow = ({ patient, assignment, onAssign, therapists, isExpanded, onE
                         {patient.edad && ` • ${patient.edad} años`}
                     </p>
                 </div>
-                
+
                 {/* Selector de terapeuta */}
                 <div className="flex-shrink-0 w-64">
                     <select
                         value={assignment || ''}
                         onChange={(e) => onAssign(e.target.value)}
-                        className={`w-full text-sm border rounded-lg px-4 py-2.5 transition-colors font-medium ${
-                            assignment 
-                                ? 'border-green-400 bg-green-50 text-green-800' 
+                        className={`w-full text-sm border rounded-lg px-4 py-2.5 transition-colors font-medium ${assignment
+                                ? 'border-green-400 bg-green-50 text-green-800'
                                 : 'border-gray-300 text-gray-600 bg-white'
-                        }`}
+                            }`}
                     >
                         <option value="">Seleccionar terapeuta...</option>
                         {therapists.map(t => (
@@ -117,7 +81,7 @@ const PatientRow = ({ patient, assignment, onAssign, therapists, isExpanded, onE
                     </select>
                 </div>
             </div>
-            
+
             {/* Panel expandido con información detallada */}
             {isExpanded && (
                 <div className="px-4 pb-4 pt-0">
@@ -149,7 +113,7 @@ const PatientRow = ({ patient, assignment, onAssign, therapists, isExpanded, onE
                                 </div>
                             </div>
                         </div>
-                        
+
                         {/* Información del terapeuta seleccionado */}
                         <div>
                             <h5 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
@@ -244,7 +208,7 @@ const ReasignarPacientesModal = ({
     };
 
     // Verificar que TODOS los pacientes tengan un terapeuta asignado válido
-    const allPatientsAssigned = patients.every(patient => 
+    const allPatientsAssigned = patients.every(patient =>
         manualAssignments[patient.id] && manualAssignments[patient.id] !== ''
     );
 
@@ -286,7 +250,7 @@ const ReasignarPacientesModal = ({
                         <Icons.Info />
                     </div>
                     <p className="text-sm text-blue-700">
-                        <strong>Tip:</strong> Haz clic en la flecha junto al nombre del paciente para ver información detallada 
+                        <strong>Tip:</strong> Haz clic en la flecha junto al nombre del paciente para ver información detallada
                         tanto del paciente como del terapeuta seleccionado.
                     </p>
                 </div>

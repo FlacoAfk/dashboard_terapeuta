@@ -2,6 +2,29 @@
 
 Todos los cambios notables de este proyecto serán documentados en este archivo.
 
+## [1.8.1] - 2026-02-09
+
+### ♻️ Refactorización Frontend
+
+- **Componentes Compartidos**
+  - Creación de librería centralizada de iconos (`Icons.jsx`) para eliminar duplicación de SVGs
+  - Implementación de `FormField.jsx` para estandarizar inputs en modales
+  - Refactorización masiva de 9+ archivos (`AdminLayout`, `TherapistLayout`, Modales) para usar estos componentes
+  - Reducción significativa de código duplicado y mejora en la mantenibilidad
+
+- **Mejoras de UX**
+  - **Scroll en Modales**: Solucionado desbordamiento en pantallas pequeñas (laptops) agregando scroll interno
+  - **Persistencia de Menú**: El estado del sidebar (colapsado/expandido) ahora se recuerda entre recargas
+  - **Columnas de Terapeutas**: Agregados campos "Especialidad" y "Teléfono" a la tabla de gestión
+  - **Paginación**: Selector de tamaño de página (10, 20, 50) agregado a tablas
+
+### 🐛 Correcciones
+
+- Corregido bug de login que impedía acceso en ciertas condiciones de red
+- Corregida lógica de filtrado de sesiones en Dashboard Terapeuta para usar el endpoint correcto
+
+---
+
 ## [1.8.0] - 2026-02-09
 
 ### ✨ Nuevas Funcionalidades

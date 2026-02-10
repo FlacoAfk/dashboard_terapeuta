@@ -49,6 +49,32 @@ const vrResultsService = {
     },
 
     /**
+     * Obtener sesiones VR filtradas por terapeuta (para dashboard)
+     * Usa /api/sessions que filtra por pacientes asignados al terapeuta
+     * @param {object} filters - Filtros opcionales (estado_revision, id_paciente, limit)
+     */
+    async getDashboardSessions(filters = {}) {
+        let endpoint = '/api/sessions';
+        const params = new URLSearchParams();
+
+        if (filters.estado_revision) {
+            params.append('estado_revision', filters.estado_revision);
+        }
+        if (filters.id_paciente) {
+            params.append('id_paciente', filters.id_paciente);
+        }
+        if (filters.limit) {
+            params.append('limit', filters.limit);
+        }
+
+        if (params.toString()) {
+            endpoint += '?' + params.toString();
+        }
+
+        return api.get(endpoint);
+    },
+
+    /**
      * Actualizar una sesión VR (observaciones, vinculación de paciente, etc.)
      * @param {string} sessionId - UUID de la sesión
      * @param {object} data - Datos a actualizar { observaciones, id_paciente }

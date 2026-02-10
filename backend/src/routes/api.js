@@ -748,6 +748,14 @@ router.get('/sessions', authenticateToken, requireTerapeuta, async (req, res) =>
 
         // TERAPEUTA: solo sesiones de sus pacientes asignados
         if (allowedPatientIds !== null) {
+            // Si no tiene pacientes asignados, devolver lista vacía directamente
+            if (allowedPatientIds.length === 0) {
+                return res.json({
+                    success: true,
+                    data: [],
+                    count: 0
+                });
+            }
             query = query.in('id_paciente_vinculado', allowedPatientIds);
         }
 

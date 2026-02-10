@@ -48,9 +48,15 @@ export const AuthProvider = ({ children }) => {
                     authService.removeToken();
                     setUser(null);
                 }
+            } else {
+                // Si el resultado no tiene la propiedad expected, asumir configurado
+                // para no bloquear al usuario en la pantalla de setup
+                setIsSetupConfigured(true);
             }
         } catch (error) {
             console.error('Error verificando setup:', error);
+            // En caso de error de red, asumir configurado para no bloquear
+            setIsSetupConfigured(true);
         }
     };
 
@@ -97,6 +103,15 @@ export const AuthProvider = ({ children }) => {
         setUser(null);
     };
 
+    /**
+     * Forzar el estado de setup como configurado
+     * Útil cuando SetupPage detecta que ya está configurado
+     * y necesita sincronizar el contexto antes de navegar
+     */
+    const forceSetupConfigured = () => {
+        setIsSetupConfigured(true);
+    };
+
     // Valor del contexto
     const value = {
         user,
@@ -104,6 +119,7 @@ export const AuthProvider = ({ children }) => {
         isAuthenticated: !!user,
         isSetupConfigured,
         checkSetupStatus, // Exponer para recargar tras setup exitoso
+        forceSetupConfigured,
         login,
         logout,
         checkAuth

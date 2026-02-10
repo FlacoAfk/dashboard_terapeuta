@@ -5,37 +5,7 @@ import patientService from '../../services/patientService';
 import vrResultsService from '../../services/vrResultsService';
 import VRSessionCard from '../../components/ui/VRSessionCard';
 import EditarPacienteModal from '../../components/modals/EditarPacienteModal';
-
-/**
- * Iconos SVG
- */
-const Icons = {
-    Back: () => (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-        </svg>
-    ),
-    Edit: () => (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-        </svg>
-    ),
-    ChevronLeft: () => (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-        </svg>
-    ),
-    ChevronRight: () => (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-        </svg>
-    ),
-    VR: () => (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-        </svg>
-    )
-};
+import { Icons } from '../../components/ui/Icons';
 
 /**
  * Avatar con iniciales
@@ -258,8 +228,8 @@ const DetallePaciente = () => {
                                                 key={page}
                                                 onClick={() => setCurrentPage(page)}
                                                 className={`w-10 h-10 rounded-lg font-medium transition-colors ${currentPage === page
-                                                        ? 'bg-[#2AA87E] text-white'
-                                                        : 'hover:bg-gray-100 text-gray-700'
+                                                    ? 'bg-[#2AA87E] text-white'
+                                                    : 'hover:bg-gray-100 text-gray-700'
                                                     }`}
                                             >
                                                 {page}

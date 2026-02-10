@@ -13,6 +13,7 @@ import { useAuth } from '../context/AuthContext';
  */
 const SetupPage = () => {
     const navigate = useNavigate();
+    const { checkSetupStatus, forceSetupConfigured } = useAuth();
     const [loading, setLoading] = useState(true);
     const [setupComplete, setSetupComplete] = useState(false);
     const [formData, setFormData] = useState({
@@ -42,6 +43,14 @@ const SetupPage = () => {
         };
         checkSetup();
     }, []);
+
+    // Auto-redirigir al login cuando se detecta que el setup ya está completo
+    useEffect(() => {
+        if (setupComplete) {
+            forceSetupConfigured();
+            navigate('/login', { replace: true });
+        }
+    }, [setupComplete, navigate, forceSetupConfigured]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -82,7 +91,7 @@ const SetupPage = () => {
         return Object.keys(newErrors).length === 0;
     };
 
-    const { checkSetupStatus } = useAuth(); // Importar checkSetupStatus del contexto
+
 
     /**
      * Maneja la creación del superadministrador
@@ -102,11 +111,12 @@ const SetupPage = () => {
             });
 
             if (result.success) {
-                // Actualizar el estado global de setup
-                await checkSetupStatus();
+                // Sincronizar contexto global inmediatamente
+                forceSetupConfigured();
                 
                 // Redirigir al login con mensaje de éxito
                 navigate('/login', { 
+                    replace: true,
                     state: { message: '¡Superadministrador creado exitosamente! Inicie sesión.' }
                 });
             } else {
@@ -128,13 +138,12 @@ const SetupPage = () => {
         try {
             const result = await authService.checkSetup();
             
-            
             // Usar 'configured' que viene de la API, o ver si result.setupComplete (backup)
             const isConfigured = result.configured || result.setupComplete;
 
             if (isConfigured) {
-                await checkSetupStatus(); // Actualizar contexto
-                navigate('/login');
+                forceSetupConfigured(); // Sincronizar contexto inmediatamente
+                navigate('/login', { replace: true });
             } else {
                 setErrors({ 
                     submit: 'No se detecta ningún Superadministrador registrado en el sistema. Debe completar este formulario primero.' 
@@ -157,7 +166,13 @@ const SetupPage = () => {
         );
     }
 
-    // Si ya existe superadmin, redirigir al login
+    // Manejar clic en "Ir al Login" desde la vista de sistema configurado
+    const handleGoToLogin = () => {
+        forceSetupConfigured(); // Sincronizar contexto global inmediatamente
+        navigate('/login', { replace: true });
+    };
+
+    // Si ya existe superadmin, mostrar mensaje breve y redirigir
     if (setupComplete) {
         return (
             <div className="min-h-screen bg-[#C5CDE8] flex flex-col items-center justify-center p-4">
@@ -168,10 +183,10 @@ const SetupPage = () => {
                         </svg>
                     </div>
                     <h2 className="text-2xl font-bold text-gray-800 mb-2">Sistema Configurado</h2>
-                    <p className="text-gray-600 mb-6">
-                        El superadministrador ya fue creado. Use sus credenciales para iniciar sesión.
+                    <p className="text-gray-600 mb-4">
+                        El superadministrador ya fue creado. Redirigiendo al login...
                     </p>
-                    <Button onClick={() => navigate('/login')}>
+                    <Button onClick={handleGoToLogin}>
                         Ir al Login
                     </Button>
                 </div>

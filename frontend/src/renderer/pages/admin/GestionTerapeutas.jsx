@@ -3,53 +3,7 @@ import AdminLayout from '../../components/layout/AdminLayout';
 import { CrearTerapeutaModal, EditarTerapeutaModal, ReasignarPacientesModal, ResetPasswordModal } from '../../components/modals';
 import therapistService from '../../services/therapistService';
 import { showAlert, showConfirm, showToast } from '../../utils/alertUtils';
-
-/**
- * Iconos SVG
- */
-const Icons = {
-    Search: () => (
-        <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-        </svg>
-    ),
-    Plus: () => (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-        </svg>
-    ),
-    Edit: () => (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-        </svg>
-    ),
-
-    Power: () => (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636a9 9 0 010 12.728m0 0l-2.829-2.829m2.829 2.829L21 21M15.536 8.464a5 5 0 010 7.072m0 0l-2.829-2.829m-4.243 2.829a4.978 4.978 0 01-1.414-2.83m-1.414 5.658a9 9 0 01-2.167-9.238m7.824 2.167a1 1 0 111.414 1.414m-1.414-1.414L3 3m8.293 8.293l1.414 1.414" />
-        </svg>
-    ),
-    ChevronLeft: () => (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-        </svg>
-    ),
-    ChevronRight: () => (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-        </svg>
-    ),
-    Refresh: () => (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-        </svg>
-    ),
-    Key: () => (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-        </svg>
-    )
-};
+import { Icons } from '../../components/ui/Icons';
 
 /**
  * Badge de estado
@@ -95,7 +49,12 @@ const GestionTerapeutas = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [actionLoading, setActionLoading] = useState(false);
-    const itemsPerPage = 5;
+    const [itemsPerPage, setItemsPerPage] = useState(10);
+
+    // Reset pagination when items per page changes
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [itemsPerPage]);
 
     // Estados de los modales
     const [showCrearModal, setShowCrearModal] = useState(false);
@@ -117,7 +76,7 @@ const GestionTerapeutas = () => {
             const result = await therapistService.getAll();
             if (result.success) {
                 setTherapists(result.data);
-                
+
                 // RF-SEG-02 (Safety): Check for inactive therapists with patients
                 const inconsistent = result.data.find(t => !t.activo && t.pacientes > 0);
                 if (inconsistent) {
@@ -227,7 +186,7 @@ const GestionTerapeutas = () => {
 
     const handleToggleStatus = async (therapist) => {
         const action = therapist.activo ? 'desactivar' : 'activar';
-        
+
         // Confirmación antes de cualquier acción
         const confirmed = await showConfirm(
             `¿${action.charAt(0).toUpperCase() + action.slice(1)} terapeuta?`,
@@ -379,6 +338,8 @@ const GestionTerapeutas = () => {
                                     <tr className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider border-b border-gray-200">
                                         <th className="pb-4 pr-4">Nombre</th>
                                         <th className="pb-4 pr-4">Correo</th>
+                                        <th className="pb-4 pr-4">Especialidad</th>
+                                        <th className="pb-4 pr-4">Teléfono</th>
                                         <th className="pb-4 pr-4 text-center">Pacientes</th>
                                         <th className="pb-4 pr-4">Estado</th>
                                         <th className="pb-4 text-center">Acciones</th>
@@ -392,6 +353,12 @@ const GestionTerapeutas = () => {
                                             </td>
                                             <td className="py-4 pr-4 text-gray-500">
                                                 {therapist.correo}
+                                            </td>
+                                            <td className="py-4 pr-4 text-gray-500">
+                                                {therapist.especialidad || '-'}
+                                            </td>
+                                            <td className="py-4 pr-4 text-gray-500">
+                                                {therapist.telefono || '-'}
                                             </td>
                                             <td className="py-4 pr-4 text-center">
                                                 <span className="font-medium text-gray-900">
@@ -434,9 +401,20 @@ const GestionTerapeutas = () => {
 
                     {/* Pagination */}
                     <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t border-gray-200">
-                        <span className="text-sm text-gray-500 text-center sm:text-left">
-                            Mostrando {Math.min(startIndex + 1, filteredTherapists.length)} - {Math.min(startIndex + itemsPerPage, filteredTherapists.length)} de {filteredTherapists.length}
-                        </span>
+                        <div className="flex flex-col sm:flex-row items-center gap-4">
+                            <span className="text-sm text-gray-500">
+                                Mostrando {Math.min(startIndex + 1, filteredTherapists.length)} - {Math.min(startIndex + itemsPerPage, filteredTherapists.length)} de {filteredTherapists.length}
+                            </span>
+                            <select
+                                value={itemsPerPage}
+                                onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                                className="text-sm border-gray-300 rounded-lg focus:ring-[#F76C6C] focus:border-[#F76C6C] p-1.5 bg-white shadow-sm"
+                            >
+                                <option value={10}>10 por página</option>
+                                <option value={20}>20 por página</option>
+                                <option value={50}>50 por página</option>
+                            </select>
+                        </div>
                         <div className="flex items-center gap-1 sm:gap-2 flex-wrap justify-center">
                             <button
                                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
@@ -489,10 +467,10 @@ const GestionTerapeutas = () => {
             <ReasignarPacientesModal
                 isOpen={showReasignarModal}
                 onClose={() => {
-                   // If this was a forced opening (inactive but has patients), verify if it's resolved?
-                   // The user requested "obligatoriamente".
-                   // For now, simpler to allow close but it will popup again on refresh.
-                   // Or we can check if the condition persists.
+                    // If this was a forced opening (inactive but has patients), verify if it's resolved?
+                    // The user requested "obligatoriamente".
+                    // For now, simpler to allow close but it will popup again on refresh.
+                    // Or we can check if the condition persists.
                     setShowReasignarModal(false);
                     setSelectedTherapist(null);
                 }}
@@ -500,7 +478,7 @@ const GestionTerapeutas = () => {
                 therapist={selectedTherapist}
                 patients={therapistPatients}
                 availableTherapists={availableTherapists}
-                // Force blocking if it's a safety check? (Optional enhancement)
+            // Force blocking if it's a safety check? (Optional enhancement)
             />
 
             <ResetPasswordModal
