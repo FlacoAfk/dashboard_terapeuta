@@ -8,3 +8,6 @@ dist
 coverage
 tests
 *.md
+scripts/
+test_output.txt
+migrar_y_sembrar.ps1

@@ -38,6 +38,7 @@ const AUDIT_TYPES = {
     PATIENT_REASSIGNED: 'PATIENT_REASSIGNED',
 
     // Sesiones
+    SESSION_CREATED: 'SESSION_CREATED',
     SESSION_STARTED: 'SESSION_STARTED',
     SESSION_FINISHED: 'SESSION_FINISHED',
     SESSION_ABANDONED: 'SESSION_ABANDONED',
@@ -70,6 +71,7 @@ const AUDIT_TYPE_LABELS = {
     PATIENT_DELETED: 'Paciente eliminado',
     PATIENT_ASSIGNED: 'Paciente asignado',
     PATIENT_REASSIGNED: 'Paciente reasignado',
+    SESSION_CREATED: 'Sesión de receta creada',
     SESSION_STARTED: 'Sesión iniciada',
     SESSION_FINISHED: 'Sesión finalizada',
     SESSION_ABANDONED: 'Sesión abandonada',

@@ -24,6 +24,7 @@ const authRoutes = require('./routes/auth');
 const usuariosRoutes = require('./routes/usuarios');
 const auditRoutes = require('./routes/audit');
 const vrResultsRoutes = require('./routes/vrResults');
+const sessionsRoutes = require('./routes/sessions');
 
 // Crear aplicación Express
 const app = express();
@@ -90,6 +91,8 @@ app.get('/health', (req, res) => {
 });
 
 // Rutas de la API
+// IMPORTANTE: /api/sessions debe montarse ANTES de /api para evitar conflictos de rutas
+app.use('/api/sessions', sessionsRoutes); // Sesiones de receta VR (nuevo: HU-01)
 app.use('/api', apiRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/usuarios', usuariosRoutes);
@@ -124,7 +127,8 @@ app.listen(PORT, async () => {
   console.log(`📚 Docs:      http://localhost:${PORT}/api-docs`);
   console.log('----------------------------------------');
   console.log('📁 Rutas VR Unity:');
-  console.log(`   - VR Results: /api/v1/session-results`);
+  console.log(`   - VR Results:      /api/v1/session-results`);
+  console.log(`   - Recipe Sessions: /api/sessions (POST, GET by-token)`);
   console.log('========================================');
 
   // Verificar conexión a Supabase

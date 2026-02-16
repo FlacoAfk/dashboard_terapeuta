@@ -110,3 +110,14 @@ CREATE TABLE public.vr_set_results (
   CONSTRAINT vr_set_results_pkey PRIMARY KEY (id),
   CONSTRAINT vr_set_results_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.vr_session_results(id)
 );
+CREATE TABLE public.sessions (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  participant_code character varying(50) NOT NULL,
+  recipe_id character varying(100) NOT NULL DEFAULT 'tinto'::character varying,
+  status character varying(20) NOT NULL DEFAULT 'ACTIVE'::character varying CHECK (status::text = ANY (ARRAY['CREATED'::character varying, 'ACTIVE'::character varying, 'FINISHED'::character varying]::text[])),
+  start_token character varying(8) NOT NULL UNIQUE,
+  created_by integer NOT NULL,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT sessions_pkey PRIMARY KEY (id),
+  CONSTRAINT sessions_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.terapeutas(id)
+);

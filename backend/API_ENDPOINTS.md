@@ -541,6 +541,98 @@ Actualiza evaluación del desempeño, observaciones clínicas y/o vinculación d
 
 ---
 
+## 5b. Sesiones de Receta VR (`/api/sessions`) — HU-01
+
+> **Flujo:** Terapeuta elige receta → crea sesión ACTIVE → genera start_token → VR consulta por token → carga receta.
+> Estos endpoints son **distintos** a los de la sección 5 (dashboard de resultados VR).
+
+### `POST /api/sessions`
+Crea una sesión de receta para que el VR cargue dinámicamente.
+- **Seguridad:** 🟡 JWT + `requireTerapeuta`
+- **Regla de acceso:** Solo terapeutas pueden crear sesiones. Solo puede existir **una sesión ACTIVE por participante**.
+- **Entradas (Body):**
+  ```json
+  {
+    "participant_code": "JPPE1234",
+    "recipe_id": "tinto"
+  }
+  ```
+- **Salidas (201):**
+  ```json
+  {
+    "success": true,
+    "session_id": "uuid",
+    "start_token": "ABC123",
+    "recipe_id": "tinto",
+    "status": "ACTIVE"
+  }
+  ```
+- **Errores:**
+  - 400 `MISSING_FIELD` — Campos requeridos faltantes
+  - 403 `NOT_THERAPIST` — Usuario no es terapeuta
+  - 409 `SESSION_ALREADY_ACTIVE` — Ya existe sesión activa para el participante (devuelve `existing_token`)
+
+### `GET /api/sessions/by-token/{token}`
+Consulta sesión activa por start_token (para que Unity/VR cargue la receta).
+- **Seguridad:** 🔵 API Key — Header `X-API-Key`
+- **Headers:** `X-API-Key: <UNITY_API_KEY>`
+- **Parámetro URL:** `token` — Token de inicio (6 caracteres alfanuméricos)
+- **Salidas (200):**
+  ```json
+  {
+    "session_id": "uuid",
+    "participant_code": "JPPE1234",
+    "recipe_id": "tinto",
+    "status": "ACTIVE"
+  }
+  ```
+- **Errores:**
+  - 400 `MISSING_TOKEN` — Token no proporcionado
+  - 401 `UNAUTHORIZED` — API Key inválida
+  - 404 `SESSION_NOT_FOUND` — No hay sesión activa con ese token
+
+### `PUT /api/sessions/{id}/finish`
+Marca una sesión como FINISHED (cuando el VR termina la receta).
+- **Seguridad:** 🔵 API Key — Header `X-API-Key`
+- **Headers:** `X-API-Key: <UNITY_API_KEY>`
+- **Parámetro URL:** `id` — UUID de la sesión
+- **Salidas (200):**
+  ```json
+  {
+    "success": true,
+    "session_id": "uuid",
+    "status": "FINISHED"
+  }
+  ```
+- **Errores:** 401 `UNAUTHORIZED`, 404 `NOT_FOUND`
+
+### `GET /api/sessions/recipe-sessions`
+Lista sesiones de receta creadas por el terapeuta.
+- **Seguridad:** 🟡 JWT + `requireTerapeuta`
+- **Regla de acceso:** TERAPEUTA solo ve sus sesiones. SUPERADMIN ve todas.
+- **Entradas (Query):** `status` (CREATED|ACTIVE|FINISHED), `participant_code` (string)
+- **Salidas (200):**
+  ```json
+  {
+    "success": true,
+    "data": [
+      {
+        "id": "uuid",
+        "participant_code": "JPPE1234",
+        "recipe_id": "tinto",
+        "status": "ACTIVE",
+        "start_token": "ABC123",
+        "created_by": 1,
+        "created_at": "2026-02-14T..."
+      }
+    ],
+    "count": 1
+  }
+  ```
+- **Errores:** 401
+
+---
+
 ## 6. Resultados VR / Unity (`/api/v1`)
 
 ### `POST /api/v1/session-results`
