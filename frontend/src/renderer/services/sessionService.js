@@ -46,13 +46,23 @@ const sessionService = {
     },
 
     /**
-     * Obtener las recetas disponibles (hardcoded por ahora, luego vendrá de BD)
+     * Obtener las recetas disponibles organizadas por dificultad
      * @returns {Array} - Lista de recetas disponibles
      */
     getAvailableRecipes() {
         return [
-            { id: 'tinto', name: 'Tinto (Café)', description: 'Preparación de café tinto colombiano' }
-            // Se agregarán más recetas en el futuro
+            // Nivel Fácil (3–5 ingredientes)
+            { id: 'tinto',               name: 'Tinto',                       difficulty: 'facil',      ingredients_range: '3-5' },
+            { id: 'cafe_con_leche',      name: 'Café con leche',              difficulty: 'facil',      ingredients_range: '3-5' },
+            { id: 'macchiato',           name: 'Macchiato / Café manchado',    difficulty: 'facil',      ingredients_range: '3-5' },
+            // Nivel Intermedio (6–10 ingredientes)
+            { id: 'arepa_con_huevo',     name: 'Arepa con huevo',             difficulty: 'intermedio', ingredients_range: '6-10' },
+            { id: 'panqueques_con_frutas', name: 'Panqueques con frutas',     difficulty: 'intermedio', ingredients_range: '6-10' },
+            { id: 'avena_con_toppings',  name: 'Avena caliente con toppings', difficulty: 'intermedio', ingredients_range: '6-10' },
+            // Nivel Difícil (11–15 ingredientes)
+            { id: 'arroz_con_pollo',     name: 'Arroz con pollo',             difficulty: 'dificil',    ingredients_range: '11-15' },
+            { id: 'spaghetti_bolognesa', name: 'Spaghetti a la boloñesa',     difficulty: 'dificil',    ingredients_range: '11-15' },
+            { id: 'sancocho_de_res',     name: 'Sancocho de res',             difficulty: 'dificil',    ingredients_range: '11-15' }
         ];
     }
 };

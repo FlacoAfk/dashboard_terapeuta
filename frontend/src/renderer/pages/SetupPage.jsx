@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Logo from '../components/ui/Logo';
 import Button from '../components/ui/Button';
-import Input from '../components/ui/Input';
 import PasswordStrengthIndicator, { validatePassword } from '../components/ui/PasswordStrengthIndicator';
 import authService from '../services/authService';
 import { useAuth } from '../context/AuthContext';
@@ -13,7 +12,7 @@ import { useAuth } from '../context/AuthContext';
  */
 const SetupPage = () => {
     const navigate = useNavigate();
-    const { checkSetupStatus, forceSetupConfigured } = useAuth();
+    const { forceSetupConfigured } = useAuth();
     const [loading, setLoading] = useState(true);
     const [setupComplete, setSetupComplete] = useState(false);
     const [formData, setFormData] = useState({

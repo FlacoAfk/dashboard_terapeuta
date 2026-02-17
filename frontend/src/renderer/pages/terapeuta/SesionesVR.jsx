@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import vrResultsService from '../../services/vrResultsService';
 import patientService from '../../services/patientService';
 import VRSessionCard from '../../components/ui/VRSessionCard';
+import CrearSesionVRModal from '../../components/modals/CrearSesionVRModal';
 import { Icons } from '../../components/ui/Icons';
 
 /**
@@ -59,6 +60,7 @@ const SesionesVR = () => {
     const [filterActividad, setFilterActividad] = useState('todos');
     const [searchTerm, setSearchTerm] = useState('');
     const [sortOrder, setSortOrder] = useState('recientes'); // recientes, antiguos
+    const [showCrearSesion, setShowCrearSesion] = useState(false);
 
     // Paginación
     const [currentPage, setCurrentPage] = useState(1);
@@ -211,7 +213,20 @@ const SesionesVR = () => {
 
     const getActivityLabel = (activityId) => {
         if (!activityId) return activityId;
+        const labels = {
+            'tinto': '☕ Tinto',
+            'cafe_con_leche': '☕ Café con leche',
+            'macchiato': '☕ Macchiato',
+            'arepa_con_huevo': '🍳 Arepa con huevo',
+            'panqueques_con_frutas': '🥞 Panqueques con frutas',
+            'avena_con_toppings': '🥣 Avena con toppings',
+            'arroz_con_pollo': '🍚 Arroz con pollo',
+            'spaghetti_bolognesa': '🍝 Spaghetti a la boloñesa',
+            'sancocho_de_res': '🍲 Sancocho de res'
+        };
         const lower = activityId.toLowerCase();
+        if (labels[lower]) return labels[lower];
+        // Fallback legacy
         if (lower.includes('tinto')) return '☕ Tinto';
         if (lower.includes('cafe')) return '☕ Café';
         if (lower.includes('huevos')) return '🍳 Huevos';
@@ -235,15 +250,32 @@ const SesionesVR = () => {
         <TherapistLayout>
             <div className="space-y-6">
                 {/* Header */}
-                <div>
-                    <h1 className="text-xl lg:text-2xl font-bold text-gray-900 flex items-center gap-3">
-                        <span className="text-2xl">🎮</span>
-                        Sesiones VR
-                    </h1>
-                    <p className="text-gray-500 mt-1 text-sm">
-                        Resumen de todas las sesiones del videojuego de tus pacientes. Solo puedes agregar observaciones clínicas.
-                    </p>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div>
+                        <h1 className="text-xl lg:text-2xl font-bold text-gray-900 flex items-center gap-3">
+                            <span className="text-2xl">🎮</span>
+                            Sesiones VR
+                        </h1>
+                        <p className="text-gray-500 mt-1 text-sm">
+                            Resumen de todas las sesiones del videojuego de tus pacientes. Solo puedes agregar observaciones clínicas.
+                        </p>
+                    </div>
+                    <button
+                        onClick={() => setShowCrearSesion(true)}
+                        className="inline-flex items-center gap-2 bg-[#2AA87E] hover:bg-[#238c68] text-white font-medium px-4 py-2.5 rounded-lg transition-colors shadow-sm self-start sm:self-auto"
+                    >
+                        <Icons.Plus />
+                        Nueva Sesión VR
+                    </button>
                 </div>
+
+                {/* Modal crear sesión */}
+                <CrearSesionVRModal
+                    isOpen={showCrearSesion}
+                    onClose={() => setShowCrearSesion(false)}
+                    onSuccess={() => fetchData()}
+                    patients={patients}
+                />
 
                 {/* Estadísticas rápidas */}
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">

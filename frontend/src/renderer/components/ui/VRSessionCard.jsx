@@ -165,6 +165,19 @@ const getActivityDisplayName = (activityId) => {
     if (!activityId) return 'Actividad VR';
 
     const names = {
+        // Nivel Fácil
+        'tinto': 'Preparar Tinto',
+        'cafe_con_leche': 'Preparar Café con leche',
+        'macchiato': 'Preparar Macchiato',
+        // Nivel Intermedio
+        'arepa_con_huevo': 'Preparar Arepa con huevo',
+        'panqueques_con_frutas': 'Preparar Panqueques con frutas',
+        'avena_con_toppings': 'Preparar Avena con toppings',
+        // Nivel Difícil
+        'arroz_con_pollo': 'Preparar Arroz con pollo',
+        'spaghetti_bolognesa': 'Preparar Spaghetti a la boloñesa',
+        'sancocho_de_res': 'Preparar Sancocho de res',
+        // Legacy IDs (por compatibilidad con sesiones antiguas)
         'tinto_easy_01': 'Preparar Tinto - Fácil',
         'tinto_easy_02': 'Preparar Tinto - Fácil',
         'tinto_medium_01': 'Preparar Tinto - Intermedio',
@@ -194,6 +207,14 @@ const getActivityDisplayName = (activityId) => {
 const getDifficultyInfo = (activityId) => {
     if (!activityId) return { label: 'N/A', color: 'gray', icon: '⚪' };
     const lower = activityId.toLowerCase();
+    // Nuevos recipe_id oficiales: dificultad por receta
+    const easyRecipes = ['tinto', 'cafe_con_leche', 'macchiato'];
+    const mediumRecipes = ['arepa_con_huevo', 'panqueques_con_frutas', 'avena_con_toppings'];
+    const hardRecipes = ['arroz_con_pollo', 'spaghetti_bolognesa', 'sancocho_de_res'];
+    if (easyRecipes.includes(lower)) return { label: 'Fácil', color: 'green', icon: '🟢' };
+    if (mediumRecipes.includes(lower)) return { label: 'Intermedio', color: 'yellow', icon: '🟡' };
+    if (hardRecipes.includes(lower)) return { label: 'Difícil', color: 'red', icon: '🔴' };
+    // Fallback para legacy IDs
     if (lower.includes('easy')) return { label: 'Fácil', color: 'green', icon: '🟢' };
     if (lower.includes('medium')) return { label: 'Intermedio', color: 'yellow', icon: '🟡' };
     if (lower.includes('hard')) return { label: 'Difícil', color: 'red', icon: '🔴' };
@@ -203,6 +224,19 @@ const getDifficultyInfo = (activityId) => {
 const getRecipeName = (activityId) => {
     if (!activityId) return 'Actividad VR';
     const lower = activityId.toLowerCase();
+    const recipeNames = {
+        'tinto': 'Tinto',
+        'cafe_con_leche': 'Café con leche',
+        'macchiato': 'Macchiato',
+        'arepa_con_huevo': 'Arepa con huevo',
+        'panqueques_con_frutas': 'Panqueques con frutas',
+        'avena_con_toppings': 'Avena con toppings',
+        'arroz_con_pollo': 'Arroz con pollo',
+        'spaghetti_bolognesa': 'Spaghetti a la boloñesa',
+        'sancocho_de_res': 'Sancocho de res'
+    };
+    if (recipeNames[lower]) return recipeNames[lower];
+    // Fallback legacy
     if (lower.includes('tinto')) return 'Tinto';
     if (lower.includes('cafe')) return 'Café';
     if (lower.includes('huevos')) return 'Huevos';

@@ -92,30 +92,6 @@ const vrResultsService = {
         const mins = Math.floor(seconds / 60);
         const secs = Math.floor(seconds % 60);
         return `${mins}:${secs.toString().padStart(2, '0')}`;
-    },
-
-    /**
-     * Obtener nombre legible del set
-     * @param {string} setName - Nombre del set en inglés
-     */
-    getSetDisplayName(setName) {
-        const names = {
-            'Ingredients': 'Ingredientes',
-            'Utensils': 'Utensilios',
-            'Preparation': 'Preparación',
-            'Organization': 'Organización'
-        };
-        return names[setName] || setName;
-    },
-
-    /**
-     * Calcular color de indicador según errores
-     * @param {number} errors - Número de errores
-     */
-    getErrorIndicatorColor(errors) {
-        if (errors === 0) return 'text-green-500';
-        if (errors <= 2) return 'text-yellow-500';
-        return 'text-red-500';
     }
 };
 

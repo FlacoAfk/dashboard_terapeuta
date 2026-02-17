@@ -30,6 +30,17 @@ CREATE TABLE public.password_reset_tokens (
   CONSTRAINT password_reset_tokens_pkey PRIMARY KEY (id),
   CONSTRAINT password_reset_tokens_id_usuario_fkey FOREIGN KEY (id_usuario) REFERENCES public.usuarios(id)
 );
+CREATE TABLE public.sessions (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  participant_code character varying NOT NULL,
+  recipe_id character varying NOT NULL DEFAULT 'tinto'::character varying CHECK (recipe_id::text = ANY (ARRAY['tinto'::character varying, 'cafe_con_leche'::character varying, 'macchiato'::character varying, 'arepa_con_huevo'::character varying, 'panqueques_con_frutas'::character varying, 'avena_con_toppings'::character varying, 'arroz_con_pollo'::character varying, 'spaghetti_bolognesa'::character varying, 'sancocho_de_res'::character varying]::text[])),
+  status character varying NOT NULL DEFAULT 'ACTIVE'::character varying CHECK (status::text = ANY (ARRAY['CREATED'::character varying, 'ACTIVE'::character varying, 'FINISHED'::character varying]::text[])),
+  start_token character varying NOT NULL UNIQUE,
+  created_by integer NOT NULL,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT sessions_pkey PRIMARY KEY (id),
+  CONSTRAINT sessions_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.terapeutas(id)
+);
 CREATE TABLE public.terapeuta_paciente (
   id integer NOT NULL DEFAULT nextval('terapeuta_paciente_id_seq'::regclass),
   id_terapeuta integer NOT NULL,
@@ -109,15 +120,4 @@ CREATE TABLE public.vr_set_results (
   errors_count integer DEFAULT 0,
   CONSTRAINT vr_set_results_pkey PRIMARY KEY (id),
   CONSTRAINT vr_set_results_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.vr_session_results(id)
-);
-CREATE TABLE public.sessions (
-  id uuid NOT NULL DEFAULT gen_random_uuid(),
-  participant_code character varying(50) NOT NULL,
-  recipe_id character varying(100) NOT NULL DEFAULT 'tinto'::character varying,
-  status character varying(20) NOT NULL DEFAULT 'ACTIVE'::character varying CHECK (status::text = ANY (ARRAY['CREATED'::character varying, 'ACTIVE'::character varying, 'FINISHED'::character varying]::text[])),
-  start_token character varying(8) NOT NULL UNIQUE,
-  created_by integer NOT NULL,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT sessions_pkey PRIMARY KEY (id),
-  CONSTRAINT sessions_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.terapeutas(id)
 );

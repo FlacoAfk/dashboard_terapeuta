@@ -16,36 +16,7 @@
 const express = require('express');
 const router = express.Router();
 const { supabase } = require('../config/supabase');
-const { authenticateToken, requireTerapeuta } = require('../middleware/authMiddleware');
-
-/**
- * Middleware para validar API Key de Unity
- */
-const validateUnityApiKey = (req, res, next) => {
-    const apiKey = req.headers['x-api-key'];
-    const expectedKey = process.env.UNITY_API_KEY;
-
-    if (!expectedKey) {
-        console.error('[Security] UNITY_API_KEY no está configurada en .env');
-        return res.status(500).json({
-            error: {
-                code: 'CONFIG_ERROR',
-                message: 'API Key no configurada en el servidor'
-            }
-        });
-    }
-
-    if (!apiKey || apiKey !== expectedKey) {
-        return res.status(401).json({
-            error: {
-                code: 'UNAUTHORIZED',
-                message: 'API Key inválida o no proporcionada'
-            }
-        });
-    }
-
-    next();
-};
+const { authenticateToken, requireTerapeuta, validateUnityApiKey } = require('../middleware/authMiddleware');
 
 /**
  * @swagger

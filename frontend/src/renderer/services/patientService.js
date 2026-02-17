@@ -35,7 +35,6 @@ const patientService = {
             const response = await api.get(endpoint);
             return { success: true, data: response.data || [] };
         } catch (error) {
-            console.error('[PatientService] getAll error:', error);
             return { success: false, error: error.message };
         }
     },
@@ -49,7 +48,6 @@ const patientService = {
             const response = await api.get(`/api/patients/${id}`);
             return { success: true, data: response.data };
         } catch (error) {
-            console.error('[PatientService] getById error:', error);
             return { success: false, error: error.message };
         }
     },
@@ -68,7 +66,6 @@ const patientService = {
             });
             return { success: true, data: response.data };
         } catch (error) {
-            console.error('[PatientService] create error:', error);
             return { success: false, error: error.message };
         }
     },
@@ -94,7 +91,6 @@ const patientService = {
             const response = await api.put(`/api/patients/${id}`, updateData);
             return { success: true, data: response.data };
         } catch (error) {
-            console.error('[PatientService] update error:', error);
             return { success: false, error: error.message };
         }
     },
@@ -108,7 +104,6 @@ const patientService = {
             const response = await api.put(`/api/patients/${id}/toggle-status`, {});
             return { success: true, data: response.data };
         } catch (error) {
-            console.error('[PatientService] toggleStatus error:', error);
             return { success: false, error: error.message };
         }
     },
@@ -137,7 +132,6 @@ const patientService = {
                 }
             };
         } catch (error) {
-            console.error('[PatientService] getStats error:', error);
             return { success: false, error: error.message };
         }
     }

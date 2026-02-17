@@ -9,6 +9,7 @@ import { GestionTerapeutas, Auditoria } from './pages/admin';
 import { DashboardTerapeuta, DetallePaciente, SesionesVR } from './pages/terapeuta';
 import ConfiguracionTerapeuta from './pages/terapeuta/ConfiguracionTerapeuta';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { SessionProvider } from './context/SessionContext';
 
 /**
  * Componente de ruta protegida
@@ -126,6 +127,7 @@ const SetupGuard = ({ children }) => {
 function App() {
     return (
         <AuthProvider>
+            <SessionProvider>
             <Routes>
                 {/* Todas las rutas envueltas en SetupGuard */}
                 <Route path="/*" element={
@@ -211,6 +213,7 @@ function App() {
                     </SetupGuard>
                 } />
             </Routes>
+        </SessionProvider>
         </AuthProvider>
     );
 }

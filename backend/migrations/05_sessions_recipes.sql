@@ -18,7 +18,12 @@ CREATE TABLE IF NOT EXISTS public.sessions (
     participant_code VARCHAR(50) NOT NULL,
 
     -- Receta a cargar en VR (ej: "tinto")
-    recipe_id VARCHAR(100) NOT NULL DEFAULT 'tinto',
+    recipe_id VARCHAR(100) NOT NULL DEFAULT 'tinto'
+        CHECK (recipe_id IN (
+            'tinto', 'cafe_con_leche', 'macchiato',
+            'arepa_con_huevo', 'panqueques_con_frutas', 'avena_con_toppings',
+            'arroz_con_pollo', 'spaghetti_bolognesa', 'sancocho_de_res'
+        )),
 
     -- Estado de la sesión
     status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE'

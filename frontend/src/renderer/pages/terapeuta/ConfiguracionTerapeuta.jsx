@@ -11,7 +11,7 @@ import { showConfirm, showToast, showAlert } from '../../utils/alertUtils';
  * Página de Configuración / Perfil del Terapeuta
  */
 const ConfiguracionTerapeuta = () => {
-    const { user, login } = useAuth(); // Usamos login para actualizar el estado del usuario si es necesario (o un reload)
+    const { user } = useAuth();
     const [showEditModal, setShowEditModal] = useState(false);
     const [showVerifyModal, setShowVerifyModal] = useState(false);
 

@@ -80,7 +80,6 @@ const GestionTerapeutas = () => {
                 // RF-SEG-02 (Safety): Check for inactive therapists with patients
                 const inconsistent = result.data.find(t => !t.activo && t.pacientes > 0);
                 if (inconsistent) {
-                    console.warn('Inconsistency found: Inactive therapist with patients', inconsistent);
                     // Trigger reassignment flow immediately
                     try {
                         const patientsResult = await therapistService.getPatients(inconsistent.id_terapeuta || inconsistent.id);
@@ -90,7 +89,7 @@ const GestionTerapeutas = () => {
                             setShowReasignarModal(true);
                         }
                     } catch (err) {
-                        console.error('Error auto-fetching patients:', err);
+                        // Error handled by caller
                     }
                 }
 

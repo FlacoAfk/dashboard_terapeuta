@@ -15,8 +15,29 @@ const express = require('express');
 const router = express.Router();
 const crypto = require('crypto');
 const { supabase } = require('../config/supabase');
-const { authenticateToken, requireTerapeuta } = require('../middleware/authMiddleware');
+const { authenticateToken, requireTerapeuta, validateUnityApiKey } = require('../middleware/authMiddleware');
 const { auditFromRequest, AUDIT_TYPES } = require('../utils/auditHelper');
+
+/**
+ * Catálogo de recetas válidas del juego VR.
+ * Estos IDs son los únicos aceptados por el videojuego.
+ */
+const VALID_RECIPES = [
+    // Nivel Fácil (3–5 ingredientes)
+    { id: 'tinto',               name: 'Tinto',                    difficulty: 'facil',       ingredients_range: '3-5' },
+    { id: 'cafe_con_leche',      name: 'Café con leche',           difficulty: 'facil',       ingredients_range: '3-5' },
+    { id: 'macchiato',           name: 'Macchiato / Café manchado', difficulty: 'facil',       ingredients_range: '3-5' },
+    // Nivel Intermedio (6–10 ingredientes)
+    { id: 'arepa_con_huevo',     name: 'Arepa con huevo',          difficulty: 'intermedio',  ingredients_range: '6-10' },
+    { id: 'panqueques_con_frutas', name: 'Panqueques con frutas',  difficulty: 'intermedio',  ingredients_range: '6-10' },
+    { id: 'avena_con_toppings',  name: 'Avena caliente con toppings', difficulty: 'intermedio', ingredients_range: '6-10' },
+    // Nivel Difícil (11–15 ingredientes)
+    { id: 'arroz_con_pollo',     name: 'Arroz con pollo',          difficulty: 'dificil',     ingredients_range: '11-15' },
+    { id: 'spaghetti_bolognesa', name: 'Spaghetti a la boloñesa',  difficulty: 'dificil',     ingredients_range: '11-15' },
+    { id: 'sancocho_de_res',     name: 'Sancocho de res',          difficulty: 'dificil',     ingredients_range: '11-15' }
+];
+
+const VALID_RECIPE_IDS = VALID_RECIPES.map(r => r.id);
 
 /**
  * Genera un token alfanumérico único de 6 caracteres (mayúsculas + dígitos).
@@ -31,29 +52,6 @@ function generateStartToken() {
     }
     return token;
 }
-
-/**
- * Middleware para validar API Key de Unity
- */
-const validateUnityApiKey = (req, res, next) => {
-    const apiKey = req.headers['x-api-key'];
-    const expectedKey = process.env.UNITY_API_KEY;
-
-    if (!expectedKey) {
-        console.error('[Security] UNITY_API_KEY no está configurada en .env');
-        return res.status(500).json({
-            error: { code: 'CONFIG_ERROR', message: 'API Key no configurada en el servidor' }
-        });
-    }
-
-    if (!apiKey || apiKey !== expectedKey) {
-        return res.status(401).json({
-            error: { code: 'UNAUTHORIZED', message: 'API Key inválida o no proporcionada' }
-        });
-    }
-
-    next();
-};
 
 // ========================================
 // POST / → Crear sesión de receta (Panel Terapeuta)
@@ -137,6 +135,15 @@ router.post('/', authenticateToken, requireTerapeuta, async (req, res) => {
                 success: false,
                 error: 'recipe_id es requerido',
                 code: 'MISSING_FIELD'
+            });
+        }
+
+        if (!VALID_RECIPE_IDS.includes(recipe_id.trim())) {
+            return res.status(400).json({
+                success: false,
+                error: `recipe_id inválido. Valores permitidos: ${VALID_RECIPE_IDS.join(', ')}`,
+                code: 'INVALID_RECIPE',
+                valid_recipes: VALID_RECIPE_IDS
             });
         }
 
@@ -481,4 +488,40 @@ router.get('/recipe-sessions', authenticateToken, requireTerapeuta, async (req, 
     }
 });
 
+// ========================================
+// GET /recipes → Lista de recetas disponibles (Panel Terapeuta)
+// ========================================
+
+/**
+ * @swagger
+ * /api/sessions/recipes:
+ *   get:
+ *     summary: Obtener catálogo de recetas disponibles
+ *     tags: [Sesiones Receta VR]
+ *     security:
+ *       - bearerAuth: []
+ *     description: |
+ *       Retorna la lista de recetas válidas que el juego VR soporta,
+ *       organizadas por nivel de dificultad.
+ *     responses:
+ *       200:
+ *         description: Lista de recetas disponibles
+ */
+router.get('/recipes', authenticateToken, requireTerapeuta, (req, res) => {
+    const grouped = {
+        facil: VALID_RECIPES.filter(r => r.difficulty === 'facil'),
+        intermedio: VALID_RECIPES.filter(r => r.difficulty === 'intermedio'),
+        dificil: VALID_RECIPES.filter(r => r.difficulty === 'dificil')
+    };
+
+    res.json({
+        success: true,
+        data: VALID_RECIPES,
+        grouped,
+        count: VALID_RECIPES.length
+    });
+});
+
 module.exports = router;
+module.exports.VALID_RECIPES = VALID_RECIPES;
+module.exports.VALID_RECIPE_IDS = VALID_RECIPE_IDS;

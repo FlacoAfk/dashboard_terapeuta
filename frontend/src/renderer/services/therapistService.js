@@ -36,7 +36,6 @@ const therapistService = {
                 }));
             return { success: true, data: therapists };
         } catch (error) {
-            console.error('[TherapistService] getAll error:', error);
             return { success: false, error: error.message };
         }
     },
@@ -56,7 +55,6 @@ const therapistService = {
             });
             return { success: true, data: response.data };
         } catch (error) {
-            console.error('[TherapistService] create error:', error);
             return { success: false, error: error.message };
         }
     },
@@ -75,7 +73,6 @@ const therapistService = {
             });
             return { success: true, data: response.data };
         } catch (error) {
-            console.error('[TherapistService] update error:', error);
             return { success: false, error: error.message };
         }
     },
@@ -89,7 +86,6 @@ const therapistService = {
             const response = await api.put(`/api/usuarios/${id}/toggle-estado`);
             return { success: true, data: response.data };
         } catch (error) {
-            console.error('[TherapistService] toggleStatus error:', error);
             return { success: false, error: error.message };
         }
     },
@@ -105,7 +101,6 @@ const therapistService = {
             });
             return { success: true, data: response.data };
         } catch (error) {
-            console.error('[TherapistService] resetPassword error:', error);
             return { success: false, error: error.message };
         }
     },
@@ -129,7 +124,6 @@ const therapistService = {
                 }));
             return { success: true, data: patients };
         } catch (error) {
-            console.error('[TherapistService] getPatients error:', error);
             return { success: false, error: error.message };
         }
     },
@@ -149,7 +143,6 @@ const therapistService = {
             }
             return { success: true, data: results };
         } catch (error) {
-            console.error('[TherapistService] reassignPatients error:', error);
             return { success: false, error: error.message };
         }
     }

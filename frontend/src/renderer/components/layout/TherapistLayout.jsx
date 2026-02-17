@@ -3,6 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { showConfirm } from '../../utils/alertUtils';
 import { Icons } from '../ui/Icons';
+import FloatingSessionClock from '../ui/FloatingSessionClock';
 
 /**
  * Item de navegación en el sidebar - responsivo
@@ -24,30 +25,7 @@ const NavItem = ({ to, icon: Icon, label, end, collapsed }) => (
     </NavLink>
 );
 
-/**
- * Componente de reloj en tiempo real
- */
-const LiveClock = () => {
-    const [time, setTime] = useState(new Date());
 
-    useEffect(() => {
-        const timer = setInterval(() => setTime(new Date()), 1000);
-        return () => clearInterval(timer);
-    }, []);
-
-    return (
-        <div className="hidden md:flex items-center gap-2 bg-white/10 rounded-full px-3 py-1.5">
-            <Icons.Clock />
-            <span className="text-white text-sm font-medium">
-                {time.toLocaleTimeString('es-CO', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    second: '2-digit'
-                })}
-            </span>
-        </div>
-    );
-};
 
 /**
  * Layout del Panel del Terapeuta
@@ -103,9 +81,8 @@ const TherapistLayout = ({ children }) => {
                         </span>
                     </div>
 
-                    {/* Right side - Clock and User */}
+                    {/* Right side - User */}
                     <div className="flex items-center gap-4">
-                        <LiveClock />
 
                         {/* User Menu */}
                         <div className="relative">
@@ -210,6 +187,9 @@ const TherapistLayout = ({ children }) => {
                     {children}
                 </main>
             </div>
+
+            {/* Reloj flotante — solo visible cuando hay sesión VR activa */}
+            <FloatingSessionClock />
         </div>
     );
 };

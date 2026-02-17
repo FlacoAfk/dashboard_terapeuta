@@ -26,35 +26,6 @@ const auditService = {
             const response = await api.get(endpoint);
             return { success: true, data: response.data || [], pagination: response.pagination };
         } catch (error) {
-            console.error('[AuditService] getEvents error:', error);
-            return { success: false, error: error.message };
-        }
-    },
-
-    /**
-     * Obtener tipos de eventos disponibles
-     * GET /api/audit/types
-     */
-    async getEventTypes() {
-        try {
-            const response = await api.get('/api/audit/types');
-            return { success: true, data: response.data };
-        } catch (error) {
-            console.error('[AuditService] getEventTypes error:', error);
-            return { success: false, error: error.message };
-        }
-    },
-
-    /**
-     * Obtener eventos de un usuario específico
-     * GET /api/audit/user/:id
-     */
-    async getEventsByUser(userId, limit = 50) {
-        try {
-            const response = await api.get(`/api/audit/user/${userId}?limit=${limit}`);
-            return { success: true, data: response.data };
-        } catch (error) {
-            console.error('[AuditService] getEventsByUser error:', error);
             return { success: false, error: error.message };
         }
     },
@@ -135,8 +106,6 @@ const auditService = {
 
             return true;
         } catch (error) {
-            console.error('[AuditService] Error downloading CSV:', error);
-
             // Fallback: Try opening in new window
             try {
                 const csvContent = this.generateCSV(events);
@@ -144,7 +113,6 @@ const auditService = {
                 window.open(dataUri);
                 return true;
             } catch (fallbackError) {
-                console.error('[AuditService] Fallback also failed:', fallbackError);
                 throw error;
             }
         }

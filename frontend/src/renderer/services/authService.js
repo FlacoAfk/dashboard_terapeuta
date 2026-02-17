@@ -118,13 +118,6 @@ const authService = {
     },
 
     /**
-     * Verificar si hay un token válido
-     */
-    isAuthenticated() {
-        return !!this.getToken();
-    },
-
-    /**
      * Solicitar código de verificación para cambio de contraseña
      * @returns {Promise<{success: boolean, message?: string, error?: string}>}
      */

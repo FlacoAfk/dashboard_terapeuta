@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import Modal from '../ui/Modal';
 import authService from '../../services/authService';
-import { showToast, showAlert } from '../../utils/alertUtils';
+import { showToast } from '../../utils/alertUtils';
 import { Icons } from '../ui/Icons';
 
 const VerificarCorreoModal = ({ isOpen, onClose, email }) => {
