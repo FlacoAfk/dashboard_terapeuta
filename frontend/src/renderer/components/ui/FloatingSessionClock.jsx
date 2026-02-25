@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useSession } from '../../context/SessionContext';
 import { Icons } from './Icons';
+import sessionService from '../../services/sessionService';
+import { showToast } from '../../utils/alertUtils';
 
 /**
  * Formatea milisegundos a HH:MM:SS
@@ -22,6 +24,7 @@ const FloatingSessionClock = () => {
     const { activeSession, dismissSession } = useSession();
     const [elapsed, setElapsed] = useState(0);
     const [minimized, setMinimized] = useState(false);
+    const [closing, setClosing] = useState(false);
 
     useEffect(() => {
         if (!activeSession) {
@@ -37,6 +40,23 @@ const FloatingSessionClock = () => {
     }, [activeSession]);
 
     if (!activeSession) return null;
+
+    const isWaitingStart = activeSession.status === 'CREATED';
+
+    const handleCloseSession = async () => {
+        if (!activeSession?.session_id || closing) return;
+
+        setClosing(true);
+        try {
+            await sessionService.closeSession(activeSession.session_id);
+            dismissSession();
+            showToast('success', 'Sesión finalizada desde el dashboard');
+        } catch (error) {
+            showToast('error', error.message || 'No se pudo finalizar la sesión');
+        } finally {
+            setClosing(false);
+        }
+    };
 
     // Vista minimizada: solo un pill pequeño
     if (minimized) {
@@ -78,20 +98,15 @@ const FloatingSessionClock = () => {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                             </svg>
                         </button>
-                        <button
-                            onClick={dismissSession}
-                            className="p-1 text-white/70 hover:text-white hover:bg-white/10 rounded transition-colors"
-                            title="Descartar"
-                        >
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </button>
                     </div>
                 </div>
 
                 {/* Body */}
                 <div className="px-4 py-3 space-y-2.5">
+                    <div className={`text-xs font-medium rounded-lg px-2.5 py-1 ${isWaitingStart ? 'bg-amber-50 text-amber-700 border border-amber-100' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'}`}>
+                        {isWaitingStart ? 'Esperando inicio en VR' : 'Iniciada por VR'}
+                    </div>
+
                     {/* Timer */}
                     <div className="flex items-center justify-center gap-2">
                         <Icons.Clock />
@@ -119,6 +134,14 @@ const FloatingSessionClock = () => {
                             </div>
                         )}
                     </div>
+
+                    <button
+                        onClick={handleCloseSession}
+                        disabled={closing}
+                        className="w-full mt-1 inline-flex items-center justify-center gap-2 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-lg py-2 text-xs font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                        {closing ? 'Finalizando...' : 'Finalizar sesión'}
+                    </button>
                 </div>
             </div>
         </div>

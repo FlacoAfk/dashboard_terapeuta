@@ -207,6 +207,15 @@ npm run dev:backend
 npm run dev:frontend
 ```
 
+### Frontend Web (Vercel / navegador)
+
+```bash
+# Desde la raíz
+npm run dev:web         # Solo frontend web
+npm run dev:web:full    # Backend + frontend web
+npm run build:web       # Build web para despliegue
+```
+
 ### Desarrollo Simultáneo
 
 ```bash

@@ -3,9 +3,19 @@ import TherapistLayout from '../../components/layout/TherapistLayout';
 import { useAuth } from '../../context/AuthContext';
 import vrResultsService from '../../services/vrResultsService';
 import patientService from '../../services/patientService';
+import sessionService from '../../services/sessionService';
 import VRSessionCard from '../../components/ui/VRSessionCard';
 import CrearSesionVRModal from '../../components/modals/CrearSesionVRModal';
 import { Icons } from '../../components/ui/Icons';
+import { showToast } from '../../utils/alertUtils';
+import { useSession } from '../../context/SessionContext';
+import MiniStat from './components/MiniStat';
+import RecipeSessionsPanel from './components/RecipeSessionsPanel';
+import {
+    DEFAULT_RECIPES,
+    findRecipeById,
+    getActivityLabelWithEmoji
+} from '../../constants/recipes';
 
 /**
  * ========================================
@@ -19,37 +29,15 @@ import { Icons } from '../../components/ui/Icons';
  */
 
 // ========================================
-// Indicadores rápidos
-// ========================================
-
-const MiniStat = ({ icon, value, label, color = 'gray' }) => {
-    const colorMap = {
-        green: 'bg-green-50 text-green-700 border-green-200',
-        blue: 'bg-blue-50 text-blue-700 border-blue-200',
-        orange: 'bg-orange-50 text-orange-700 border-orange-200',
-        red: 'bg-red-50 text-red-700 border-red-200',
-        purple: 'bg-purple-50 text-purple-700 border-purple-200',
-        gray: 'bg-gray-50 text-gray-700 border-gray-200'
-    };
-
-    return (
-        <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${colorMap[color]}`}>
-            <span className="text-xl">{icon}</span>
-            <div>
-                <p className="text-2xl font-bold leading-none">{value}</p>
-                <p className="text-xs opacity-75 mt-0.5">{label}</p>
-            </div>
-        </div>
-    );
-};
-
-// ========================================
 // Componente principal
 // ========================================
 
 const SesionesVR = () => {
     const { user } = useAuth();
+    const { syncSession } = useSession();
     const [sessions, setSessions] = useState([]);
+    const [recipeSessions, setRecipeSessions] = useState([]);
+    const [recipes, setRecipes] = useState(DEFAULT_RECIPES);
     const [patients, setPatients] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -61,23 +49,71 @@ const SesionesVR = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [sortOrder, setSortOrder] = useState('recientes'); // recientes, antiguos
     const [showCrearSesion, setShowCrearSesion] = useState(false);
+    const [recipeExpanded, setRecipeExpanded] = useState(true);
 
     // Paginación
     const [currentPage, setCurrentPage] = useState(1);
     const sessionsPerPage = 10;
+    const [recipeCurrentPage, setRecipeCurrentPage] = useState(1);
+    const recipeSessionsPerPage = 4;
+    const RECIPE_SESSION_POLL_MS = 10000;
 
     useEffect(() => {
         fetchData();
     }, []);
 
-    const fetchData = async () => {
+    const formatDateTime = (value) => {
+        if (!value) return '—';
+        return new Date(value).toLocaleString('es-CO', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    };
+
+    const getRemainingMinutes = (createdAt) => {
+        const elapsedMs = Date.now() - new Date(createdAt).getTime();
+        const remainingMs = Math.max(0, (30 * 60 * 1000) - elapsedMs);
+        return Math.ceil(remainingMs / (60 * 1000));
+    };
+
+    const getRecipeName = (recipeId) => {
+        const recipe = findRecipeById(recipeId, recipes);
+        return recipe?.name || recipeId;
+    };
+
+    const syncRecipeSessionState = (nextRecipeSessions = []) => {
+        setRecipeSessions(nextRecipeSessions);
+
+        const currentSession = nextRecipeSessions.find(s => ['CREATED', 'ACTIVE'].includes(s.status));
+        if (currentSession) {
+            syncSession({
+                session_id: currentSession.id,
+                start_token: currentSession.start_token,
+                recipe_id: currentSession.recipe_id,
+                recipe_name: getRecipeName(currentSession.recipe_id),
+                participant_code: currentSession.participant_code,
+                status: currentSession.status,
+                started_at: new Date(currentSession.created_at).getTime()
+            });
+        } else {
+            syncSession(null);
+        }
+    };
+
+    const fetchData = async (options = {}) => {
+        const forceRefresh = options.forceRefresh === true;
         setLoading(true);
         setError('');
         try {
             // Cargar sesiones y pacientes en paralelo
-            const [sessionsResult, patientsResult] = await Promise.all([
+            const [sessionsResult, patientsResult, recipeSessionsResult, recipesResult] = await Promise.all([
                 vrResultsService.getDashboardSessions({ limit: 500 }),
-                patientService.getAll()
+                patientService.getAll(),
+                sessionService.getRecipeSessions({ refresh: forceRefresh }),
+                sessionService.loadAvailableRecipes({ forceRefresh })
             ]);
 
             if (sessionsResult.success) {
@@ -102,12 +138,87 @@ const SesionesVR = () => {
             if (patientsResult.success) {
                 setPatients(patientsResult.data || []);
             }
+
+            if (recipeSessionsResult.success) {
+                syncRecipeSessionState(recipeSessionsResult.data || []);
+            }
+
+            if (Array.isArray(recipesResult) && recipesResult.length > 0) {
+                setRecipes(recipesResult);
+            }
         } catch (err) {
             setError('Error al cargar datos de sesiones VR');
             console.error('[SesionesVR] Error:', err);
         } finally {
             setLoading(false);
         }
+    };
+
+    const inProgressRecipeSession = useMemo(
+        () => recipeSessions.find(s => ['CREATED', 'ACTIVE'].includes(s.status)) || null,
+        [recipeSessions]
+    );
+
+    useEffect(() => {
+        if (!inProgressRecipeSession) return;
+
+        let cancelled = false;
+
+        const pollRecipeSessions = async () => {
+            try {
+                const recipeSessionsResult = await sessionService.getRecipeSessions({ refresh: true });
+                if (!cancelled && recipeSessionsResult.success) {
+                    syncRecipeSessionState(recipeSessionsResult.data || []);
+                }
+            } catch (pollError) {
+                console.error('[SesionesVR] Poll recipe sessions error:', pollError);
+            }
+        };
+
+        const timerId = setInterval(pollRecipeSessions, RECIPE_SESSION_POLL_MS);
+
+        return () => {
+            cancelled = true;
+            clearInterval(timerId);
+        };
+    }, [inProgressRecipeSession, RECIPE_SESSION_POLL_MS]);
+
+    const totalRecipePages = Math.max(1, Math.ceil(recipeSessions.length / recipeSessionsPerPage));
+    const paginatedRecipeSessions = recipeSessions.slice(
+        (recipeCurrentPage - 1) * recipeSessionsPerPage,
+        recipeCurrentPage * recipeSessionsPerPage
+    );
+
+    useEffect(() => {
+        if (recipeCurrentPage > totalRecipePages) {
+            setRecipeCurrentPage(totalRecipePages);
+        }
+    }, [recipeCurrentPage, totalRecipePages]);
+
+    const handleCloseRecipeSession = async (sessionId) => {
+        try {
+            await sessionService.closeSession(sessionId);
+            showToast('success', 'Sesión finalizada correctamente');
+            await fetchData({ forceRefresh: true });
+        } catch (err) {
+            showToast('error', err.message || 'No se pudo finalizar la sesión');
+        }
+    };
+
+    const getSessionStatusBadge = (status) => {
+        if (status === 'CREATED') {
+            return 'bg-amber-100 text-amber-700';
+        }
+        if (status === 'ACTIVE') {
+            return 'bg-emerald-100 text-emerald-700';
+        }
+        return 'bg-gray-100 text-gray-600';
+    };
+
+    const getSessionStatusLabel = (status) => {
+        if (status === 'CREATED') return 'En espera de inicio';
+        if (status === 'ACTIVE') return 'Iniciada por VR';
+        return 'Finalizada';
     };
 
     // Estadísticas calculadas
@@ -212,27 +323,7 @@ const SesionesVR = () => {
     };
 
     const getActivityLabel = (activityId) => {
-        if (!activityId) return activityId;
-        const labels = {
-            'tinto': '☕ Tinto',
-            'cafe_con_leche': '☕ Café con leche',
-            'macchiato': '☕ Macchiato',
-            'arepa_con_huevo': '🍳 Arepa con huevo',
-            'panqueques_con_frutas': '🥞 Panqueques con frutas',
-            'avena_con_toppings': '🥣 Avena con toppings',
-            'arroz_con_pollo': '🍚 Arroz con pollo',
-            'spaghetti_bolognesa': '🍝 Spaghetti a la boloñesa',
-            'sancocho_de_res': '🍲 Sancocho de res'
-        };
-        const lower = activityId.toLowerCase();
-        if (labels[lower]) return labels[lower];
-        // Fallback legacy
-        if (lower.includes('tinto')) return '☕ Tinto';
-        if (lower.includes('cafe')) return '☕ Café';
-        if (lower.includes('huevos')) return '🍳 Huevos';
-        if (lower.includes('arepa')) return '🫓 Arepa';
-        if (lower.includes('agua_panela')) return '🍯 Agua de Panela';
-        return activityId;
+        return getActivityLabelWithEmoji(activityId, recipes);
     };
 
     const clearFilters = () => {
@@ -241,6 +332,12 @@ const SesionesVR = () => {
         setFilterActividad('todos');
         setSearchTerm('');
         setSortOrder('recientes');
+    };
+
+    const handleRefreshAll = async () => {
+        setCurrentPage(1);
+        setRecipeCurrentPage(1);
+        await fetchData();
     };
 
     const hasActiveFilters = filterEstado !== 'todos' || filterPaciente !== 'todos' ||
@@ -260,21 +357,35 @@ const SesionesVR = () => {
                             Resumen de todas las sesiones del videojuego de tus pacientes. Solo puedes agregar observaciones clínicas.
                         </p>
                     </div>
-                    <button
-                        onClick={() => setShowCrearSesion(true)}
-                        className="inline-flex items-center gap-2 bg-[#2AA87E] hover:bg-[#238c68] text-white font-medium px-4 py-2.5 rounded-lg transition-colors shadow-sm self-start sm:self-auto"
-                    >
-                        <Icons.Plus />
-                        Nueva Sesión VR
-                    </button>
+                    <div className="flex items-center gap-2 self-start sm:self-auto">
+                        <button
+                            onClick={handleRefreshAll}
+                            disabled={loading}
+                            className="inline-flex items-center justify-center w-11 h-11 rounded-lg border border-gray-300 bg-white text-gray-600 hover:text-[#2AA87E] hover:border-[#2AA87E]/40 hover:bg-[#2AA87E]/5 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            title="Recargar todas las peticiones de sesiones VR"
+                        >
+                            <Icons.Refresh />
+                        </button>
+
+                        <button
+                            onClick={() => setShowCrearSesion(true)}
+                            disabled={!!inProgressRecipeSession}
+                            title={inProgressRecipeSession ? 'Hay una sesión en curso. Finalízala para crear una nueva.' : undefined}
+                            className="inline-flex items-center gap-2 bg-[#2AA87E] hover:bg-[#238c68] text-white font-medium px-4 py-2.5 rounded-lg transition-colors shadow-sm"
+                        >
+                            <Icons.Plus />
+                            Nueva Sesión VR
+                        </button>
+                    </div>
                 </div>
 
                 {/* Modal crear sesión */}
                 <CrearSesionVRModal
                     isOpen={showCrearSesion}
                     onClose={() => setShowCrearSesion(false)}
-                    onSuccess={() => fetchData()}
+                    onSuccess={() => fetchData({ forceRefresh: true })}
                     patients={patients}
+                    blockedSession={inProgressRecipeSession}
                 />
 
                 {/* Estadísticas rápidas */}
@@ -285,6 +396,25 @@ const SesionesVR = () => {
                     <MiniStat icon="⏳" value={stats.pendientes} label="Pendientes de revisión" color="orange" />
                     <MiniStat icon="✅" value={stats.revisadas} label="Revisadas" color="green" />
                 </div>
+
+                <RecipeSessionsPanel
+                    Icons={Icons}
+                    recipeExpanded={recipeExpanded}
+                    setRecipeExpanded={setRecipeExpanded}
+                    recipeSessions={recipeSessions}
+                    inProgressRecipeSession={inProgressRecipeSession}
+                    getRemainingMinutes={getRemainingMinutes}
+                    handleCloseRecipeSession={handleCloseRecipeSession}
+                    paginatedRecipeSessions={paginatedRecipeSessions}
+                    getRecipeName={getRecipeName}
+                    getSessionStatusBadge={getSessionStatusBadge}
+                    getSessionStatusLabel={getSessionStatusLabel}
+                    formatDateTime={formatDateTime}
+                    totalRecipePages={totalRecipePages}
+                    recipeCurrentPage={recipeCurrentPage}
+                    setRecipeCurrentPage={setRecipeCurrentPage}
+                    recipeSessionsPerPage={recipeSessionsPerPage}
+                />
 
                 {/* Panel de filtros */}
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
@@ -390,15 +520,6 @@ const SesionesVR = () => {
                                 </button>
                             )}
 
-                            {/* Refrescar */}
-                            <button
-                                onClick={fetchData}
-                                disabled={loading}
-                                className="p-2 text-gray-500 hover:text-[#2AA87E] hover:bg-[#2AA87E]/10 rounded-lg transition-colors ml-auto"
-                                title="Recargar sesiones"
-                            >
-                                <Icons.Refresh />
-                            </button>
                         </div>
                     </div>
                 </div>

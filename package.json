@@ -10,9 +10,20 @@
   "scripts": {
     "dev:backend": "npm run dev --workspace=backend",
     "dev:frontend": "npm run dev --workspace=frontend",
+    "dev:web": "npm run dev:web --workspace=frontend",
+    "dev:web:full": "concurrently \"npm run dev:backend\" \"npm run dev:web\"",
     "start:backend": "npm start --workspace=backend",
     "start:frontend": "npm start --workspace=frontend",
     "build:frontend": "npm run build --workspace=frontend",
+    "build:web": "npm run build:web --workspace=frontend",
+    "build:backend": "npm run build --workspace=backend --if-present",
+    "build": "npm run build:web && npm run build:frontend",
+    "lint:backend": "npm run lint --workspace=backend",
+    "lint:frontend": "npm run lint --workspace=frontend",
+    "lint": "npm run lint:backend && npm run lint:frontend",
+    "test:backend": "npm run test --workspace=backend",
+    "test:frontend": "npm run test --workspace=frontend",
+    "test": "npm run test:backend && npm run test:frontend",
     "install:all": "npm install",
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\""
   },
@@ -27,9 +38,9 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "concurrently": "^9.1.2"
-  },
-  "dependencies": {
-    "lts": "^2.0.0"
+    "concurrently": "^9.1.2",
+    "eslint": "^9.24.0",
+    "globals": "^16.3.0",
+    "prettier": "^3.5.3"
   }
 }

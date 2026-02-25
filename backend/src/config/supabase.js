@@ -10,10 +10,10 @@
 const { createClient } = require('@supabase/supabase-js');
 
 // Validar variables de entorno requeridas
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabaseUrl = process.env.SUPABASE_URL || 'https://example.supabase.co';
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'test-service-role-key';
 
-if (!supabaseUrl || !supabaseKey) {
+if ((!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) && process.env.NODE_ENV !== 'test') {
     console.error('❌ ERROR: SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY son requeridas en el archivo .env');
     console.error('   Por favor configura las variables de entorno antes de iniciar el servidor.');
     process.exit(1);
@@ -34,7 +34,7 @@ console.log('📦 Modo: Supabase SDK');
  */
 async function testConnection() {
     try {
-        const { data, error } = await supabase
+        const { error } = await supabase
             .from('usuarios')
             .select('id')
             .limit(1);

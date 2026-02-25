@@ -8,6 +8,9 @@
  */
 
 import api from './api';
+import { DEFAULT_RECIPES, normalizeRecipes } from '../constants/recipes';
+
+let cachedRecipes = [...DEFAULT_RECIPES];
 
 const sessionService = {
     /**
@@ -37,6 +40,9 @@ const sessionService = {
         if (filters.participant_code) {
             params.append('participant_code', filters.participant_code);
         }
+        if (filters.refresh) {
+            params.append('refresh', 'true');
+        }
 
         if (params.toString()) {
             endpoint += '?' + params.toString();
@@ -46,24 +52,35 @@ const sessionService = {
     },
 
     /**
-     * Obtener las recetas disponibles organizadas por dificultad
-     * @returns {Array} - Lista de recetas disponibles
+     * Finalizar manualmente una sesión de receta desde dashboard
+     * @param {string} sessionId - UUID de la sesión
+     */
+    async closeSession(sessionId) {
+        return api.put(`/api/sessions/${sessionId}/close`, {});
+    },
+
+    /**
+     * Cargar catálogo de recetas desde backend y guardarlo en cache local
+     */
+    async loadAvailableRecipes({ forceRefresh = false } = {}) {
+        if (!forceRefresh && cachedRecipes.length > 0) {
+            return cachedRecipes;
+        }
+
+        try {
+            const response = await api.get('/api/sessions/recipes');
+            cachedRecipes = normalizeRecipes(response?.data || response);
+            return cachedRecipes;
+        } catch (error) {
+            return cachedRecipes;
+        }
+    },
+
+    /**
+     * Obtener catálogo de recetas desde cache
      */
     getAvailableRecipes() {
-        return [
-            // Nivel Fácil (3–5 ingredientes)
-            { id: 'tinto',               name: 'Tinto',                       difficulty: 'facil',      ingredients_range: '3-5' },
-            { id: 'cafe_con_leche',      name: 'Café con leche',              difficulty: 'facil',      ingredients_range: '3-5' },
-            { id: 'macchiato',           name: 'Macchiato / Café manchado',    difficulty: 'facil',      ingredients_range: '3-5' },
-            // Nivel Intermedio (6–10 ingredientes)
-            { id: 'arepa_con_huevo',     name: 'Arepa con huevo',             difficulty: 'intermedio', ingredients_range: '6-10' },
-            { id: 'panqueques_con_frutas', name: 'Panqueques con frutas',     difficulty: 'intermedio', ingredients_range: '6-10' },
-            { id: 'avena_con_toppings',  name: 'Avena caliente con toppings', difficulty: 'intermedio', ingredients_range: '6-10' },
-            // Nivel Difícil (11–15 ingredientes)
-            { id: 'arroz_con_pollo',     name: 'Arroz con pollo',             difficulty: 'dificil',    ingredients_range: '11-15' },
-            { id: 'spaghetti_bolognesa', name: 'Spaghetti a la boloñesa',     difficulty: 'dificil',    ingredients_range: '11-15' },
-            { id: 'sancocho_de_res',     name: 'Sancocho de res',             difficulty: 'dificil',    ingredients_range: '11-15' }
-        ];
+        return cachedRecipes;
     }
 };
 

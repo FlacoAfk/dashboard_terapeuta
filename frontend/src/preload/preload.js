@@ -30,5 +30,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
 contextBridge.exposeInMainWorld('env', {
     isDevelopment: process.env.NODE_ENV === 'development',
     apiUrl: process.env.API_URL || 'http://localhost:3001',
+    apiTimeoutMs: Number(process.env.API_TIMEOUT_MS || 15000),
     appVersion: require('../../package.json').version
 });

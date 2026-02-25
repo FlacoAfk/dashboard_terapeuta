@@ -2,8 +2,8 @@
 
 Este documento detalla todos los endpoints disponibles en el backend del Dashboard Terapeuta.
 
-**Versión:** 1.8.1  
-**Última auditoría:** 2026-02-09  
+**Versión:** 1.8.2  
+**Última auditoría:** 2026-02-23  
 **Total endpoints:** 35  
 URL Base: `/api` (excepto VR Results que usa `/api/v1`)
 
@@ -33,6 +33,13 @@ URL Base: `/api` (excepto VR Results que usa `/api/v1`)
 | `SUPERADMIN_EMAIL` | No | Email del superadmin para seed |
 | `SUPERADMIN_PASSWORD` | No | Password del superadmin para seed |
 | `UNITY_API_KEY` | ✅ Sí | API Key para autenticación de Unity |
+| `REDIS_CACHE_ENABLED` | No | Habilita cache Redis (`true` por defecto; usar `false` para desactivar) |
+| `REDIS_URL` | No | URL completa de Redis (ej: `redis://localhost:6379/0`) |
+| `REDIS_HOST` | No | Host de Redis (si no usas `REDIS_URL`) |
+| `REDIS_PORT` | No | Puerto de Redis (default: 6379) |
+| `REDIS_DB` | No | Índice de base en Redis (default: 0) |
+| `REDIS_PASSWORD` | No | Contraseña de Redis, si aplica |
+| `REDIS_CONNECT_TIMEOUT_MS` | No | Timeout de conexión Redis en ms (default: 3000) |
 
 ---
 
@@ -431,6 +438,7 @@ Asigna (o reasigna) un paciente a un terapeuta.
 Obtiene informe completo del paciente con estadísticas de sesiones VR.
 - **Seguridad:** 🟡 JWT + `requireTerapeuta` + **ownership check**
 - **Regla de acceso:** TERAPEUTA solo accede si el paciente le está asignado.
+- **Cache:** Redis (TTL corto, invalidación automática en cambios de paciente/sesiones)
 - **Parámetro URL:** `id`
 - **Salidas (200):**
   ```json
@@ -543,13 +551,14 @@ Actualiza evaluación del desempeño, observaciones clínicas y/o vinculación d
 
 ## 5b. Sesiones de Receta VR (`/api/sessions`) — HU-01
 
-> **Flujo:** Terapeuta elige receta → crea sesión ACTIVE → genera start_token → VR consulta por token → carga receta.
+> **Flujo:** Terapeuta elige receta → crea sesión **CREATED** (en espera) → genera start_token → VR consulta por token (pasa a **ACTIVE**) → al finalizar pasa a **FINISHED**.
 > Estos endpoints son **distintos** a los de la sección 5 (dashboard de resultados VR).
 
 ### `POST /api/sessions`
 Crea una sesión de receta para que el VR cargue dinámicamente.
 - **Seguridad:** 🟡 JWT + `requireTerapeuta`
-- **Regla de acceso:** Solo terapeutas pueden crear sesiones. Solo puede existir **una sesión ACTIVE por participante**.
+- **Regla de acceso:** Solo terapeutas pueden crear sesiones. Solo puede existir **una sesión en curso (CREATED/ACTIVE) por terapeuta** y una en curso por participante.
+- **Auto-cierre:** Si la sesión queda en estado `CREATED` y el videojuego no la inicia, se cierra automáticamente a los **30 minutos**.
 - **Entradas (Body):**
   ```json
   {
@@ -564,16 +573,17 @@ Crea una sesión de receta para que el VR cargue dinámicamente.
     "session_id": "uuid",
     "start_token": "ABC123",
     "recipe_id": "tinto",
-    "status": "ACTIVE"
+    "status": "CREATED"
   }
   ```
 - **Errores:**
   - 400 `MISSING_FIELD` — Campos requeridos faltantes
   - 403 `NOT_THERAPIST` — Usuario no es terapeuta
+  - 409 `SESSION_IN_PROGRESS` — El terapeuta ya tiene una sesión en curso
   - 409 `SESSION_ALREADY_ACTIVE` — Ya existe sesión activa para el participante (devuelve `existing_token`)
 
 ### `GET /api/sessions/by-token/{token}`
-Consulta sesión activa por start_token (para que Unity/VR cargue la receta).
+Consulta sesión por start_token (para que Unity/VR cargue la receta).
 - **Seguridad:** 🔵 API Key — Header `X-API-Key`
 - **Headers:** `X-API-Key: <UNITY_API_KEY>`
 - **Parámetro URL:** `token` — Token de inicio (6 caracteres alfanuméricos)
@@ -586,10 +596,11 @@ Consulta sesión activa por start_token (para que Unity/VR cargue la receta).
     "status": "ACTIVE"
   }
   ```
+- **Comportamiento:** Si estaba en `CREATED`, al consultarse por primera vez cambia a `ACTIVE`.
 - **Errores:**
   - 400 `MISSING_TOKEN` — Token no proporcionado
   - 401 `UNAUTHORIZED` — API Key inválida
-  - 404 `SESSION_NOT_FOUND` — No hay sesión activa con ese token
+  - 404 `SESSION_NOT_FOUND` — No hay sesión `CREATED/ACTIVE` con ese token
 
 ### `PUT /api/sessions/{id}/finish`
 Marca una sesión como FINISHED (cuando el VR termina la receta).
@@ -605,6 +616,21 @@ Marca una sesión como FINISHED (cuando el VR termina la receta).
   }
   ```
 - **Errores:** 401 `UNAUTHORIZED`, 404 `NOT_FOUND`
+
+### `PUT /api/sessions/{id}/close`
+Finaliza una sesión manualmente desde el dashboard.
+- **Seguridad:** 🟡 JWT + `requireTerapeuta`
+- **Regla de acceso:** TERAPEUTA solo puede cerrar sesiones creadas por él. SUPERADMIN puede cerrar cualquiera.
+- **Parámetro URL:** `id` — UUID de la sesión
+- **Salidas (200):**
+  ```json
+  {
+    "success": true,
+    "session_id": "uuid",
+    "status": "FINISHED"
+  }
+  ```
+- **Errores:** 401 `AUTH_REQUIRED`, 403 `ACCESS_DENIED`, 404 `NOT_FOUND`
 
 ### `GET /api/sessions/recipe-sessions`
 Lista sesiones de receta creadas por el terapeuta.
@@ -776,6 +802,7 @@ Lista todos los terapeutas con su estado.
 ### `GET /api/dashboard/stats`
 Obtiene estadísticas generales del sistema.
 - **Seguridad:** 🟡 JWT + `requireTerapeuta`
+- **Cache:** Redis (TTL corto, invalidación automática)
 - **Entradas:** Ninguna
 - **Salidas (200):**
   ```json

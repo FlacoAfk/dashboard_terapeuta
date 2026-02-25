@@ -1,9 +1,10 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import Modal from '../ui/Modal';
 import sessionService from '../../services/sessionService';
 import { showToast } from '../../utils/alertUtils';
 import { Icons } from '../ui/Icons';
 import { useSession } from '../../context/SessionContext';
+import { DEFAULT_RECIPES, RECIPE_EMOJIS } from '../../constants/recipes';
 
 /**
  * Emojis y colores por dificultad
@@ -12,21 +13,6 @@ const DIFFICULTY_CONFIG = {
     facil: { label: 'Fácil', color: 'green', emoji: '🟢', badge: 'bg-green-100 text-green-700', border: 'border-green-200 hover:border-green-400', ring: 'ring-green-500' },
     intermedio: { label: 'Intermedio', color: 'yellow', emoji: '🟡', badge: 'bg-yellow-100 text-yellow-700', border: 'border-yellow-200 hover:border-yellow-400', ring: 'ring-yellow-500' },
     dificil: { label: 'Difícil', color: 'red', emoji: '🔴', badge: 'bg-red-100 text-red-700', border: 'border-red-200 hover:border-red-400', ring: 'ring-red-500' }
-};
-
-/**
- * Emojis por receta
- */
-const RECIPE_EMOJIS = {
-    tinto: '☕',
-    cafe_con_leche: '☕',
-    macchiato: '☕',
-    arepa_con_huevo: '🍳',
-    panqueques_con_frutas: '🥞',
-    avena_con_toppings: '🥣',
-    arroz_con_pollo: '🍚',
-    spaghetti_bolognesa: '🍝',
-    sancocho_de_res: '🍲'
 };
 
 /**
@@ -40,15 +26,15 @@ const RecipeCard = ({ recipe, isSelected, onClick }) => {
         <button
             type="button"
             onClick={onClick}
-            className={`relative w-full text-left p-3 rounded-xl border-2 transition-all duration-200 ${
+            className={`relative w-full text-left p-3 rounded-xl border-2 transition-all duration-200 focus:outline-none ${
                 isSelected
-                    ? `${diff.border.split(' ')[0]} ${diff.ring} ring-2 bg-white shadow-md scale-[1.02]`
+                    ? `border-[#2AA87E] bg-[#2AA87E]/5 shadow-sm`
                     : `border-gray-200 hover:border-gray-300 bg-white hover:shadow-sm`
             }`}
         >
             {isSelected && (
                 <div className="absolute top-2 right-2">
-                    <div className="w-5 h-5 bg-[#2AA87E] rounded-full flex items-center justify-center">
+                    <div className="w-5 h-5 bg-[#2AA87E] rounded-full flex items-center justify-center shadow-sm">
                         <Icons.Check />
                     </div>
                 </div>
@@ -74,8 +60,9 @@ const RecipeCard = ({ recipe, isSelected, onClick }) => {
 /**
  * Modal para crear una sesión de receta VR
  */
-const CrearSesionVRModal = ({ isOpen, onClose, onSuccess, patients = [] }) => {
+const CrearSesionVRModal = ({ isOpen, onClose, onSuccess, patients = [], blockedSession = null }) => {
     const { startSession } = useSession();
+    const [recipes, setRecipes] = useState(DEFAULT_RECIPES);
     const [selectedRecipe, setSelectedRecipe] = useState('');
     const [participantCode, setParticipantCode] = useState('');
     const [filterDifficulty, setFilterDifficulty] = useState('todas');
@@ -83,7 +70,19 @@ const CrearSesionVRModal = ({ isOpen, onClose, onSuccess, patients = [] }) => {
     const [error, setError] = useState('');
     const [result, setResult] = useState(null); // Para mostrar el token generado
 
-    const recipes = sessionService.getAvailableRecipes();
+    useEffect(() => {
+        let active = true;
+
+        sessionService.loadAvailableRecipes({ forceRefresh: true }).then((loadedRecipes) => {
+            if (active && Array.isArray(loadedRecipes) && loadedRecipes.length > 0) {
+                setRecipes(loadedRecipes);
+            }
+        });
+
+        return () => {
+            active = false;
+        };
+    }, []);
 
     const filteredRecipes = useMemo(() => {
         if (filterDifficulty === 'todas') return recipes;
@@ -111,6 +110,11 @@ const CrearSesionVRModal = ({ isOpen, onClose, onSuccess, patients = [] }) => {
         setError('');
 
         try {
+            if (blockedSession) {
+                setError('Ya existe una sesión en curso. Finalízala antes de crear una nueva.');
+                return;
+            }
+
             const response = await sessionService.createSession({
                 participant_code: participantCode,
                 recipe_id: selectedRecipe
@@ -134,8 +138,13 @@ const CrearSesionVRModal = ({ isOpen, onClose, onSuccess, patients = [] }) => {
             }
         } catch (err) {
             // Manejar sesión ya activa
-            if (err.message?.includes('Ya existe una sesión activa') || err.message?.includes('SESSION_ALREADY_ACTIVE')) {
-                setError('Ya existe una sesión activa para este participante. Debe finalizar la sesión actual antes de crear una nueva.');
+            if (
+                err.message?.includes('Ya existe una sesión activa') ||
+                err.message?.includes('SESSION_ALREADY_ACTIVE') ||
+                err.message?.includes('SESSION_IN_PROGRESS') ||
+                err.message?.includes('sesión en curso')
+            ) {
+                setError('Ya existe una sesión en curso. Debe finalizarse antes de crear una nueva.');
             } else {
                 setError(err.message || 'Error al crear la sesión');
             }
@@ -237,15 +246,27 @@ const CrearSesionVRModal = ({ isOpen, onClose, onSuccess, patients = [] }) => {
 
     // Vista del formulario
     return (
-        <Modal isOpen={isOpen} onClose={handleClose} size="lg">
+        <Modal isOpen={isOpen} onClose={handleClose} size="2xl" contentClassName="h-[70vh]">
             <Modal.Header onClose={handleClose} icon={Icons.Sesiones} iconBg="bg-[#2AA87E]">
                 Nueva Sesión VR
             </Modal.Header>
 
             <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
                 <Modal.Body>
-                    <div className="space-y-5">
+                    <div className="space-y-6">
                         {/* Seleccionar Paciente */}
+                        {blockedSession && (
+                            <div className="flex items-start gap-2 p-3 bg-amber-50 text-amber-700 rounded-lg text-sm border border-amber-100">
+                                <svg className="w-5 h-5 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <div>
+                                    <p className="font-medium">Hay una sesión en curso</p>
+                                    <p className="text-xs mt-0.5">Token: <span className="font-mono font-bold">{blockedSession.start_token}</span> — Participante: {blockedSession.participant_code}</p>
+                                </div>
+                            </div>
+                        )}
+
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
                                 Paciente <span className="text-red-500">*</span>
@@ -302,7 +323,7 @@ const CrearSesionVRModal = ({ isOpen, onClose, onSuccess, patients = [] }) => {
                             </div>
 
                             {/* Grid de recetas */}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-70 overflow-y-auto pr-1">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-96 overflow-y-auto pr-1.5">
                                 {filteredRecipes.map(recipe => (
                                     <RecipeCard
                                         key={recipe.id}
@@ -361,7 +382,7 @@ const CrearSesionVRModal = ({ isOpen, onClose, onSuccess, patients = [] }) => {
                     </button>
                     <button
                         type="submit"
-                        disabled={loading || !selectedRecipe || !participantCode}
+                        disabled={loading || !selectedRecipe || !participantCode || !!blockedSession}
                         className="flex items-center gap-2 bg-[#2AA87E] hover:bg-[#238c68] disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium px-5 py-2 rounded-lg transition-colors"
                     >
                         {loading ? (

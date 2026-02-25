@@ -1,6 +1,5 @@
 # Dependencies
 node_modules/
-package-lock.json
 
 # Environment (NEVER commit these!)
 .env
@@ -10,6 +9,7 @@ backend/.env
 
 # Build outputs
 dist/
+dist-web/
 dist-electron/
 build/
 out/

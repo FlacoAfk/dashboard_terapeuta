@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.8.2] - 2026-02-23
+
+### Added
+- **Redis Cache (opcional)**: Integración de cache distribuido con fallback seguro si Redis no está disponible.
+- **Docker Compose**: Nuevo servicio `redis` para despliegue local junto al backend.
+
+### Changed
+- **Rutas cacheadas**:
+	- `GET /api/patients`
+	- `GET /api/patients/:id`
+	- `GET /api/patients/:id/report`
+	- `GET /api/dashboard/stats`
+	- `GET /api/sessions/recipe-sessions`
+	- `GET /api/sessions/recipes`
+	- `GET /api/v1/session-results`
+	- `GET /api/v1/session-results/:id`
+	- `GET /api/v1/patients/lookup`
+- **Invalidación automática**: Limpieza de cache en endpoints `POST/PUT` relacionados con pacientes, sesiones receta y recepción de resultados VR.
+
 ## [1.8.0] - 2026-02-09
 
 ### Added

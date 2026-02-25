@@ -14,6 +14,7 @@ const { supabase } = require('../config/supabase');
 const { authenticateToken, requireSuperAdmin } = require('../middleware/authMiddleware');
 const { validateUserCreate, validateUserUpdate } = require('../validators/userValidator');
 const { AUDIT_TYPES, auditFromRequest } = require('../utils/auditHelper');
+const { isValidPassword, getPasswordPolicyMessage } = require('../utils/passwordPolicy');
 
 /**
  * @swagger
@@ -126,11 +127,10 @@ router.post('/terapeuta', authenticateToken, requireSuperAdmin, validateUserCrea
     }
 
     // Validar contraseña (mínimo 10 caracteres, mayúscula, minúscula, número, símbolo)
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{10,}$/;
-    if (!passwordRegex.test(password)) {
+    if (!isValidPassword(password)) {
         return res.status(400).json({
             success: false,
-            error: 'La contraseña debe tener mínimo 10 caracteres, mayúsculas, minúsculas, números y símbolos'
+            error: getPasswordPolicyMessage()
         });
     }
 
@@ -425,7 +425,6 @@ router.put('/:id/toggle-estado', authenticateToken, requireSuperAdmin, async (re
 router.post('/:id/reset-password', authenticateToken, requireSuperAdmin, async (req, res) => {
     const { id } = req.params;
     const { newPassword } = req.body;
-    console.log(`[DEBUG] Reset password request for ID: ${id}`);
 
     if (!newPassword) {
         return res.status(400).json({
@@ -435,11 +434,10 @@ router.post('/:id/reset-password', authenticateToken, requireSuperAdmin, async (
     }
 
     // Validar contraseña
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{10,}$/;
-    if (!passwordRegex.test(newPassword)) {
+    if (!isValidPassword(newPassword)) {
         return res.status(400).json({
             success: false,
-            error: 'La contraseña debe tener mínimo 10 caracteres, mayúsculas, minúsculas, números y símbolos'
+            error: getPasswordPolicyMessage()
         });
     }
 

@@ -18,9 +18,11 @@ const validateUserCreate = [
         .isEmail().withMessage('Debe ser un correo válido'),
     body('password')
         .notEmpty().withMessage('La contraseña es requerida')
-        .isLength({ min: 8 }).withMessage('La contraseña debe tener al menos 8 caracteres')
+        .isLength({ min: 10 }).withMessage('La contraseña debe tener al menos 10 caracteres')
         .matches(/[A-Z]/).withMessage('La contraseña debe contener al menos una mayúscula')
-        .matches(/\d/).withMessage('La contraseña debe contener al menos un número'),
+        .matches(/[a-z]/).withMessage('La contraseña debe contener al menos una minúscula')
+        .matches(/\d/).withMessage('La contraseña debe contener al menos un número')
+        .matches(/[@$!%*?&]/).withMessage('La contraseña debe contener al menos un símbolo (@$!%*?&)'),
     body('especialidad')
         .optional()
         .trim(),
@@ -42,8 +44,11 @@ const validateUserUpdate = [
         .isEmail().withMessage('Debe ser un correo válido'),
     body('password')
         .optional()
-        .isLength({ min: 8 }).withMessage('La contraseña debe tener al menos 8 caracteres')
-        .matches(/[A-Z]/).withMessage('La contraseña debe contener al menos una mayúscula'),
+        .isLength({ min: 10 }).withMessage('La contraseña debe tener al menos 10 caracteres')
+        .matches(/[A-Z]/).withMessage('La contraseña debe contener al menos una mayúscula')
+        .matches(/[a-z]/).withMessage('La contraseña debe contener al menos una minúscula')
+        .matches(/\d/).withMessage('La contraseña debe contener al menos un número')
+        .matches(/[@$!%*?&]/).withMessage('La contraseña debe contener al menos un símbolo (@$!%*?&)'),
     handleValidationErrors
 ];
 

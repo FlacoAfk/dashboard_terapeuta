@@ -17,6 +17,15 @@ const express = require('express');
 const router = express.Router();
 const { supabase } = require('../config/supabase');
 const { authenticateToken, requireTerapeuta, validateUnityApiKey } = require('../middleware/authMiddleware');
+const { buildCacheKey, getCachedJson, setCachedJson, invalidateCacheByPattern } = require('../utils/cache');
+
+async function invalidateVrResultsCache(sessionId = null) {
+    await Promise.all([
+        invalidateCacheByPattern('vr:session-results:list:*'),
+        invalidateCacheByPattern('vr:patients-lookup:*'),
+        sessionId ? invalidateCacheByPattern(`vr:session-results:detail:${sessionId}`) : Promise.resolve(0)
+    ]);
+}
 
 /**
  * @swagger
@@ -241,6 +250,8 @@ router.post('/session-results', validateUnityApiKey, async (req, res) => {
         }
 
         // Respuesta exitosa
+        await invalidateVrResultsCache(sessionId);
+
         res.status(201).json({
             id: sessionId,
             createdAtIso: sessionData.created_at
@@ -284,6 +295,18 @@ router.get('/session-results', authenticateToken, requireTerapeuta, async (req, 
     try {
         const { participantId, activityId } = req.query;
 
+        const cacheKey = buildCacheKey('vr:session-results:list', {
+            role: req.user.rol,
+            therapistId: req.user.id_terapeuta || null,
+            participantId: participantId || null,
+            activityId: activityId || null
+        });
+
+        const cachedPayload = await getCachedJson(cacheKey);
+        if (cachedPayload) {
+            return res.json(cachedPayload);
+        }
+
         let query = supabase
             .from('vr_session_results')
             .select('*')
@@ -305,11 +328,14 @@ router.get('/session-results', authenticateToken, requireTerapeuta, async (req, 
             });
         }
 
-        res.json({
+        const payload = {
             success: true,
             data: data,
             count: data.length
-        });
+        };
+
+        await setCachedJson(cacheKey, payload, 20);
+        res.json(payload);
 
     } catch (error) {
         res.status(500).json({
@@ -343,6 +369,16 @@ router.get('/session-results/:id', authenticateToken, requireTerapeuta, async (r
     try {
         const { id } = req.params;
 
+        const cacheKey = buildCacheKey(`vr:session-results:detail:${id}`, {
+            role: req.user.rol,
+            therapistId: req.user.id_terapeuta || null
+        });
+
+        const cachedPayload = await getCachedJson(cacheKey);
+        if (cachedPayload) {
+            return res.json(cachedPayload);
+        }
+
         // Obtener sesión
         const { data: session, error: sessionError } = await supabase
             .from('vr_session_results')
@@ -363,29 +399,46 @@ router.get('/session-results/:id', authenticateToken, requireTerapeuta, async (r
             .eq('session_id', id)
             .order('started_at', { ascending: true });
 
-        // Para cada set, obtener errores y objetos retornados
-        const setsWithDetails = [];
-        for (const set of (sets || [])) {
-            const { data: errors } = await supabase
+        const setIds = (sets || []).map((set) => set.id);
+        let errorsBySetId = new Map();
+
+        if (setIds.length > 0) {
+            const { data: allErrors, error: errorsQueryError } = await supabase
                 .from('vr_set_errors')
                 .select('*')
-                .eq('set_id', set.id)
+                .in('set_id', setIds)
                 .order('occurred_at', { ascending: true });
 
-            setsWithDetails.push({
-                ...set,
-                errors: errors || [],
-                returnedObjects: [] // Table removed: returnedObjects unused
-            });
+            if (errorsQueryError) {
+                return res.status(500).json({
+                    error: { code: 'DB_ERROR', message: errorsQueryError.message }
+                });
+            }
+
+            errorsBySetId = (allErrors || []).reduce((acc, currentError) => {
+                const bucket = acc.get(currentError.set_id) || [];
+                bucket.push(currentError);
+                acc.set(currentError.set_id, bucket);
+                return acc;
+            }, new Map());
         }
 
-        res.json({
+        const setsWithDetails = (sets || []).map((set) => ({
+            ...set,
+            errors: errorsBySetId.get(set.id) || [],
+            returnedObjects: [] // Table removed: returnedObjects unused
+        }));
+
+        const payload = {
             success: true,
             data: {
                 ...session,
                 sets: setsWithDetails
             }
-        });
+        };
+
+        await setCachedJson(cacheKey, payload, 45);
+        res.json(payload);
 
     } catch (error) {
         res.status(500).json({
@@ -458,6 +511,12 @@ router.get('/patients/lookup', validateUnityApiKey, async (req, res) => {
             });
         }
 
+        const cacheKey = buildCacheKey('vr:patients-lookup', { identificacion });
+        const cachedPayload = await getCachedJson(cacheKey);
+        if (cachedPayload) {
+            return res.json(cachedPayload);
+        }
+
         // Buscar paciente por identificación exacta
         const { data: patient, error } = await supabase
             .from('pacientes')
@@ -468,11 +527,14 @@ router.get('/patients/lookup', validateUnityApiKey, async (req, res) => {
 
         if (error || !patient) {
             // No encontrado - responder sin revelar si existe o no (seguridad)
-            return res.json({
+            const payload = {
                 found: false,
                 participant_id: null,
                 display_name: null
-            });
+            };
+
+            await setCachedJson(cacheKey, payload, 60);
+            return res.json(payload);
         }
 
         // Generar nombre parcial para privacidad (ej: "Juan P.")
@@ -481,13 +543,16 @@ router.get('/patients/lookup', validateUnityApiKey, async (req, res) => {
             ? `${nameParts[0]} ${nameParts[1].charAt(0)}.`
             : nameParts[0];
 
-        res.json({
+        const payload = {
             found: true,
             participant_id: patient.identificacion,
             display_name: displayName,
             // Opcionalmente podríamos agregar el ID interno si Unity lo necesita
             internal_id: patient.id
-        });
+        };
+
+        await setCachedJson(cacheKey, payload, 60);
+        res.json(payload);
 
     } catch (error) {
         res.status(500).json({

@@ -9,7 +9,7 @@
 
 const jwt = require('jsonwebtoken');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'cerebro_al_fuego_secret_key_2024';
+const JWT_SECRET = process.env.JWT_SECRET || (process.env.NODE_ENV === 'production' ? null : 'dev_only_change_me');
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h';
 
 /**
@@ -154,7 +154,7 @@ const optionalAuth = (req, res, next) => {
         try {
             const decoded = jwt.verify(token, JWT_SECRET);
             req.user = decoded;
-        } catch (error) {
+        } catch {
             // Token inválido pero continuamos sin usuario
             req.user = null;
         }
@@ -188,6 +188,10 @@ const validateUnityApiKey = (req, res, next) => {
 
     next();
 };
+
+if (!JWT_SECRET) {
+    throw new Error('JWT_SECRET es requerido en producción');
+}
 
 module.exports = {
     authenticateToken,

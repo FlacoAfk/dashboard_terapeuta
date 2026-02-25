@@ -3,7 +3,7 @@ import React from 'react';
 /**
  * Componente Modal base reutilizable
  */
-const Modal = ({ isOpen, onClose, children, size = 'md' }) => {
+const Modal = ({ isOpen, onClose, children, size = 'md', contentClassName = '' }) => {
     if (!isOpen) return null;
 
     const sizeClasses = {
@@ -15,16 +15,18 @@ const Modal = ({ isOpen, onClose, children, size = 'md' }) => {
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="fixed inset-0 z-50">
             {/* Overlay */}
             <div 
-                className="absolute inset-0 bg-black/50 transition-opacity"
+                className="fixed inset-0 bg-black/55 transition-opacity"
                 onClick={onClose}
             />
-            
+
             {/* Modal Content */}
-            <div className={`relative bg-white rounded-xl shadow-2xl w-full mx-4 ${sizeClasses[size]} max-h-[90vh] overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200`}>
-                {children}
+            <div className="relative h-full w-full overflow-y-auto p-3 sm:p-5 flex items-center justify-center">
+                <div className={`relative mx-auto bg-white rounded-xl shadow-2xl w-full ${sizeClasses[size]} max-h-[92vh] overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200 ${contentClassName}`}>
+                    {children}
+                </div>
             </div>
         </div>
     );

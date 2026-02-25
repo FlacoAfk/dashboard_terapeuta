@@ -17,27 +17,16 @@ const crypto = require('crypto');
 const { supabase } = require('../config/supabase');
 const { authenticateToken, requireTerapeuta, validateUnityApiKey } = require('../middleware/authMiddleware');
 const { auditFromRequest, AUDIT_TYPES } = require('../utils/auditHelper');
+const { buildCacheKey, getCachedJson, setCachedJson, invalidateCacheByPattern } = require('../utils/cache');
+const { VALID_RECIPES, VALID_RECIPE_IDS } = require('../constants/recipes');
+const SESSION_WAIT_TIMEOUT_MINUTES = 30;
 
-/**
- * Catálogo de recetas válidas del juego VR.
- * Estos IDs son los únicos aceptados por el videojuego.
- */
-const VALID_RECIPES = [
-    // Nivel Fácil (3–5 ingredientes)
-    { id: 'tinto',               name: 'Tinto',                    difficulty: 'facil',       ingredients_range: '3-5' },
-    { id: 'cafe_con_leche',      name: 'Café con leche',           difficulty: 'facil',       ingredients_range: '3-5' },
-    { id: 'macchiato',           name: 'Macchiato / Café manchado', difficulty: 'facil',       ingredients_range: '3-5' },
-    // Nivel Intermedio (6–10 ingredientes)
-    { id: 'arepa_con_huevo',     name: 'Arepa con huevo',          difficulty: 'intermedio',  ingredients_range: '6-10' },
-    { id: 'panqueques_con_frutas', name: 'Panqueques con frutas',  difficulty: 'intermedio',  ingredients_range: '6-10' },
-    { id: 'avena_con_toppings',  name: 'Avena caliente con toppings', difficulty: 'intermedio', ingredients_range: '6-10' },
-    // Nivel Difícil (11–15 ingredientes)
-    { id: 'arroz_con_pollo',     name: 'Arroz con pollo',          difficulty: 'dificil',     ingredients_range: '11-15' },
-    { id: 'spaghetti_bolognesa', name: 'Spaghetti a la boloñesa',  difficulty: 'dificil',     ingredients_range: '11-15' },
-    { id: 'sancocho_de_res',     name: 'Sancocho de res',          difficulty: 'dificil',     ingredients_range: '11-15' }
-];
-
-const VALID_RECIPE_IDS = VALID_RECIPES.map(r => r.id);
+async function invalidateSessionCaches() {
+    await Promise.all([
+        invalidateCacheByPattern('sessions:recipe-sessions:*'),
+        invalidateCacheByPattern('sessions:recipes:*')
+    ]);
+}
 
 /**
  * Genera un token alfanumérico único de 6 caracteres (mayúsculas + dígitos).
@@ -51,6 +40,32 @@ function generateStartToken() {
         token += chars[bytes[i] % chars.length];
     }
     return token;
+}
+
+/**
+ * Cierra automáticamente sesiones CREATED vencidas (no iniciadas en VR).
+ */
+async function closeExpiredCreatedSessions(createdBy = null) {
+    const threshold = new Date(Date.now() - SESSION_WAIT_TIMEOUT_MINUTES * 60 * 1000).toISOString();
+
+    let query = supabase
+        .from('sessions')
+        .update({ status: 'FINISHED' })
+        .eq('status', 'CREATED')
+        .lt('created_at', threshold)
+        .select('id, participant_code, start_token, created_by');
+
+    if (createdBy) {
+        query = query.eq('created_by', createdBy);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+        console.error('Error cerrando sesiones vencidas:', error);
+        return [];
+    }
+
+    return data || [];
 }
 
 // ========================================
@@ -157,12 +172,33 @@ router.post('/', authenticateToken, requireTerapeuta, async (req, res) => {
             });
         }
 
-        // ── Verificar que no exista sesión ACTIVE para este participante ──
+        await closeExpiredCreatedSessions(createdBy);
+
+        // ── Restricción global: solo una sesión en curso por terapeuta (CREATED o ACTIVE) ──
+        const { data: inProgressSession } = await supabase
+            .from('sessions')
+            .select('id, start_token, participant_code, recipe_id, status, created_at')
+            .eq('created_by', createdBy)
+            .in('status', ['CREATED', 'ACTIVE'])
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+        if (inProgressSession) {
+            return res.status(409).json({
+                success: false,
+                error: 'Ya tienes una sesión en curso. Debes finalizarla antes de crear otra.',
+                code: 'SESSION_IN_PROGRESS',
+                session: inProgressSession
+            });
+        }
+
+        // ── Verificar que no exista sesión en curso para este participante ──
         const { data: existingSession } = await supabase
             .from('sessions')
-            .select('id, start_token')
+            .select('id, start_token, status')
             .eq('participant_code', participant_code.trim())
-            .eq('status', 'ACTIVE')
+            .in('status', ['CREATED', 'ACTIVE'])
             .maybeSingle();
 
         if (existingSession) {
@@ -205,7 +241,7 @@ router.post('/', authenticateToken, requireTerapeuta, async (req, res) => {
             .insert({
                 participant_code: participant_code.trim(),
                 recipe_id: recipe_id.trim(),
-                status: 'ACTIVE',
+                status: 'CREATED',
                 start_token: startToken,
                 created_by: createdBy
             })
@@ -228,6 +264,8 @@ router.post('/', authenticateToken, requireTerapeuta, async (req, res) => {
             recipe_id: recipe_id.trim(),
             start_token: startToken
         });
+
+        await invalidateSessionCaches();
 
         // ── Respuesta según contrato ──
         res.status(201).json({
@@ -305,6 +343,8 @@ router.get('/by-token/:token', validateUnityApiKey, async (req, res) => {
     try {
         const { token } = req.params;
 
+        await closeExpiredCreatedSessions();
+
         if (!token || token.trim().length === 0) {
             return res.status(400).json({
                 error: { code: 'MISSING_TOKEN', message: 'Token es requerido' }
@@ -315,7 +355,7 @@ router.get('/by-token/:token', validateUnityApiKey, async (req, res) => {
             .from('sessions')
             .select('id, participant_code, recipe_id, status')
             .eq('start_token', token.trim().toUpperCase())
-            .eq('status', 'ACTIVE')
+            .in('status', ['CREATED', 'ACTIVE'])
             .maybeSingle();
 
         if (error) {
@@ -334,12 +374,30 @@ router.get('/by-token/:token', validateUnityApiKey, async (req, res) => {
             });
         }
 
+        let responseSession = session;
+
+        // La primera vez que VR consulta token, la sesión pasa de CREATED a ACTIVE
+        if (session.status === 'CREATED') {
+            const { data: activatedSession, error: activateError } = await supabase
+                .from('sessions')
+                .update({ status: 'ACTIVE' })
+                .eq('id', session.id)
+                .eq('status', 'CREATED')
+                .select('id, participant_code, recipe_id, status')
+                .single();
+
+            if (!activateError && activatedSession) {
+                responseSession = activatedSession;
+                await invalidateSessionCaches();
+            }
+        }
+
         // ── Respuesta según contrato ──
         res.json({
-            session_id: session.id,
-            participant_code: session.participant_code,
-            recipe_id: session.recipe_id,
-            status: session.status
+            session_id: responseSession.id,
+            participant_code: responseSession.participant_code,
+            recipe_id: responseSession.recipe_id,
+            status: responseSession.status
         });
 
     } catch (error) {
@@ -395,7 +453,7 @@ router.put('/:id/finish', validateUnityApiKey, async (req, res) => {
             .from('sessions')
             .update({ status: 'FINISHED' })
             .eq('id', id)
-            .eq('status', 'ACTIVE')
+            .in('status', ['CREATED', 'ACTIVE'])
             .select('id, status')
             .single();
 
@@ -404,6 +462,8 @@ router.put('/:id/finish', validateUnityApiKey, async (req, res) => {
                 error: { code: 'NOT_FOUND', message: 'Sesión activa no encontrada' }
             });
         }
+
+        await invalidateSessionCaches();
 
         res.json({
             success: true,
@@ -416,6 +476,84 @@ router.put('/:id/finish', validateUnityApiKey, async (req, res) => {
         res.status(500).json({
             error: { code: 'INTERNAL_ERROR', message: error.message }
         });
+    }
+});
+
+// ========================================
+// PUT /:id/close → Finalizar sesión desde Dashboard (JWT)
+// ========================================
+
+router.put('/:id/close', authenticateToken, requireTerapeuta, async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const { data: existingSession, error: readError } = await supabase
+            .from('sessions')
+            .select('id, status, created_by, participant_code, start_token, recipe_id')
+            .eq('id', id)
+            .maybeSingle();
+
+        if (readError) {
+            return res.status(500).json({ success: false, error: readError.message });
+        }
+
+        if (!existingSession) {
+            return res.status(404).json({
+                success: false,
+                error: 'Sesión no encontrada',
+                code: 'NOT_FOUND'
+            });
+        }
+
+        if (req.user.rol === 'TERAPEUTA' && req.user.id_terapeuta && existingSession.created_by !== req.user.id_terapeuta) {
+            return res.status(403).json({
+                success: false,
+                error: 'No tienes permiso para finalizar esta sesión',
+                code: 'ACCESS_DENIED'
+            });
+        }
+
+        if (!['CREATED', 'ACTIVE'].includes(existingSession.status)) {
+            return res.status(400).json({
+                success: false,
+                error: 'La sesión ya está finalizada',
+                code: 'SESSION_ALREADY_FINISHED'
+            });
+        }
+
+        const { data: updated, error: updateError } = await supabase
+            .from('sessions')
+            .update({ status: 'FINISHED' })
+            .eq('id', id)
+            .in('status', ['CREATED', 'ACTIVE'])
+            .select('id, status, participant_code, start_token, recipe_id')
+            .single();
+
+        if (updateError || !updated) {
+            return res.status(404).json({
+                success: false,
+                error: 'No se pudo finalizar la sesión',
+                code: 'NOT_FOUND'
+            });
+        }
+
+        await auditFromRequest(req, AUDIT_TYPES.SESSION_FINISHED || 'SESSION_FINISHED', {
+            session_id: updated.id,
+            participant_code: updated.participant_code,
+            recipe_id: updated.recipe_id,
+            finish_source: 'DASHBOARD'
+        });
+
+        await invalidateSessionCaches();
+
+        res.json({
+            success: true,
+            session_id: updated.id,
+            status: updated.status
+        });
+    } catch (error) {
+        console.error('Error en PUT /sessions/:id/close:', error);
+        res.status(500).json({ success: false, error: error.message });
     }
 });
 
@@ -452,7 +590,26 @@ router.put('/:id/finish', validateUnityApiKey, async (req, res) => {
  */
 router.get('/recipe-sessions', authenticateToken, requireTerapeuta, async (req, res) => {
     try {
-        const { status, participant_code } = req.query;
+        const { status, participant_code, refresh } = req.query;
+        const forceRefresh = String(refresh || '').toLowerCase() === 'true';
+
+        const cacheKey = buildCacheKey('sessions:recipe-sessions', {
+            role: req.user.rol,
+            therapistId: req.user.id_terapeuta || null,
+            status: status || null,
+            participant_code: participant_code || null
+        });
+
+        if (!forceRefresh) {
+            const cachedPayload = await getCachedJson(cacheKey);
+            if (cachedPayload) {
+                return res.json(cachedPayload);
+            }
+        }
+
+        if (req.user.id_terapeuta) {
+            await closeExpiredCreatedSessions(req.user.id_terapeuta);
+        }
 
         let query = supabase
             .from('sessions')
@@ -476,11 +633,14 @@ router.get('/recipe-sessions', authenticateToken, requireTerapeuta, async (req, 
 
         if (error) throw error;
 
-        res.json({
+        const payload = {
             success: true,
             data: sessions || [],
             count: (sessions || []).length
-        });
+        };
+
+        await setCachedJson(cacheKey, payload, 20);
+        res.json(payload);
 
     } catch (error) {
         console.error('Error en GET /sessions/recipe-sessions:', error);
@@ -507,19 +667,29 @@ router.get('/recipe-sessions', authenticateToken, requireTerapeuta, async (req, 
  *       200:
  *         description: Lista de recetas disponibles
  */
-router.get('/recipes', authenticateToken, requireTerapeuta, (req, res) => {
+router.get('/recipes', authenticateToken, requireTerapeuta, async (req, res) => {
+    const cacheKey = buildCacheKey('sessions:recipes', { version: 1 });
+
+    const cachedPayload = await getCachedJson(cacheKey);
+    if (cachedPayload) {
+        return res.json(cachedPayload);
+    }
+
     const grouped = {
         facil: VALID_RECIPES.filter(r => r.difficulty === 'facil'),
         intermedio: VALID_RECIPES.filter(r => r.difficulty === 'intermedio'),
         dificil: VALID_RECIPES.filter(r => r.difficulty === 'dificil')
     };
 
-    res.json({
+    const payload = {
         success: true,
         data: VALID_RECIPES,
         grouped,
         count: VALID_RECIPES.length
-    });
+    };
+
+    await setCachedJson(cacheKey, payload, 300);
+    return res.json(payload);
 });
 
 module.exports = router;

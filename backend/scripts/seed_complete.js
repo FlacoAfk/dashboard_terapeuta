@@ -18,7 +18,7 @@
 
 require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 
 const supabase = createClient(
     process.env.SUPABASE_URL,
@@ -86,6 +86,13 @@ const OBSERVACIONES_CLINICAS = [
 
 // Sets/etapas del videojuego
 const SET_NAMES = ['Reconocimiento', 'Recolección', 'Preparación', 'Organización'];
+
+// Recetas disponibles (Match con constraint de BD)
+const RECIPE_IDS = [
+    'tinto', 'cafe_con_leche', 'macchiato', 'arepa_con_huevo',
+    'panqueques_con_frutas', 'avena_con_toppings',
+    'arroz_con_pollo', 'spaghetti_bolognesa', 'sancocho_de_res'
+];
 
 // ========================================
 // FUNCIONES UTILITARIAS
@@ -248,6 +255,7 @@ async function seed() {
         'vr_set_errors',
         'vr_set_results',
         'vr_session_results',
+        'sessions',
         'auditoria',
         'password_reset_tokens',
         'terapeuta_paciente',
@@ -549,6 +557,58 @@ async function seed() {
     }
 
     console.log(`   ✅ Sesiones VR creadas: ${vrSessionCount} (${vrRevisadas} revisadas, ${vrPendientes} pendientes)`);
+
+    // ────────────────────────────────────
+    // 5. SESIONES DE RECETA (HU-01)
+    // ────────────────────────────────────
+    console.log('\n🥘 Creando Sesiones de Receta (HU-01)...');
+    let recipeSessionsCount = 0;
+    const sessionStatuses = ['CREATED', 'ACTIVE', 'FINISHED'];
+
+    // Crear algunas sesiones para cada terapeuta
+    for (const terapeuta of terapeutas) {
+        const numSessions = Math.floor(Math.random() * 3) + 2; // 2-4 sesiones por terapeuta
+
+        for (let i = 0; i < numSessions; i++) {
+            // Usar un código de participante existente o nuevo
+            const useExistingPatient = Math.random() > 0.3;
+            let participantCode;
+
+            if (useExistingPatient && pacientes.length > 0) {
+                // Filtrar pacientes de este terapeuta
+                const misPacientes = pacientes.filter(p => p.id_terapeuta === terapeuta.id);
+                if (misPacientes.length > 0) {
+                    participantCode = random(misPacientes).identificacion;
+                } else {
+                    participantCode = 'INVITADO-' + Math.floor(Math.random() * 1000);
+                }
+            } else {
+                participantCode = 'INVITADO-' + Math.floor(Math.random() * 1000);
+            }
+
+            const status = random(sessionStatuses);
+            // Generar token único de 6 caracteres
+            const token = Math.random().toString(36).substring(2, 8).toUpperCase();
+
+            const { error: sessionError } = await supabase
+                .from('sessions')
+                .insert({
+                    participant_code: participantCode,
+                    recipe_id: random(RECIPE_IDS),
+                    status: status,
+                    start_token: token,
+                    created_by: terapeuta.id,
+                    created_at: randomDate(7).toISOString() // Últimos 7 días
+                });
+
+            if (sessionError) {
+                console.error(`   ❌ Error creando sesión de receta:`, sessionError.message);
+            } else {
+                recipeSessionsCount++;
+            }
+        }
+    }
+    console.log(`   ✅ Sesiones de Receta creadas: ${recipeSessionsCount}`);
 
     // ────────────────────────────────────
     // 5. EVENTOS DE AUDITORÍA

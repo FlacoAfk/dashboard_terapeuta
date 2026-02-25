@@ -3,9 +3,10 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter, HashRouter } from 'react-router-dom';
 import App from './App';
 import './index.css';
+import { isElectronRuntime } from './config/runtime';
 
 // Usar HashRouter para Electron (mejor compatibilidad con file://)
-const Router = window.electronAPI ? HashRouter : BrowserRouter;
+const Router = isElectronRuntime() ? HashRouter : BrowserRouter;
 
 ReactDOM.createRoot(document.getElementById('root')).render(
     <React.StrictMode>

@@ -9,74 +9,21 @@
 
 const express = require('express');
 const bcrypt = require('bcryptjs');
-const crypto = require('crypto');
 const router = express.Router();
 const { supabase } = require('../config/supabase');
 const { generateToken, authenticateToken } = require('../middleware/authMiddleware');
 const { auditFromRequest, auditLogin, auditWithUser, AUDIT_TYPES } = require('../utils/auditHelper');
-const { sendPasswordResetEmail, sendVerificationCodeEmail } = require('../services/emailService');
+const { sendVerificationCodeEmail } = require('../services/emailService');
+const {
+    isAccountLocked,
+    recordFailedAttempt,
+    resetAttempts,
+    getLockTimeRemaining
+} = require('../services/loginAttemptService');
+const { isValidPassword, getPasswordPolicyMessage } = require('../utils/passwordPolicy');
 const { validateLogin } = require('../validators/authValidator');
 
-/**
- * ========================================
- * SISTEMA DE BLOQUEO DE CUENTA
- * ========================================
- * RF-SEG-01: Bloqueo después de 5 intentos fallidos
- */
-const loginAttempts = new Map(); // email -> { count, lockedUntil }
-const MAX_ATTEMPTS = 5;
-const LOCK_DURATION_MS = 15 * 60 * 1000; // 15 minutos
-
-/**
- * Verificar si una cuenta está bloqueada
- */
-const isAccountLocked = (email) => {
-    const attempt = loginAttempts.get(email);
-    if (!attempt) return false;
-
-    if (attempt.lockedUntil && Date.now() < attempt.lockedUntil) {
-        return true;
-    }
-
-    // Si el bloqueo expiró, resetear intentos
-    if (attempt.lockedUntil && Date.now() >= attempt.lockedUntil) {
-        loginAttempts.delete(email);
-    }
-
-    return false;
-};
-
-/**
- * Registrar intento fallido de login
- */
-const recordFailedAttempt = (email) => {
-    const attempt = loginAttempts.get(email) || { count: 0, lockedUntil: null };
-    attempt.count += 1;
-
-    if (attempt.count >= MAX_ATTEMPTS) {
-        attempt.lockedUntil = Date.now() + LOCK_DURATION_MS;
-    }
-
-    loginAttempts.set(email, attempt);
-    return attempt;
-};
-
-/**
- * Resetear intentos al login exitoso
- */
-const resetAttempts = (email) => {
-    loginAttempts.delete(email);
-};
-
-/**
- * Obtener tiempo restante de bloqueo
- */
-const getLockTimeRemaining = (email) => {
-    const attempt = loginAttempts.get(email);
-    if (!attempt || !attempt.lockedUntil) return 0;
-    const remaining = Math.ceil((attempt.lockedUntil - Date.now()) / 1000 / 60);
-    return remaining > 0 ? remaining : 0;
-};
+const ADMIN_SETUP_ROLES = ['SUPERADMIN', 'ROOT', 'ADMIN'];
 
 /**
  * @swagger
@@ -112,19 +59,19 @@ router.post('/login', validateLogin, async (req, res) => {
         });
     }
 
-    // Verificar si la cuenta está bloqueada
-    if (isAccountLocked(email)) {
-        const remainingMinutes = getLockTimeRemaining(email);
-        await auditLogin(req, AUDIT_TYPES.LOGIN_FAILED, email, { reason: 'Cuenta bloqueada', remainingMinutes });
-        return res.status(423).json({
-            success: false,
-            error: `Cuenta bloqueada por demasiados intentos fallidos. Intente nuevamente en ${remainingMinutes} minutos.`,
-            code: 'ACCOUNT_LOCKED',
-            remainingMinutes
-        });
-    }
-
     try {
+        // Verificar si la cuenta está bloqueada
+        if (await isAccountLocked(email)) {
+            const remainingMinutes = await getLockTimeRemaining(email);
+            await auditLogin(req, AUDIT_TYPES.LOGIN_FAILED, email, { reason: 'Cuenta bloqueada', remainingMinutes });
+            return res.status(423).json({
+                success: false,
+                error: `Cuenta bloqueada por demasiados intentos fallidos. Intente nuevamente en ${remainingMinutes} minutos.`,
+                code: 'ACCOUNT_LOCKED',
+                remainingMinutes
+            });
+        }
+
         // Buscar usuario y terapeuta asociado
         const { data: userData, error: userError } = await supabase
             .from('usuarios')
@@ -133,7 +80,7 @@ router.post('/login', validateLogin, async (req, res) => {
             .single();
 
         if (userError || !userData) {
-            recordFailedAttempt(email);
+            await recordFailedAttempt(email);
             await auditLogin(req, AUDIT_TYPES.LOGIN_FAILED, email, { reason: 'Usuario no encontrado' });
             return res.status(401).json({
                 success: false,
@@ -166,15 +113,15 @@ router.post('/login', validateLogin, async (req, res) => {
         // Verificar contraseña
         const validPassword = await bcrypt.compare(password, user.password_hash);
         if (!validPassword) {
-            const attempt = recordFailedAttempt(email);
-            const attemptsRemaining = MAX_ATTEMPTS - attempt.count;
+            const attempt = await recordFailedAttempt(email);
+            const attemptsRemaining = attempt.attemptsRemaining;
             await auditLogin(req, AUDIT_TYPES.LOGIN_FAILED, email, { reason: 'Contraseña incorrecta', attemptsRemaining });
 
             let errorMessage = 'Credenciales inválidas';
             if (attemptsRemaining > 0 && attemptsRemaining <= 2) {
                 errorMessage += `. Intentos restantes: ${attemptsRemaining}`;
             } else if (attemptsRemaining <= 0) {
-                const remainingMinutes = getLockTimeRemaining(email);
+                const remainingMinutes = await getLockTimeRemaining(email);
                 return res.status(423).json({
                     success: false,
                     error: `Cuenta bloqueada por demasiados intentos fallidos. Intente nuevamente en ${remainingMinutes} minutos.`,
@@ -204,7 +151,7 @@ router.post('/login', validateLogin, async (req, res) => {
         });
 
         // Login exitoso: resetear intentos fallidos
-        resetAttempts(email);
+        await resetAttempts(email);
 
         // Registrar auditoría con usuario autenticado
         await auditWithUser(req, AUDIT_TYPES.LOGIN_SUCCESS, user, { email });
@@ -268,26 +215,25 @@ router.post('/setup', async (req, res) => {
     }
 
     // Validar política de contraseña (RF-SEG-01: mínimo 10 caracteres, mayúsculas, minúsculas, número, símbolo)
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{10,}$/;
-    if (!passwordRegex.test(password)) {
+    if (!isValidPassword(password)) {
         return res.status(400).json({
             success: false,
-            error: 'La contraseña debe tener mínimo 10 caracteres, incluir mayúsculas, minúsculas, números y símbolos (@$!%*?&)'
+            error: getPasswordPolicyMessage()
         });
     }
 
     try {
-        // Verificar si ya existe un superadministrador
+        // Verificar si ya existe una cuenta administrativa inicial
         const { data: existingAdmin } = await supabase
             .from('usuarios')
             .select('id')
-            .eq('rol', 'SUPERADMIN')
+            .in('rol', ADMIN_SETUP_ROLES)
             .limit(1);
 
         if (existingAdmin && existingAdmin.length > 0) {
             return res.status(400).json({
                 success: false,
-                error: 'Ya existe un Superadministrador. Esta operación solo puede realizarse una vez.',
+                error: 'Ya existe una cuenta root/superadmin. Esta operación solo puede realizarse una vez.',
                 code: 'SUPERADMIN_EXISTS'
             });
         }
@@ -446,11 +392,10 @@ router.post('/change-password', authenticateToken, async (req, res) => {
     }
 
     // Validar nueva contraseña
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{10,}$/;
-    if (!passwordRegex.test(newPassword)) {
+    if (!isValidPassword(newPassword)) {
         return res.status(400).json({
             success: false,
-            error: 'La nueva contraseña debe tener mínimo 10 caracteres, incluir mayúsculas, minúsculas, números y símbolos'
+            error: getPasswordPolicyMessage()
         });
     }
 
@@ -513,7 +458,7 @@ router.get('/check-setup', async (req, res) => {
         const { data, error } = await supabase
             .from('usuarios')
             .select('id')
-            .eq('rol', 'SUPERADMIN')
+            .in('rol', ADMIN_SETUP_ROLES)
             .limit(1);
 
         if (error) {
@@ -578,46 +523,44 @@ router.post('/forgot-password', async (req, res) => {
             .single();
 
         if (user) {
-            if (user) {
-                // Generar código de 6 dígitos
-                const code = Math.floor(100000 + Math.random() * 900000).toString();
-                const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutos
+            // Generar código de 6 dígitos
+            const code = Math.floor(100000 + Math.random() * 900000).toString();
+            const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutos
 
-                // Invalidar tokens anteriores del usuario
-                await supabase
-                    .from('password_reset_tokens')
-                    .update({ used: true })
-                    .eq('id_usuario', user.id)
-                    .eq('used', false);
+            // Invalidar tokens anteriores del usuario
+            await supabase
+                .from('password_reset_tokens')
+                .update({ used: true })
+                .eq('id_usuario', user.id)
+                .eq('used', false);
 
-                // Guardar nuevo código
-                const { error: tokenError } = await supabase
-                    .from('password_reset_tokens')
-                    .insert({
-                        id_usuario: user.id,
-                        token: code,
-                        expires_at: expiresAt.toISOString(),
-                        used: false
-                    });
+            // Guardar nuevo código
+            const { error: tokenError } = await supabase
+                .from('password_reset_tokens')
+                .insert({
+                    id_usuario: user.id,
+                    token: code,
+                    expires_at: expiresAt.toISOString(),
+                    used: false
+                });
 
-                if (tokenError) {
-                    console.error('Error guardando código:', tokenError.message);
+            if (tokenError) {
+                console.error('Error guardando código:', tokenError.message);
+            } else {
+                // Enviar email con el código
+                const emailResult = await sendVerificationCodeEmail(email, code);
+
+                // Registrar en auditoría
+                await auditFromRequest(req, AUDIT_TYPES.PASSWORD_RESET_REQUEST || 'PASSWORD_RESET_REQUEST', {
+                    email,
+                    message: 'Solicitud de restablecimiento de contraseña (código)',
+                    emailSent: emailResult.success
+                });
+
+                if (emailResult.success) {
+                    console.log(`📧 Código de recuperación enviado a: ${email}`);
                 } else {
-                    // Enviar email con el código
-                    const emailResult = await sendVerificationCodeEmail(email, code);
-
-                    // Registrar en auditoría
-                    await auditFromRequest(req, AUDIT_TYPES.PASSWORD_RESET_REQUEST || 'PASSWORD_RESET_REQUEST', {
-                        email,
-                        message: 'Solicitud de restablecimiento de contraseña (código)',
-                        emailSent: emailResult.success
-                    });
-
-                    if (emailResult.success) {
-                        console.log(`📧 Código de recuperación enviado a: ${email}`);
-                    } else {
-                        console.error(`❌ Error enviando email a ${email}: ${emailResult.error}`);
-                    }
+                    console.error(`❌ Error enviando email a ${email}: ${emailResult.error}`);
                 }
             }
         }
@@ -671,11 +614,10 @@ router.post('/reset-password', async (req, res) => {
     }
 
     // Validar política de contraseña
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{10,}$/;
-    if (!passwordRegex.test(newPassword)) {
+    if (!isValidPassword(newPassword)) {
         return res.status(400).json({
             success: false,
-            error: 'La contraseña debe tener mínimo 10 caracteres, incluir mayúsculas, minúsculas, números y símbolos (@$!%*?&)'
+            error: getPasswordPolicyMessage()
         });
     }
 
