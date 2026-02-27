@@ -1,9 +1,8 @@
 # Guía de Integración: API Backend ↔ Videojuego VR (Unity)
 
 **Proyecto:** Cerebro al Fuego — Cocina VR  
-**Última actualización:** 2026-02-19  
-**URL Base del Backend (Producción):** `https://cerebro-al-fuego-image-482550109792.us-central1.run.app`  
-**URL Base del Backend (Desarrollo local):** `http://localhost:3001`
+**Última actualización:** 2026-02-14  
+**URL Base del Backend:** `http://localhost:3001` (desarrollo local)
 
 ---
 
@@ -12,23 +11,11 @@
 Todos los endpoints que consume el videojuego usan **API Key** en el header HTTP.
 
 ```
-Header: X-API-Key: <UNITY_API_KEY>
+Header: X-API-Key: YOUR_UNITY_API_KEY
 ```
 
 > **Importante:** Esta API Key debe estar configurada igual en ambos lados (backend `.env` y Unity).  
 > Si la key es inválida o no se envía, todos los endpoints responden **401 Unauthorized**.
-
-Ejemplo recomendado en Unity (variable centralizada):
-
-```csharp
-public static class BackendConfig
-{
-  public const string ProductionBaseUrl = "https://cerebro-al-fuego-image-482550109792.us-central1.run.app";
-  public const string LocalBaseUrl = "http://localhost:3001";
-  public const string BaseUrl = ProductionBaseUrl; // Cambiar a LocalBaseUrl para pruebas locales
-  public const string ApiKey = "<UNITY_API_KEY>"; // Inyectar por config en producción
-}
-```
 
 ---
 
@@ -109,7 +96,7 @@ GET /api/sessions/by-token/{token}
 
 **Headers:**
 ```
-X-API-Key: <UNITY_API_KEY>
+X-API-Key: YOUR_UNITY_API_KEY
 ```
 
 **Ejemplo de petición:**
@@ -128,7 +115,7 @@ GET http://localhost:3001/api/sessions/by-token/ABC123
 ```
 
 **¿Qué hacer con la respuesta?**
-- Usar `recipe_id` para cargar la receta correspondiente (ver catálogo de recetas más abajo)
+- Usar `recipe_id` para cargar la receta correspondiente (por ahora solo `"tinto"`)
 - Guardar `session_id` en memoria para usarlo en los endpoints 2 y 3
 - Guardar `participant_code` para usarlo como `participantId` en el endpoint 3
 
@@ -157,11 +144,11 @@ public class SessionResponse
 
 public IEnumerator GetSessionByToken(string token)
 {
-    string url = $"{BackendConfig.BaseUrl}/api/sessions/by-token/{token}";
+    string url = $"http://localhost:3001/api/sessions/by-token/{token}";
     
     using (UnityWebRequest request = UnityWebRequest.Get(url))
     {
-        request.SetRequestHeader("X-API-Key", BackendConfig.ApiKey);
+        request.SetRequestHeader("X-API-Key", "YOUR_UNITY_API_KEY");
         
         yield return request.SendWebRequest();
         
@@ -198,7 +185,7 @@ PUT /api/sessions/{id}/finish
 
 **Headers:**
 ```
-X-API-Key: <UNITY_API_KEY>
+X-API-Key: YOUR_UNITY_API_KEY
 Content-Type: application/json
 ```
 
@@ -230,11 +217,11 @@ PUT http://localhost:3001/api/sessions/a1b2c3d4-e5f6-7890-abcd-ef1234567890/fini
 ```csharp
 public IEnumerator FinishSession(string sessionId)
 {
-    string url = $"{BackendConfig.BaseUrl}/api/sessions/{sessionId}/finish";
+    string url = $"http://localhost:3001/api/sessions/{sessionId}/finish";
     
     using (UnityWebRequest request = UnityWebRequest.Put(url, "{}"))
     {
-        request.SetRequestHeader("X-API-Key", BackendConfig.ApiKey);
+        request.SetRequestHeader("X-API-Key", "YOUR_UNITY_API_KEY");
         request.SetRequestHeader("Content-Type", "application/json");
         
         yield return request.SendWebRequest();
@@ -259,7 +246,7 @@ POST /api/v1/session-results
 
 **Headers:**
 ```
-X-API-Key: <UNITY_API_KEY>
+X-API-Key: YOUR_UNITY_API_KEY
 Content-Type: application/json
 ```
 
@@ -451,7 +438,7 @@ public class ErrorData
 
 public IEnumerator SendSessionResults(SessionResultPayload payload)
 {
-    string url = $"{BackendConfig.BaseUrl}/api/v1/session-results";
+    string url = "http://localhost:3001/api/v1/session-results";
     string jsonBody = JsonUtility.ToJson(payload);
     
     using (UnityWebRequest request = new UnityWebRequest(url, "POST"))
@@ -460,7 +447,7 @@ public IEnumerator SendSessionResults(SessionResultPayload payload)
         request.uploadHandler = new UploadHandlerRaw(bodyRaw);
         request.downloadHandler = new DownloadHandlerBuffer();
         request.SetRequestHeader("Content-Type", "application/json");
-        request.SetRequestHeader("X-API-Key", BackendConfig.ApiKey);
+        request.SetRequestHeader("X-API-Key", "YOUR_UNITY_API_KEY");
         
         yield return request.SendWebRequest();
         
@@ -489,7 +476,7 @@ GET /api/v1/patients/lookup?identificacion={cedula}
 
 **Headers:**
 ```
-X-API-Key: <UNITY_API_KEY>
+X-API-Key: YOUR_UNITY_API_KEY
 ```
 
 **Ejemplo de petición:**
@@ -553,23 +540,15 @@ GET http://localhost:3001/api/v1/patients/lookup?identificacion=1234567890
 
 ---
 
-## Recetas Disponibles (Backend actual)
+## Recetas Disponibles
 
-El backend actualmente valida y permite estos `recipe_id`:
+Por ahora solo hay una receta. Cuando se agreguen más, el campo `recipe_id` tendrá otros valores.
 
-| recipe_id | Nombre | Dificultad |
-|-----------|--------|------------|
-| `tinto` | Tinto | Fácil |
-| `cafe_con_leche` | Café con leche | Fácil |
-| `macchiato` | Macchiato / Café manchado | Fácil |
-| `arepa_con_huevo` | Arepa con huevo | Intermedio |
-| `panqueques_con_frutas` | Panqueques con frutas | Intermedio |
-| `avena_con_toppings` | Avena caliente con toppings | Intermedio |
-| `arroz_con_pollo` | Arroz con pollo | Difícil |
-| `spaghetti_bolognesa` | Spaghetti a la boloñesa | Difícil |
-| `sancocho_de_res` | Sancocho de res | Difícil |
+| recipe_id | Nombre | Descripción |
+|-----------|--------|-------------|
+| `tinto` | Tinto (Café) | Preparación de café tinto colombiano |
 
-> Si Unity recibe un `recipe_id` que aún no tiene implementado visualmente, debe mostrar error controlado y no iniciar gameplay.
+> **Para agregar nuevas recetas:** Solo es necesario que Unity soporte el nuevo `recipe_id` como string. No se requiere cambio en el backend. El terapeuta seleccionará la receta desde el panel y el `recipe_id` llegará automáticamente al VR.
 
 ---
 
@@ -583,17 +562,6 @@ Todos los endpoints para Unity pueden devolver estos errores generales:
 | **400** | Datos faltantes o inválidos | Revisar el body/parámetros enviados |
 | **404** | Recurso no encontrado | El token/sesión no existe o ya no está activa |
 | **500** | Error interno del servidor | Reintentar después de unos segundos |
-
-Errores específicos a tener en cuenta:
-
-| Código interno | Dónde aparece | Significado |
-|----------------|---------------|-------------|
-| `UNAUTHORIZED` | Todos los endpoints Unity | API Key inválida o ausente |
-| `CONFIG_ERROR` | Todos los endpoints Unity | `UNITY_API_KEY` no configurada en backend |
-| `MISSING_TOKEN` | `GET /api/sessions/by-token/{token}` | Token no enviado |
-| `NOT_FOUND` | `PUT /api/sessions/{id}/finish` | Sesión activa no encontrada |
-| `MISSING_FIELD` | `POST /api/v1/session-results` | Falta campo requerido en payload |
-| `INVALID_SETS` | `POST /api/v1/session-results` | `sets` no es array válido |
 
 **Formato estándar de error:**
 ```json
@@ -611,18 +579,16 @@ Errores específicos a tener en cuenta:
 
 Puedes probar los endpoints desde la terminal antes de implementarlos en Unity:
 
-> Si vas a probar en entorno desplegado, reemplaza `http://localhost:3001` por `https://cerebro-al-fuego-image-482550109792.us-central1.run.app`.
-
 **1. Consultar sesión por token:**
 ```bash
-curl -H "X-API-Key: <UNITY_API_KEY>" \
+curl -H "X-API-Key: YOUR_UNITY_API_KEY" \
   http://localhost:3001/api/sessions/by-token/ABC123
 ```
 
 **2. Finalizar sesión:**
 ```bash
 curl -X PUT \
-  -H "X-API-Key: <UNITY_API_KEY>" \
+  -H "X-API-Key: YOUR_UNITY_API_KEY" \
   -H "Content-Type: application/json" \
   http://localhost:3001/api/sessions/{session_id}/finish
 ```
@@ -630,7 +596,7 @@ curl -X PUT \
 **3. Enviar resultados:**
 ```bash
 curl -X POST \
-  -H "X-API-Key: <UNITY_API_KEY>" \
+  -H "X-API-Key: YOUR_UNITY_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "participantId": "JPPE1234",
@@ -651,7 +617,7 @@ curl -X POST \
 
 **4. Verificar paciente:**
 ```bash
-curl -H "X-API-Key: <UNITY_API_KEY>" \
+curl -H "X-API-Key: YOUR_UNITY_API_KEY" \
   "http://localhost:3001/api/v1/patients/lookup?identificacion=1234567890"
 ```
 
@@ -669,17 +635,6 @@ curl -H "X-API-Key: <UNITY_API_KEY>" \
 
 5. **Solo puede existir una sesión ACTIVE por participante.** Si el terapeuta intenta crear otra, el backend responde 409 con el token existente.
 
-6. **Backend de producción actual:** `https://cerebro-al-fuego-image-482550109792.us-central1.run.app`.
+6. **El backend está en el puerto 3001.** Para producción la URL cambiará — se coordinará cuando sea el momento del deploy.
 
----
 
-## Checklist de Implementación para Unity
-
-- [ ] Centralizar `BaseUrl` y `ApiKey` en una sola clase de configuración.
-- [ ] Implementar flujo obligatorio: `by-token` → gameplay → `finish` → `session-results`.
-- [ ] Persistir localmente (`session_id`, `participant_code`, métricas) para recuperación ante cierre inesperado.
-- [ ] Reintentar `POST /api/v1/session-results` con backoff si falla por red/500.
-- [ ] Mostrar mensajes de error claros para `401`, `404` y `400`.
-- [ ] Enviar timestamps en ISO 8601 UTC (`DateTime.UtcNow.ToString("o")`).
-- [ ] Asegurar que `activityId` coincida con `recipe_id` recibido en `by-token`.
-- [ ] Validar que `sets` tenga al menos un elemento antes de enviar resultados.

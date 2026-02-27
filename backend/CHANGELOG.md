@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.8.3] - 2026-02-27
+
+### Added
+- **CORS flexible para previews Vercel**: soporte por sufijo de proyecto con `CORS_ALLOWED_VERCEL_PROJECT_SUFFIX`.
+
+### Changed
+- **Cloud Run proxy awareness**: `app.set('trust proxy', 1)` para respetar IP real detrás de proxy.
+- **Rate limit**: se excluye `OPTIONS` para evitar bloqueos de preflight CORS.
+- **Deploy docs**: guía manual actualizada (Cloud Run + Vercel + Redis) sin secretos en texto plano.
+
+### Fixed
+- **Preflight intermitente**: mitigados errores `429` en `/api/auth/check-setup` bajo alta frecuencia de preflight.
+
 ## [1.8.2] - 2026-02-23
 
 ### Added

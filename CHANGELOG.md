@@ -2,6 +2,37 @@
 
 Todos los cambios notables de este proyecto serán documentados en este archivo.
 
+## [1.8.3] - 2026-02-27
+
+### 🚀 Deploy y Operación
+
+- Despliegue manual consolidado para Backend (Cloud Run) y Frontend (Vercel).
+- Integración operativa de Redis en producción (`health/ready` reporta `redis: true`).
+- Actualización de CORS para soportar previews de Vercel del proyecto `flacoafks-projects`.
+
+### 🛡️ Estabilidad y Seguridad
+
+- Corrección de flujo intermitente que enviaba al formulario de setup por fallos transitorios de red.
+- `check-setup` en frontend ahora evita falsos negativos de configuración cuando hay degradación temporal.
+- Mejora de backend para Cloud Run:
+  - `trust proxy` habilitado.
+  - preflight `OPTIONS` excluido de rate limit para evitar `429` en CORS.
+
+### 🧹 Limpieza
+
+- Eliminación de workflows de GitHub Actions (`ci` y deploys) por canal de despliegue manual.
+- Limpieza de documentación de despliegue para evitar valores sensibles y usar placeholders.
+- Eliminación de scripts manuales legacy de `backend/tests` que no participaban en runtime/CI.
+- `.gitignore` endurecido para evitar commits accidentales de `.vercel/` y `.env.production`.
+
+### 🔄 Versionamiento
+
+- Root: `1.8.0` → `1.8.3`
+- Backend: `1.8.1` → `1.8.3`
+- Frontend: `1.8.1` → `1.8.3`
+
+---
+
 ## [1.8.1] - 2026-02-09
 
 ### ♻️ Refactorización Frontend

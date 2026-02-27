@@ -70,7 +70,12 @@ const authService = {
             const response = await api.get('/api/auth/check-setup');
             return response.data || response;
         } catch (error) {
-            return { configured: false };
+            // En errores transitorios (red/CORS/timeout), no forzar flujo de setup.
+            return {
+                configured: true,
+                degraded: true,
+                error: error.message || 'No se pudo verificar estado de setup'
+            };
         }
     },
 

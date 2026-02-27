@@ -4,7 +4,7 @@
 -- ============================================================================
 -- Instrucciones:
 -- 1. Ve a tu Dashboard de Supabase (https://app.supabase.com)
--- 2. Selecciona tu proyecto: vtspkfdwhazxrigihdto
+-- 2. Selecciona tu proyecto: your-supabase-project-id
 -- 3. Ve al "SQL Editor" en el menú lateral
 -- 4. Copia y pega este script completo
 -- 5. Ejecuta (Run)
@@ -130,3 +130,4 @@ ORDER BY table_name;
 -- ============================================================================
 -- FIN DE MIGRACIÓN
 -- ============================================================================
+

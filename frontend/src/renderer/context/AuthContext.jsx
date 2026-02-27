@@ -38,7 +38,7 @@ export const AuthProvider = ({ children }) => {
             const result = await authService.checkSetup();
 
             // Si el backend devuelve success: true, usamos el valor de 'configured'
-            // Si falla, asumimos configurado para no bloquear error, o no configurado si es 404/etc
+            // Si hay degradación de red, authService devuelve configured=true para no bloquear en setup.
             if (result && typeof result.configured !== 'undefined') {
                 setIsSetupConfigured(result.configured);
                 

@@ -11,9 +11,12 @@ import api from '../services/api';
 const ResetPassword = () => {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
-    const token = searchParams.get('token');
+    const tokenFromUrl = (searchParams.get('token') || '').trim();
+    const emailHint = (searchParams.get('email') || '').trim();
+    const requiresVerificationCode = tokenFromUrl.length === 0;
 
     const [formData, setFormData] = useState({
+        verificationCode: tokenFromUrl,
         password: '',
         confirmPassword: ''
     });
@@ -23,12 +26,15 @@ const ResetPassword = () => {
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-    // Verificar que hay token
+    // Mantener el código sincronizado si llega token por query string
     useEffect(() => {
-        if (!token) {
-            setError('Enlace inválido. No se encontró el token de recuperación.');
+        if (tokenFromUrl) {
+            setFormData((prev) => ({
+                ...prev,
+                verificationCode: tokenFromUrl
+            }));
         }
-    }, [token]);
+    }, [tokenFromUrl]);
 
     /**
      * Manejar cambios en los inputs
@@ -45,7 +51,14 @@ const ResetPassword = () => {
     /**
      * Validar contraseña
      */
-    const validatePassword = () => {
+    const validateForm = () => {
+        if (requiresVerificationCode) {
+            const code = formData.verificationCode.trim();
+            if (!/^\d{6}$/.test(code)) {
+                return 'Ingrese el código de 6 dígitos enviado a su correo';
+            }
+        }
+
         if (formData.password.length < 10) {
             return 'La contraseña debe tener al menos 10 caracteres';
         }
@@ -74,17 +87,19 @@ const ResetPassword = () => {
         e.preventDefault();
         setError('');
 
-        // Validar contraseña
-        const validationError = validatePassword();
+        // Validar formulario
+        const validationError = validateForm();
         if (validationError) {
             setError(validationError);
             return;
         }
 
+        const recoveryToken = tokenFromUrl || formData.verificationCode.trim();
+
         setLoading(true);
         try {
             const response = await api.post('/api/auth/reset-password', {
-                token,
+                token: recoveryToken,
                 newPassword: formData.password
             });
 
@@ -94,7 +109,7 @@ const ResetPassword = () => {
                 setError(response.error || 'Error al restablecer la contraseña');
             }
         } catch (err) {
-            setError('Error de conexión con el servidor');
+            setError(err.message || 'Error de conexión con el servidor');
         } finally {
             setLoading(false);
         }
@@ -127,34 +142,6 @@ const ResetPassword = () => {
         );
     }
 
-    // Pantalla de error (sin token)
-    if (!token) {
-        return (
-            <div className="min-h-screen bg-[#C5CDE8] flex flex-col items-center justify-center p-4">
-                <div className="w-full max-w-md">
-                    <div className="bg-white rounded-2xl shadow-xl p-8 text-center">
-                        <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </div>
-                        <h2 className="text-2xl font-bold text-gray-800 mb-2">
-                            Enlace Inválido
-                        </h2>
-                        <p className="text-gray-600 mb-6">
-                            Este enlace de recuperación no es válido o ha expirado.
-                        </p>
-                        <Link to="/forgot-password">
-                            <Button>
-                                Solicitar Nuevo Enlace
-                            </Button>
-                        </Link>
-                    </div>
-                </div>
-            </div>
-        );
-    }
-
     return (
         <div className="min-h-screen bg-[#C5CDE8] flex flex-col items-center justify-center p-4">
             <div className="w-full max-w-md">
@@ -164,16 +151,49 @@ const ResetPassword = () => {
                         <Logo size="lg" />
                     </div>
                     <h1 className="text-3xl font-bold text-gray-800 mb-1">
-                        Nueva Contraseña
+                        Restablecer Contraseña
                     </h1>
                     <p className="text-gray-600">
-                        Ingrese su nueva contraseña
+                        {requiresVerificationCode
+                            ? 'Ingrese el código recibido y su nueva contraseña'
+                            : 'Ingrese su nueva contraseña'}
                     </p>
+                    {requiresVerificationCode && emailHint && (
+                        <p className="text-xs text-gray-500 mt-2">
+                            Correo: <strong>{emailHint}</strong>
+                        </p>
+                    )}
                 </div>
 
                 {/* Card del formulario */}
                 <div className="bg-white rounded-2xl shadow-xl p-8">
                     <form onSubmit={handleSubmit} className="space-y-6">
+                        {/* Código de verificación (flujo por correo) */}
+                        {requiresVerificationCode && (
+                            <div className="space-y-1.5">
+                                <label className="block text-sm font-medium text-gray-700">
+                                    Código de Verificación
+                                </label>
+                                <div className="relative">
+                                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M9 3h6a2 2 0 012 2v1H7V5a2 2 0 012-2zm-2 4h10a2 2 0 012 2v10a2 2 0 01-2 2H7a2 2 0 01-2-2V9a2 2 0 012-2z" />
+                                        </svg>
+                                    </div>
+                                    <input
+                                        type="text"
+                                        name="verificationCode"
+                                        value={formData.verificationCode}
+                                        onChange={handleChange}
+                                        placeholder="123456"
+                                        inputMode="numeric"
+                                        maxLength={6}
+                                        className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-colors tracking-[0.4em] font-semibold"
+                                    />
+                                </div>
+                            </div>
+                        )}
+
                         {/* Campo Nueva Contraseña */}
                         <div className="space-y-1.5">
                             <label className="block text-sm font-medium text-gray-700">

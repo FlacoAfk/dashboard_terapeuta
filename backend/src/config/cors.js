@@ -2,9 +2,12 @@ const DEFAULT_ALLOWED_ORIGINS = [
     'http://localhost:3000',
     'http://localhost:5173',
     'http://localhost:5174',
-    'file://',
-    'https://cerebro-al-fuego-image-482550109792.us-central1.run.app'
+    'file://'
 ];
+
+function getVercelProjectSuffix() {
+    return String(process.env.CORS_ALLOWED_VERCEL_PROJECT_SUFFIX || '').trim().toLowerCase();
+}
 
 function getAllowedOrigins() {
     const configured = process.env.CORS_ALLOWED_ORIGINS;
@@ -20,6 +23,7 @@ function getAllowedOrigins() {
 
 function buildCorsOptions() {
     const allowedOrigins = new Set(getAllowedOrigins());
+    const vercelProjectSuffix = getVercelProjectSuffix();
 
     const isLoopbackOrigin = (origin) => {
         if (!origin || typeof origin !== 'string') {
@@ -30,6 +34,21 @@ function buildCorsOptions() {
     };
 
     const isElectronNullOrigin = (origin) => origin === 'null';
+    const isAllowedVercelPreview = (origin) => {
+        if (!origin || !vercelProjectSuffix) {
+            return false;
+        }
+
+        try {
+            const parsed = new URL(origin);
+            return (
+                parsed.protocol === 'https:' &&
+                parsed.hostname.endsWith(`-${vercelProjectSuffix}.vercel.app`)
+            );
+        } catch {
+            return false;
+        }
+    };
 
     return {
         credentials: true,
@@ -39,7 +58,12 @@ function buildCorsOptions() {
                 return;
             }
 
-            if (allowedOrigins.has(origin) || isLoopbackOrigin(origin) || isElectronNullOrigin(origin)) {
+            if (
+                allowedOrigins.has(origin) ||
+                isLoopbackOrigin(origin) ||
+                isElectronNullOrigin(origin) ||
+                isAllowedVercelPreview(origin)
+            ) {
                 callback(null, true);
                 return;
             }

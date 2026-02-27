@@ -4,6 +4,16 @@ const { getRedisClient } = require('../utils/cache');
 
 const router = express.Router();
 
+/**
+ * @swagger
+ * /health:
+ *   get:
+ *     summary: Estado general del backend
+ *     tags: [Health]
+ *     responses:
+ *       200:
+ *         description: Backend operativo
+ */
 router.get('/health', (req, res) => {
     const baseUrl = `${req.protocol}://${req.get('host')}`;
 
@@ -16,6 +26,16 @@ router.get('/health', (req, res) => {
     });
 });
 
+/**
+ * @swagger
+ * /health/live:
+ *   get:
+ *     summary: Liveness probe
+ *     tags: [Health]
+ *     responses:
+ *       200:
+ *         description: Proceso vivo
+ */
 router.get('/health/live', (req, res) => {
     res.json({
         status: 'alive',
@@ -24,6 +44,18 @@ router.get('/health/live', (req, res) => {
     });
 });
 
+/**
+ * @swagger
+ * /health/ready:
+ *   get:
+ *     summary: Readiness probe (DB/Redis)
+ *     tags: [Health]
+ *     responses:
+ *       200:
+ *         description: Dependencias listas
+ *       503:
+ *         description: Dependencias no listas
+ */
 router.get('/health/ready', async (req, res) => {
     const dbReady = await testConnection();
     const redisReady = !!getRedisClient() || process.env.REDIS_CACHE_ENABLED === 'false';

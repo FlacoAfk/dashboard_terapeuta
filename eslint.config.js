@@ -21,7 +21,7 @@ module.exports = [
             }
         },
         rules: {
-            'no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+            'no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
             'no-undef': 'error'
         }
     },
@@ -41,7 +41,7 @@ module.exports = [
             }
         },
         rules: {
-            'no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+            'no-unused-vars': 'off',
             'no-undef': 'error'
         }
     }

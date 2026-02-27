@@ -218,7 +218,7 @@ router.get('/user/:id', authenticateToken, requireSuperAdmin, async (req, res) =
 
         const formattedData = data.map(a => {
             const descripcionObj = parseDescripcion(a.descripcion);
-            const { _actor_email, _ip_origen, _tipo_label, ...detalleClean } = descripcionObj;
+            const { _ip_origen, _tipo_label, ...detalleClean } = descripcionObj;
 
             return {
                 id: a.id,

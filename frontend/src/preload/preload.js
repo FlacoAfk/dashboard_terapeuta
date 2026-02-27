@@ -8,6 +8,7 @@
  */
 
 const { contextBridge, ipcRenderer } = require('electron');
+const DEFAULT_API_URL = 'https://cerebro-al-fuego-image-482550109792.us-central1.run.app';
 
 // Exponer APIs al renderer de forma segura
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -29,7 +30,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 // Exponer información del entorno
 contextBridge.exposeInMainWorld('env', {
     isDevelopment: process.env.NODE_ENV === 'development',
-    apiUrl: process.env.API_URL || 'http://localhost:3001',
+    apiUrl: process.env.API_URL || DEFAULT_API_URL,
     apiTimeoutMs: Number(process.env.API_TIMEOUT_MS || 15000),
     appVersion: require('../../package.json').version
 });

@@ -2,8 +2,8 @@
 
 Sistema de gestión clínica para el proyecto de realidad virtual "Cerebro al Fuego". Permite la administración de terapeutas, pacientes, sesiones VR con evaluación del desempeño, y auditoría del sistema.
 
-**Versión:** 1.8.1  
-**Última actualización:** 2026-02-09
+**Versión:** 1.8.3  
+**Última actualización:** 2026-02-27
 
 ---
 
@@ -83,9 +83,9 @@ dashboard_terapeuta/
 │   ├── scripts/
 │   │   └── seed_complete.js        # Poblar BD con datos iniciales
 │   ├── tests/
-│   │   ├── e2e_validation.js       # Tests E2E automáticos
-│   │   ├── full_endpoint_audit.js  # Auditoría de endpoints
-│   │   └── security_validation.js  # Validación de seguridad
+│   │   ├── app.test.js             # Smoke tests locales del backend
+│   │   ├── integration/            # Pruebas de contrato contra API desplegada
+│   │   └── performance_p95.js      # Baseline de latencia p95
 │   ├── Dockerfile                  # Imagen Docker para Cloud Run
 │   ├── docker-compose.yml          # Docker Compose para desarrollo
 │   ├── API_ENDPOINTS.md            # Documentación detallada de endpoints
@@ -245,7 +245,7 @@ SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_USER=tu_email@gmail.com
 SMTP_PASS=tu_app_password
-SMTP_FROM="Cerebro al Fuego" <tu_email@gmail.com>
+SMTP_FROM=tu_email@gmail.com
 
 # Superadmin (para seed)
 SUPERADMIN_EMAIL=admin@tudominio.com

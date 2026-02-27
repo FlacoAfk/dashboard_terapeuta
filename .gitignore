@@ -5,6 +5,7 @@ node_modules/
 .env
 .env.local
 .env.*.local
+.env.production
 backend/.env
 
 # Build outputs
@@ -63,3 +64,6 @@ backend/scripts/clear_with_sql.js
 
 # Gemini/AI artifacts (local only)
 .gemini/
+
+# Vercel local state
+.vercel/

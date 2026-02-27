@@ -78,7 +78,13 @@ const ForgotPassword = () => {
                                 contacte al administrador del sistema para que restablezca su contraseña manualmente.
                             </p>
                         </div>
-                        <Button onClick={() => navigate('/login')}>
+                        <Button
+                            onClick={() => navigate(`/reset-password?email=${encodeURIComponent(email)}`)}
+                            className="mb-3"
+                        >
+                            Ingresar Código
+                        </Button>
+                        <Button variant="secondary" onClick={() => navigate('/login')}>
                             Volver al Login
                         </Button>
                     </div>

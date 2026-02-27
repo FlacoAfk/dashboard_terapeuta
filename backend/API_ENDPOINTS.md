@@ -137,9 +137,9 @@ Inicia sesión de usuario. Incluye protección anti-brute-force (bloqueo tempora
       "token": "eyJhbGciOiJI...",
       "user": {
         "id": 1,
-        "email": "cerebroalfuego@gmail.com",
+        "email": "admin@example.com",
         "rol": "SUPERADMIN",
-        "nombre": "cerebroalfuego@gmail.com",
+        "nombre": "admin@example.com",
         "id_terapeuta": null
       }
     }
@@ -161,11 +161,11 @@ Obtiene información del usuario autenticado.
     "success": true,
     "data": {
       "id": 1,
-      "email": "cerebroalfuego@gmail.com",
+      "email": "admin@example.com",
       "rol": "SUPERADMIN",
       "activo": true,
       "ultimo_acceso": "2026-02-09T06:11:14.704",
-      "nombre": "cerebroalfuego@gmail.com"
+      "nombre": "admin@example.com"
     }
   }
   ```
@@ -852,7 +852,7 @@ Lista eventos de auditoría con paginación.
         "tipo_evento": "PATIENT_ASSIGNED",
         "tipo_label": "Paciente asignado",
         "id_usuario": 1,
-        "actor_email": "cerebroalfuego@gmail.com",
+        "actor_email": "admin@example.com",
         "actor_nombre": null,
         "ip_origen": "::1",
         "detalle": { "id_paciente": "15", "terapeuta_nombre": "Dr. Juan" },
@@ -947,3 +947,5 @@ Descarga registros de auditoría en formato CSV.
 | 33 | GET | `/api/audit/types` | JWT + SuperAdmin | 401 | 200 |
 | 34 | GET | `/api/audit/user/:id` | JWT + SuperAdmin | 401 | 200 |
 | 35 | GET | `/api/audit/export` | JWT + SuperAdmin | 401 | 200 (CSV) |
+
+

@@ -6,6 +6,8 @@ function getWebEnv() {
     return {};
 }
 
+const DEFAULT_API_URL = 'https://cerebro-al-fuego-image-482550109792.us-central1.run.app';
+
 export function isElectronRuntime() {
     return typeof window !== 'undefined' && Boolean(window.electronAPI);
 }
@@ -17,7 +19,7 @@ export function getApiUrl() {
     return (
         windowEnv?.apiUrl ||
         webEnv.VITE_API_URL ||
-        'http://localhost:3001'
+        DEFAULT_API_URL
     );
 }
 

@@ -8,7 +8,7 @@
  * 
  * Contenido:
  * - 1 Superadmin (desde .env)
- * - 3 Terapeutas activos (incluye cuenta de prueba julianmonj45@gmail.com)
+ * - 3 Terapeutas activos de prueba
  * - 12 Pacientes adultos mayores con datos demográficos colombianos
  * - ~40-70 Sesiones VR del videojuego con sets, errores y observaciones
  * - Eventos de auditoría realistas en formato JSON
@@ -19,6 +19,7 @@
 require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 const bcrypt = require('bcryptjs');
+const { VALID_RECIPE_IDS } = require('../src/constants/recipes');
 
 const supabase = createClient(
     process.env.SUPABASE_URL,
@@ -88,10 +89,10 @@ const OBSERVACIONES_CLINICAS = [
 const SET_NAMES = ['Reconocimiento', 'Recolección', 'Preparación', 'Organización'];
 
 // Recetas disponibles (Match con constraint de BD)
-const RECIPE_IDS = [
-    'tinto', 'cafe_con_leche', 'macchiato', 'arepa_con_huevo',
-    'panqueques_con_frutas', 'avena_con_toppings',
-    'arroz_con_pollo', 'spaghetti_bolognesa', 'sancocho_de_res'
+const RECIPE_IDS = VALID_RECIPE_IDS;
+
+const RETURNABLE_OBJECTS = [
+    'Cuchara', 'Taza', 'Plato', 'Sartén', 'Olla', 'Espátula', 'Vaso medidor'
 ];
 
 // ========================================
@@ -138,6 +139,119 @@ function thisWeekDate() {
     date.setDate(date.getDate() - daysBack);
     date.setHours(Math.floor(Math.random() * 8) + 8, Math.floor(Math.random() * 60), Math.floor(Math.random() * 60));
     return date;
+}
+
+function buildErrorText(errorOrMessage = '') {
+    if (!errorOrMessage) return '';
+    if (typeof errorOrMessage === 'string') return errorOrMessage;
+
+    return [
+        errorOrMessage.message,
+        errorOrMessage.details,
+        errorOrMessage.hint
+    ]
+        .filter(Boolean)
+        .join(' ');
+}
+
+function isMissingTableError(errorOrMessage = '') {
+    const code = String(errorOrMessage?.code || '');
+    const message = buildErrorText(errorOrMessage).toLowerCase();
+
+    return (
+        code === 'PGRST205' ||
+        (message.includes('relation') && message.includes('does not exist')) ||
+        message.includes('could not find the table')
+    );
+}
+
+function isMissingColumnError(errorOrMessage = '') {
+    const message = buildErrorText(errorOrMessage).toLowerCase();
+    return message.includes('column') && message.includes('does not exist');
+}
+
+function buildDeleteQuery(table, strategy) {
+    let query = supabase.from(table).delete();
+
+    if (strategy.type === 'notnull') {
+        return query.not(strategy.column, 'is', null);
+    }
+
+    if (strategy.type === 'gte') {
+        return query.gte(strategy.column, strategy.value);
+    }
+
+    if (strategy.type === 'neq') {
+        return query.neq(strategy.column, strategy.value);
+    }
+
+    return query.gte('id', 0);
+}
+
+async function deleteWithFallbackStrategies(table, strategies) {
+    const fallbackStrategies = Array.isArray(strategies) ? strategies : [strategies];
+    let lastError = null;
+
+    for (const strategy of fallbackStrategies) {
+        const result = await buildDeleteQuery(table, strategy);
+
+        if (!result.error) {
+            return { ok: true };
+        }
+
+        if (isMissingTableError(result.error)) {
+            return { ok: true, skippedMissingTable: true };
+        }
+
+        // Permite compatibilidad entre variantes de esquema usando columnas alternativas.
+        if (isMissingColumnError(result.error)) {
+            lastError = result.error;
+            continue;
+        }
+
+        return { ok: false, error: result.error };
+    }
+
+    return { ok: false, error: lastError || new Error(`No se pudo limpiar ${table}`) };
+}
+
+function generarCedulaUnica(usedCedulas) {
+    let candidate = generarCedula();
+    let attempts = 0;
+    while (usedCedulas.has(candidate) && attempts < 200) {
+        candidate = generarCedula();
+        attempts++;
+    }
+    usedCedulas.add(candidate);
+    return candidate;
+}
+
+function generarCodigoRecuperacionUnico(usedCodes) {
+    let code = Math.floor(100000 + Math.random() * 900000).toString();
+    let attempts = 0;
+    while (usedCodes.has(code) && attempts < 200) {
+        code = Math.floor(100000 + Math.random() * 900000).toString();
+        attempts++;
+    }
+    usedCodes.add(code);
+    return code;
+}
+
+function generarStartTokenUnico(usedTokens) {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let token = '';
+    let attempts = 0;
+
+    while ((token.length === 0 || usedTokens.has(token)) && attempts < 200) {
+        token = '';
+        for (let i = 0; i < 6; i++) {
+            token += chars[Math.floor(Math.random() * chars.length)];
+        }
+        attempts++;
+    }
+
+    usedTokens.add(token);
+    return token;
 }
 
 // Crear evento de auditoría en formato JSON correcto
@@ -194,13 +308,27 @@ function generarSesionVR(participantId, fecha) {
         const errors = [];
         for (let j = 0; j < numErrors; j++) {
             const err = random(ERROR_CODES);
+            const eventIso = new Date(currentTime.getTime() + Math.random() * setDuration * 1000).toISOString();
             errors.push({
                 code: err.code,
                 message: err.message,
-                timestampIso: new Date(currentTime.getTime() + Math.random() * setDuration * 1000).toISOString(),
+                timestampIso: eventIso,
+                timeIso: eventIso,
                 context: random(err.contextos)
             });
         }
+
+        const completion = setName === 'Preparación'
+            ? {
+                coffeeAdded: Math.random() > 0.15,
+                sugarAdded: Math.random() > 0.2,
+                cupCoffeeAmount01: Number((Math.random() * 0.45 + 0.5).toFixed(2))
+            }
+            : undefined;
+
+        const returnedObjects = setName === 'Organización'
+            ? RETURNABLE_OBJECTS.filter(() => Math.random() > 0.62)
+            : [];
 
         sets.push({
             setName,
@@ -212,6 +340,8 @@ function generarSesionVR(participantId, fecha) {
             dropsCount: Math.floor(Math.random() * 2),
             releasesCount: Math.floor(Math.random() * 5) + 1,
             errorsCount: numErrors,
+            completion,
+            returnedObjects,
             errors
         });
 
@@ -247,12 +377,22 @@ async function seed() {
     console.log('🌱 Iniciando seed de base de datos...');
     console.log('⚠️  Se eliminarán todos los datos existentes.\n');
 
+    if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        throw new Error('SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY son requeridas para ejecutar el seed.');
+    }
+
+    if (String(process.env.SUPABASE_SERVICE_ROLE_KEY).includes('sb_publishable_')) {
+        console.warn('⚠️  Se detectó una key publishable en SUPABASE_SERVICE_ROLE_KEY.');
+        console.warn('    Si hay RLS activa, el seed puede fallar. Se recomienda usar la service_role key.\n');
+    }
+
     // ────────────────────────────────────
     // 0. LIMPIAR BD (orden por dependencias FK)
     // ────────────────────────────────────
     console.log('🧹 Limpiando base de datos...');
     const tablesToClean = [
         'vr_set_errors',
+        'vr_set_returned_objects',
         'vr_set_results',
         'vr_session_results',
         'sessions',
@@ -264,20 +404,64 @@ async function seed() {
         'usuarios'
     ];
 
+    const cleanupStrategies = {
+        vr_set_errors: [
+            { type: 'notnull', column: 'set_id' },
+            { type: 'notnull', column: 'code' }
+        ],
+        vr_set_returned_objects: [
+            { type: 'notnull', column: 'set_id' },
+            { type: 'notnull', column: 'object_name' }
+        ],
+        vr_set_results: [
+            { type: 'notnull', column: 'session_id' },
+            { type: 'notnull', column: 'set_name' }
+        ],
+        vr_session_results: [
+            { type: 'notnull', column: 'participant_id' },
+            { type: 'notnull', column: 'activity_id' }
+        ],
+        sessions: [
+            { type: 'notnull', column: 'start_token' },
+            { type: 'notnull', column: 'participant_code' }
+        ],
+        auditoria: [
+            { type: 'gte', column: 'id', value: 0 },
+            { type: 'notnull', column: 'tipo_accion' }
+        ],
+        password_reset_tokens: [
+            { type: 'gte', column: 'id', value: 0 },
+            { type: 'notnull', column: 'token' }
+        ],
+        terapeuta_paciente: [
+            { type: 'notnull', column: 'id_terapeuta' },
+            { type: 'notnull', column: 'id_paciente' }
+        ],
+        pacientes: [
+            { type: 'gte', column: 'id', value: 0 },
+            { type: 'notnull', column: 'nombre' }
+        ],
+        terapeutas: [
+            { type: 'gte', column: 'id', value: 0 },
+            { type: 'notnull', column: 'id_usuario' }
+        ],
+        usuarios: [
+            { type: 'gte', column: 'id', value: 0 },
+            { type: 'notnull', column: 'email' }
+        ]
+    };
+
     for (const table of tablesToClean) {
-        // UUID tables need a different filter — use gte on id to match everything
-        // For integer-ID tables, use neq('id', -99999)
-        const uuidTables = ['vr_set_errors', 'vr_set_results', 'vr_session_results', 'password_reset_tokens'];
-        let result;
-        if (uuidTables.includes(table)) {
-            result = await supabase.from(table).delete().gte('created_at', '1970-01-01T00:00:00Z');
-        } else if (table === 'terapeuta_paciente') {
-            result = await supabase.from(table).delete().gte('id_terapeuta', 0);
-        } else {
-            result = await supabase.from(table).delete().neq('id', -99999);
+        const strategy = cleanupStrategies[table] || [{ type: 'gte', column: 'id', value: 0 }];
+        const cleanupResult = await deleteWithFallbackStrategies(table, strategy);
+
+        if (!cleanupResult.ok) {
+            const details = buildErrorText(cleanupResult.error);
+            throw new Error(`Error limpiando ${table}: ${details}`);
         }
-        if (result.error) {
-            console.warn(`   ⚠️  ${table}: ${result.error.message}`);
+
+        if (cleanupResult.skippedMissingTable) {
+            console.log(`   ℹ️  ${table} no existe en este esquema, se omite.`);
         } else {
             console.log(`   ✅ ${table} limpiada`);
         }
@@ -287,8 +471,8 @@ async function seed() {
     // 1. SUPERADMIN
     // ────────────────────────────────────
     console.log('\n👤 Creando Superadministrador...');
-    const superadminEmail = process.env.SUPERADMIN_EMAIL || 'cerebroalfuego@gmail.com';
-    const superadminPassword = process.env.SUPERADMIN_PASSWORD || 'Admin@123456';
+    const superadminEmail = process.env.SUPERADMIN_EMAIL || 'superadmin@example.com';
+    const superadminPassword = process.env.SUPERADMIN_PASSWORD || 'ChangeThisDefaultPassword123!';
 
     const adminPasswordHash = await bcrypt.hash(superadminPassword, 10);
     const { data: admin, error: adminError } = await supabase
@@ -312,25 +496,26 @@ async function seed() {
     // 2. TERAPEUTAS
     // ────────────────────────────────────
     console.log('\n👨‍⚕️ Creando Terapeutas...');
+    const seedTherapistPassword = process.env.SEED_THERAPIST_PASSWORD || 'TherapistSeed123!';
     const terapeutasData = [
         {
-            nombre: 'Dr. Julian Medina Monje',
-            email: 'julianmonj45@gmail.com',
-            password: 'Julianmed45@',
+            nombre: 'Dra. Laura Rivera',
+            email: 'terapeuta1@example.com',
+            password: seedTherapistPassword,
             especialidad: 'Neuropsicología',
             telefono: generarTelefonoColombia()
         },
         {
-            nombre: 'Dra. Carolina Mejía Ospina',
-            email: 'carolina.mejia@cerebroalfuego.com',
-            password: 'Terapeuta@123',
+            nombre: 'Dr. Mateo Salazar',
+            email: 'terapeuta2@example.com',
+            password: seedTherapistPassword,
             especialidad: 'Geriatría Cognitiva',
             telefono: generarTelefonoColombia()
         },
         {
-            nombre: 'Dr. Alejandro Restrepo Gómez',
-            email: 'alejandro.restrepo@cerebroalfuego.com',
-            password: 'Terapeuta@123',
+            nombre: 'Dra. Valentina Ocampo',
+            email: 'terapeuta3@example.com',
+            password: seedTherapistPassword,
             especialidad: 'Terapia Ocupacional',
             telefono: generarTelefonoColombia()
         }
@@ -389,6 +574,18 @@ async function seed() {
     // ────────────────────────────────────
     console.log('\n🧑‍🦳 Creando Pacientes...');
     const pacientes = [];
+    const usedCedulas = new Set();
+
+    const { data: existingCedulas, error: existingCedulasError } = await supabase
+        .from('pacientes')
+        .select('identificacion');
+
+    if (!existingCedulasError && Array.isArray(existingCedulas)) {
+        existingCedulas
+            .map(p => p.identificacion)
+            .filter(Boolean)
+            .forEach(id => usedCedulas.add(String(id)));
+    }
 
     // Distribución: 5 para el primer terapeuta, 4 para el segundo, 3 para el tercero
     const distribucion = [5, 4, 3];
@@ -405,7 +602,7 @@ async function seed() {
             const apellido2 = random(APELLIDOS);
             const nombreCompleto = `${nombre} ${apellido1} ${apellido2}`;
             const edad = generarEdad(60, 85);
-            const cedula = generarCedula();
+            const cedula = generarCedulaUnica(usedCedulas);
             // Todos activos excepto el último paciente (para verificar filtro)
             const activo = pacienteIndex < 11;
 
@@ -457,6 +654,7 @@ async function seed() {
     let vrSessionCount = 0;
     let vrRevisadas = 0;
     let vrPendientes = 0;
+    let returnedObjectsTableAvailable = true;
     const sesionesCreadas = []; // Para auditoría
 
     const pacientesActivos = pacientes.filter(p => p.activo);
@@ -544,6 +742,26 @@ async function seed() {
                         objeto_contexto: error.context || null
                     });
                 }
+
+                if (returnedObjectsTableAvailable && Array.isArray(set.returnedObjects) && set.returnedObjects.length > 0) {
+                    const returnedRows = set.returnedObjects.map(objectName => ({
+                        set_id: setResult.id,
+                        object_name: objectName
+                    }));
+
+                    const { error: returnedObjectsError } = await supabase
+                        .from('vr_set_returned_objects')
+                        .insert(returnedRows);
+
+                    if (returnedObjectsError) {
+                        if (isMissingTableError(returnedObjectsError)) {
+                            returnedObjectsTableAvailable = false;
+                            console.log('   ℹ️  Tabla vr_set_returned_objects no disponible, se omite su carga.');
+                        } else {
+                            console.error('   ❌ Error insertando objetos retornados:', buildErrorText(returnedObjectsError));
+                        }
+                    }
+                }
             }
 
             if (esRevisada) {
@@ -563,7 +781,30 @@ async function seed() {
     // ────────────────────────────────────
     console.log('\n🥘 Creando Sesiones de Receta (HU-01)...');
     let recipeSessionsCount = 0;
-    const sessionStatuses = ['CREATED', 'ACTIVE', 'FINISHED'];
+    const recipeSessionStatusCounts = { CREATED: 0, ACTIVE: 0, FINISHED: 0 };
+    const usedSessionTokens = new Set();
+    const participantsWithInProgressSession = new Set();
+    const therapistsWithInProgressSession = new Set();
+
+    const { data: existingSessions, error: existingSessionsError } = await supabase
+        .from('sessions')
+        .select('start_token, participant_code, status, created_by');
+
+    if (!existingSessionsError && Array.isArray(existingSessions)) {
+        existingSessions.forEach(session => {
+            if (session.start_token) {
+                usedSessionTokens.add(String(session.start_token));
+            }
+            if (session.status === 'CREATED' || session.status === 'ACTIVE') {
+                if (session.participant_code) {
+                    participantsWithInProgressSession.add(String(session.participant_code));
+                }
+                if (session.created_by) {
+                    therapistsWithInProgressSession.add(Number(session.created_by));
+                }
+            }
+        });
+    }
 
     // Crear algunas sesiones para cada terapeuta
     for (const terapeuta of terapeutas) {
@@ -583,35 +824,144 @@ async function seed() {
                     participantCode = 'INVITADO-' + Math.floor(Math.random() * 1000);
                 }
             } else {
-                participantCode = 'INVITADO-' + Math.floor(Math.random() * 1000);
+                participantCode = `INVITADO-${terapeuta.id}-${i + 1}-${Math.floor(Math.random() * 900 + 100)}`;
             }
 
-            const status = random(sessionStatuses);
-            // Generar token único de 6 caracteres
-            const token = Math.random().toString(36).substring(2, 8).toUpperCase();
+            let status = 'FINISHED';
+            const canCreateInProgressSession =
+                !participantsWithInProgressSession.has(participantCode) &&
+                !therapistsWithInProgressSession.has(terapeuta.id);
 
-            const { error: sessionError } = await supabase
-                .from('sessions')
-                .insert({
-                    participant_code: participantCode,
-                    recipe_id: random(RECIPE_IDS),
-                    status: status,
-                    start_token: token,
-                    created_by: terapeuta.id,
-                    created_at: randomDate(7).toISOString() // Últimos 7 días
-                });
+            if (canCreateInProgressSession && i === 0) {
+                status = Math.random() > 0.5 ? 'CREATED' : 'ACTIVE';
+            } else if (canCreateInProgressSession && Math.random() > 0.75) {
+                status = Math.random() > 0.5 ? 'CREATED' : 'ACTIVE';
+            }
 
-            if (sessionError) {
-                console.error(`   ❌ Error creando sesión de receta:`, sessionError.message);
-            } else {
+            let createdSession = false;
+            let attempts = 0;
+
+            while (!createdSession && attempts < 6) {
+                attempts++;
+                const token = generarStartTokenUnico(usedSessionTokens);
+
+                if ((status === 'CREATED' || status === 'ACTIVE') && participantsWithInProgressSession.has(participantCode)) {
+                    status = 'FINISHED';
+                }
+                if ((status === 'CREATED' || status === 'ACTIVE') && therapistsWithInProgressSession.has(terapeuta.id)) {
+                    status = 'FINISHED';
+                }
+
+                const { error: sessionError } = await supabase
+                    .from('sessions')
+                    .insert({
+                        participant_code: participantCode,
+                        recipe_id: random(RECIPE_IDS),
+                        status,
+                        start_token: token,
+                        created_by: terapeuta.id,
+                        created_at: randomDate(7).toISOString() // Últimos 7 días
+                    });
+
+                if (sessionError) {
+                    const errorText = buildErrorText(sessionError);
+                    const uniqueConflict = String(sessionError.code || '') === '23505';
+                    const tokenConflict = uniqueConflict && errorText.includes('start_token');
+                    const activeConflict =
+                        uniqueConflict && (
+                            errorText.includes('ix_sessions_one_active_per_participant') ||
+                            errorText.includes('participant_code')
+                        );
+
+                    if (tokenConflict) {
+                        continue;
+                    }
+
+                    if (activeConflict) {
+                        participantsWithInProgressSession.add(participantCode);
+                        status = 'FINISHED';
+                        continue;
+                    }
+
+                    console.error('   ❌ Error creando sesión de receta:', errorText);
+                    break;
+                }
+
                 recipeSessionsCount++;
+                recipeSessionStatusCounts[status] = (recipeSessionStatusCounts[status] || 0) + 1;
+
+                if (status === 'CREATED' || status === 'ACTIVE') {
+                    participantsWithInProgressSession.add(participantCode);
+                    therapistsWithInProgressSession.add(terapeuta.id);
+                }
+
+                createdSession = true;
+            }
+
+            if (!createdSession) {
+                console.error(`   ❌ No se pudo crear sesión de receta para terapeuta ${terapeuta.id} y participante ${participantCode}`);
             }
         }
     }
-    console.log(`   ✅ Sesiones de Receta creadas: ${recipeSessionsCount}`);
+    console.log(`   ✅ Sesiones de Receta creadas: ${recipeSessionsCount} (CREATED: ${recipeSessionStatusCounts.CREATED}, ACTIVE: ${recipeSessionStatusCounts.ACTIVE}, FINISHED: ${recipeSessionStatusCounts.FINISHED})`);
 
     // ────────────────────────────────────
-    // 5. EVENTOS DE AUDITORÍA
+    // 6. CÓDIGOS DE RECUPERACIÓN
+    // ────────────────────────────────────
+    console.log('\n🔐 Creando códigos de recuperación...');
+    let resetTokensCount = 0;
+    const usedResetCodes = new Set();
+
+    const { data: existingResetTokens, error: existingResetTokensError } = await supabase
+        .from('password_reset_tokens')
+        .select('token');
+
+    if (!existingResetTokensError && Array.isArray(existingResetTokens)) {
+        existingResetTokens
+            .map(t => t.token)
+            .filter(Boolean)
+            .forEach(t => usedResetCodes.add(String(t)));
+    }
+
+    const resetTargets = [
+        { id_usuario: admin.id, email: superadminEmail, expiresInMinutes: -10, used: true },
+        ...terapeutas.slice(0, 2).map(t => ({
+            id_usuario: t.userId,
+            email: t.email,
+            expiresInMinutes: 15,
+            used: false
+        }))
+    ];
+
+    for (const target of resetTargets) {
+        const code = generarCodigoRecuperacionUnico(usedResetCodes);
+        const expiresAt = new Date(Date.now() + target.expiresInMinutes * 60 * 1000).toISOString();
+
+        const { error: resetError } = await supabase
+            .from('password_reset_tokens')
+            .insert({
+                id_usuario: target.id_usuario,
+                token: code,
+                expires_at: expiresAt,
+                used: target.used
+            });
+
+        if (resetError) {
+            if (isMissingTableError(resetError)) {
+                console.log('   ℹ️  Tabla password_reset_tokens no existe en este esquema, se omite esta sección.');
+                resetTokensCount = 0;
+                break;
+            }
+            console.error(`   ❌ Error creando código para ${target.email}:`, buildErrorText(resetError));
+            continue;
+        }
+
+        resetTokensCount++;
+    }
+    console.log(`   ✅ Códigos de recuperación creados: ${resetTokensCount}`);
+
+    // ────────────────────────────────────
+    // 7. EVENTOS DE AUDITORÍA
     // ────────────────────────────────────
     console.log('\n📋 Creando eventos de auditoría...');
     const eventosAuditoria = [];
@@ -705,7 +1055,7 @@ async function seed() {
     }
 
     // ────────────────────────────────────
-    // 6. RESUMEN FINAL
+    // 8. RESUMEN FINAL
     // ────────────────────────────────────
     console.log('\n' + '='.repeat(60));
     console.log('🎉 SEED COMPLETADO EXITOSAMENTE');
@@ -726,11 +1076,18 @@ async function seed() {
       ✅ Revisadas: ${vrRevisadas}
       ⏳ Pendientes: ${vrPendientes}
 
+   🥘 Sesiones de Receta: ${recipeSessionsCount}
+      🟡 CREATED: ${recipeSessionStatusCounts.CREATED}
+      🟢 ACTIVE: ${recipeSessionStatusCounts.ACTIVE}
+      ⚪ FINISHED: ${recipeSessionStatusCounts.FINISHED}
+
+   🔐 Códigos de recuperación: ${resetTokensCount}
+
    📋 Auditoría: ${eventosAuditoria.length} eventos
 
    🔑 Para probar como terapeuta:
-      Email: julianmonj45@gmail.com
-      Pass:  Julianmed45@
+      Email: ${terapeutasData[0].email}
+      Pass:  ${terapeutasData[0].password}
 `);
 }
 

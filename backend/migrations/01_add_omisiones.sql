@@ -3,7 +3,7 @@
 -- ============================================================================
 -- Instrucciones:
 -- 1. Ve a tu Dashboard de Supabase (https://app.supabase.com)
--- 2. Selecciona tu proyecto: vtspkfdwhazxrigihdto
+-- 2. Selecciona tu proyecto: your-supabase-project-id
 -- 3. Ve al "SQL Editor" en el menú lateral.
 -- 4. Copia y pega este script.
 -- 5. Ejecuta (Run).
@@ -24,3 +24,4 @@ WHERE table_name = 'resumen_sesion' AND column_name = 'total_omisiones';
 -- ============================================================================
 -- FIN
 -- ============================================================================
+

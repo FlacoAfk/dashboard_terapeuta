@@ -10,6 +10,7 @@ const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 
 let mainWindow;
+const DEFAULT_API_URL = 'https://cerebro-al-fuego-image-482550109792.us-central1.run.app';
 
 /**
  * Crea la ventana principal de la aplicación
@@ -42,7 +43,7 @@ const createWindow = () => {
 
     // Limpiar almacenamiento al cargar para evitar problemas de estado obsoleto
     mainWindow.webContents.on('did-finish-load', () => {
-        const apiUrl = process.env.API_URL || 'http://localhost:3001';
+        const apiUrl = process.env.API_URL || DEFAULT_API_URL;
         mainWindow.webContents.executeJavaScript(`
             // Evitar loops infinitos de recarga
             if (!sessionStorage.getItem('__electron_cleaned__')) {

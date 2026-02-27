@@ -5,7 +5,7 @@
 -- ============================================================================
 -- Instrucciones:
 -- 1. Ve a tu Dashboard de Supabase (https://app.supabase.com)
--- 2. Selecciona tu proyecto: vtspkfdwhazxrigihdto
+-- 2. Selecciona tu proyecto: your-supabase-project-id
 -- 3. Ve al "SQL Editor" en el menú lateral
 -- 4. Copia y pega este script completo
 -- 5. Ejecuta (Run)
@@ -59,3 +59,4 @@ CREATE INDEX IF NOT EXISTS ix_sessions_status
 CREATE UNIQUE INDEX IF NOT EXISTS ix_sessions_one_active_per_participant
     ON public.sessions (participant_code)
     WHERE status = 'ACTIVE';
+

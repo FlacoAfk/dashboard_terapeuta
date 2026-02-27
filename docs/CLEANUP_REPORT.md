@@ -10,8 +10,17 @@
 
 ## Technical debt intentionally kept (for compatibility)
 
-- Legacy manual scripts in `backend/tests/*.js` remain available for ad-hoc audits.
 - Legacy activity labels in some UI components are kept as fallback for historical session IDs.
+
+## Removed in this cleanup pass
+
+- Deleted ad-hoc manual scripts that were not part of runtime/CI:
+  - `backend/tests/e2e_validation.js`
+  - `backend/tests/full_endpoint_audit.js`
+  - `backend/tests/security_validation.js`
+- Removed local-only Vercel artifacts from project tree:
+  - `frontend/.vercel` is now ignored via root `.gitignore`
+  - `frontend/.env.production` is now ignored via root `.gitignore`
 
 ## Criteria used
 

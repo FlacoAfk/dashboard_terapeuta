@@ -48,7 +48,7 @@ El backend utiliza: PORT, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, JWT_SECRET, J
       `,
             contact: {
                 name: 'Cerebro al Fuego',
-                email: 'cerebroalfuego@gmail.com'
+                email: 'admin@example.com'
             }
         },
         servers: [
@@ -67,6 +67,7 @@ El backend utiliza: PORT, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, JWT_SECRET, J
             { name: 'Usuarios', description: 'Gestión de usuarios y terapeutas (solo Superadmin)' },
             { name: 'Pacientes', description: 'CRUD de pacientes e informes' },
             { name: 'Sesiones VR', description: 'Visualización, evaluación del desempeño y revisión de sesiones VR en el dashboard' },
+            { name: 'Sesiones Receta VR', description: 'Creación y cierre de sesiones para integración con Unity' },
             { name: 'Terapeutas', description: 'Información de terapeutas' },
             { name: 'Dashboard', description: 'Estadísticas generales' },
             { name: 'Auditoría', description: 'Eventos de auditoría y exportación CSV (solo Superadmin)' },
@@ -258,9 +259,14 @@ El backend utiliza: PORT, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, JWT_SECRET, J
             }
         }
     },
-    apis: ['./src/routes/*.js', './src/server.js']
+    apis: [
+        './src/routes/*.js',
+        './src/domains/**/*.js',
+        './src/server.js'
+    ]
 };
 
 const swaggerSpec = swaggerJsdoc(options);
 
 module.exports = swaggerSpec;
+

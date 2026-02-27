@@ -1,6 +1,6 @@
 {
   "name": "dashboard-terapeuta",
-  "version": "1.8.0",
+  "version": "1.8.3",
   "description": "Dashboard para terapeuta con Express backend y Electron + React frontend",
   "private": true,
   "workspaces": [
@@ -18,12 +18,15 @@
     "build:web": "npm run build:web --workspace=frontend",
     "build:backend": "npm run build --workspace=backend --if-present",
     "build": "npm run build:web && npm run build:frontend",
-    "lint:backend": "npm run lint --workspace=backend",
-    "lint:frontend": "npm run lint --workspace=frontend",
+    "lint:backend": "npm --workspace=backend run lint -- --max-warnings=0",
+    "lint:frontend": "npm --workspace=frontend run lint -- --max-warnings=0",
     "lint": "npm run lint:backend && npm run lint:frontend",
     "test:backend": "npm run test --workspace=backend",
+    "test:backend:coverage": "npm run test:coverage --workspace=backend",
     "test:frontend": "npm run test --workspace=frontend",
     "test": "npm run test:backend && npm run test:frontend",
+    "test:coverage": "npm run test:backend:coverage && npm run test:frontend",
+    "format:check": "prettier --check --no-error-on-unmatched-pattern \".github/workflows/*.{yml,yaml}\"",
     "install:all": "npm install",
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\""
   },

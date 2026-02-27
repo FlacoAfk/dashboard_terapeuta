@@ -31,7 +31,8 @@ function buildSecurityMiddleware() {
                     error: 'Demasiadas solicitudes. Intente nuevamente en unos minutos.',
                     code: 'RATE_LIMIT_EXCEEDED'
                 },
-                skip: (req) => req.path.startsWith('/health')
+                // Evita bloquear preflight CORS y probes operativas.
+                skip: (req) => req.method === 'OPTIONS' || req.path.startsWith('/health')
             })
         );
     }

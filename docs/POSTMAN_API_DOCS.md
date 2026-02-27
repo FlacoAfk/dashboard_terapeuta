@@ -36,7 +36,7 @@ Crea un Environment en Postman con estas variables:
 | `base_url` | `https://cerebro-al-fuego-image-482550109792.us-central1.run.app` | URL base de la API |
 | `token_admin` | *(se obtiene al hacer login)* | JWT del Superadmin |
 | `token_terapeuta` | *(se obtiene al hacer login)* | JWT del Terapeuta |
-| `unity_api_key` | `5f8a9b2c3d4e5f60718293a4b5c6d7e8` | API Key para endpoints de Unity |
+| `unity_api_key` | `YOUR_UNITY_API_KEY` | API Key para endpoints de Unity |
 
 ### Headers Comunes
 
@@ -143,8 +143,8 @@ if (pm.response.code === 200) {
 **Body (JSON):**
 ```json
 {
-    "email": "cerebroalfuego@gmail.com",
-    "password": "Admin@123456"
+    "email": "admin@example.com",
+    "password": "ReplaceWithStrongPassword123!"
 }
 ```
 
@@ -157,7 +157,7 @@ if (pm.response.code === 200) {
         "token": "eyJhbGciOiJIUzI1NiIs...",
         "user": {
             "id": 1,
-            "email": "cerebroalfuego@gmail.com",
+            "email": "admin@example.com",
             "rol": "SUPERADMIN",
             "nombre": "Administrador Principal",
             "id_terapeuta": 1
@@ -265,12 +265,12 @@ if (pm.response.code === 200) {
     "success": true,
     "data": {
         "id": 1,
-        "email": "cerebroalfuego@gmail.com",
+        "email": "admin@example.com",
         "rol": "SUPERADMIN",
         "activo": true,
         "ultimo_acceso": "2026-02-08T10:00:00.000Z",
         "nombre": "Administrador Principal",
-        "correo": "cerebroalfuego@gmail.com",
+        "correo": "admin@example.com",
         "especialidad": "Administración",
         "id_terapeuta": 1
     }
@@ -297,7 +297,7 @@ if (pm.response.code === 200) {
 **Body (JSON):**
 ```json
 {
-    "currentPassword": "Admin@123456",
+    "currentPassword": "ReplaceWithStrongPassword123!",
     "newPassword": "NuevaPass@12345"
 }
 ```
@@ -330,7 +330,7 @@ if (pm.response.code === 200) {
 **Body (JSON):**
 ```json
 {
-    "email": "cerebroalfuego@gmail.com"
+    "email": "admin@example.com"
 }
 ```
 
@@ -420,14 +420,14 @@ if (pm.response.code === 200) {
     "data": [
         {
             "id": 1,
-            "username": "cerebroalfuego@gmail.com",
+            "username": "admin@example.com",
             "rol": "SUPERADMIN",
             "activo": true,
             "fecha_creacion": "2026-02-08T10:00:00.000Z",
             "ultimo_acceso": "2026-02-08T12:00:00.000Z",
             "id_terapeuta": 1,
             "nombre": "Administrador Principal",
-            "correo": "cerebroalfuego@gmail.com",
+            "correo": "admin@example.com",
             "especialidad": "Administración",
             "telefono": null,
             "pacientes_count": 0
@@ -1397,13 +1397,13 @@ if (pm.response.code === 200) {
             "tipo_evento": "LOGIN_SUCCESS",
             "tipo_label": "Inicio de sesión exitoso",
             "id_usuario": 1,
-            "actor_email": "cerebroalfuego@gmail.com",
+            "actor_email": "admin@example.com",
             "actor_nombre": null,
             "ip_origen": "::1",
             "detalle": {
-                "email": "cerebroalfuego@gmail.com"
+                "email": "admin@example.com"
             },
-            "detalle_texto": "email: cerebroalfuego@gmail.com",
+            "detalle_texto": "email: admin@example.com",
             "timestamp": "2026-02-08T10:00:00.000Z"
         }
     ],
@@ -1440,7 +1440,7 @@ if (pm.response.code === 200) {
             "tipo_evento": "LOGIN_SUCCESS",
             "tipo_label": "Inicio de sesión exitoso",
             "ip_origen": "::1",
-            "detalle": { "email": "cerebroalfuego@gmail.com" },
+            "detalle": { "email": "admin@example.com" },
             "timestamp": "2026-02-08T10:00:00.000Z"
         }
     ]
@@ -1499,7 +1499,7 @@ if (pm.response.code === 200) {
 
 ```csv
 "ID","Fecha","Tipo","Usuario","IP","Detalles"
-"1","8/2/2026, 10:00:00 a. m.","Inicio de sesión exitoso","cerebroalfuego@gmail.com","::1","{""email"":""cerebroalfuego@gmail.com""}"
+"1","8/2/2026, 10:00:00 a. m.","Inicio de sesión exitoso","admin@example.com","::1","{""email"":""admin@example.com""}"
 ```
 
 > **Nota:** En Postman, guardar la respuesta como archivo `.csv` usando "Save Response > Save to File".
@@ -1542,8 +1542,8 @@ if (pm.response.code === 200) {
 
 ### Superadmin
 ```
-Email:    cerebroalfuego@gmail.com
-Password: Admin@123456
+Email:    admin@example.com
+Password: ReplaceWithStrongPassword123!
 ```
 
 ### Terapeutas
@@ -1561,7 +1561,7 @@ Password: Terapeuta@123
 ### API Key de Unity
 ```
 Header:   X-API-Key
-Value:    5f8a9b2c3d4e5f60718293a4b5c6d7e8
+Value:    YOUR_UNITY_API_KEY
 ```
 
 ### Política de Contraseña
@@ -1619,3 +1619,5 @@ Value:    5f8a9b2c3d4e5f60718293a4b5c6d7e8
 ---
 
 *Generado el 8 de febrero de 2026 — Versión 1.7.1*
+
+

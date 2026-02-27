@@ -18,6 +18,8 @@ const sessionsRoutes = require('./routes/sessions');
 
 function createApp() {
     const app = express();
+    // Cloud Run está detrás de proxy. Necesario para rate-limit/IP real.
+    app.set('trust proxy', 1);
 
     app.use(requestContext);
     app.use((req, res, next) => {
