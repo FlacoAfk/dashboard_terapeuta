@@ -55,10 +55,10 @@ const EditarPacienteModal = ({ patient, onClose, onSuccess }) => {
                     <div className="space-y-4">
                         {/* Identificación */}
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                            <label htmlFor="editarpacientemodal-field-58" className="block text-sm font-medium text-gray-700 mb-1">
                                 Documento de Identidad <span className="text-red-500">*</span>
                             </label>
-                            <input
+                            <input id="editarpacientemodal-field-58"
                                 type="text"
                                 value={formData.identificacion}
                                 onChange={(e) => setFormData({ ...formData, identificacion: e.target.value })}
@@ -69,10 +69,10 @@ const EditarPacienteModal = ({ patient, onClose, onSuccess }) => {
                         {/* Nombre y Apellido */}
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                <label htmlFor="editarpacientemodal-field-72" className="block text-sm font-medium text-gray-700 mb-1">
                                     Nombre <span className="text-red-500">*</span>
                                 </label>
-                                <input
+                                <input id="editarpacientemodal-field-72"
                                     type="text"
                                     value={formData.nombre}
                                     onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
@@ -80,10 +80,10 @@ const EditarPacienteModal = ({ patient, onClose, onSuccess }) => {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                <label htmlFor="editarpacientemodal-field-83" className="block text-sm font-medium text-gray-700 mb-1">
                                     Apellido
                                 </label>
-                                <input
+                                <input id="editarpacientemodal-field-83"
                                     type="text"
                                     value={formData.apellido}
                                     onChange={(e) => setFormData({ ...formData, apellido: e.target.value })}
@@ -94,10 +94,10 @@ const EditarPacienteModal = ({ patient, onClose, onSuccess }) => {
 
                         {/* Edad */}
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                            <label htmlFor="editarpacientemodal-field-97" className="block text-sm font-medium text-gray-700 mb-1">
                                 Edad <span className="text-red-500">*</span>
                             </label>
-                            <input
+                            <input id="editarpacientemodal-field-97"
                                 type="number"
                                 value={formData.edad}
                                 onChange={(e) => setFormData({ ...formData, edad: e.target.value })}
@@ -109,10 +109,10 @@ const EditarPacienteModal = ({ patient, onClose, onSuccess }) => {
 
                         {/* Diagnóstico */}
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                            <label htmlFor="editarpacientemodal-field-112" className="block text-sm font-medium text-gray-700 mb-1">
                                 Diagnóstico / Condición <span className="text-red-500">*</span>
                             </label>
-                            <textarea
+                            <textarea id="editarpacientemodal-field-112"
                                 value={formData.condicion}
                                 onChange={(e) => setFormData({ ...formData, condicion: e.target.value })}
                                 rows={3}

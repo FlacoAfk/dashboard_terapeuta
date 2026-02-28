@@ -128,15 +128,15 @@ const Auditoria = () => {
                     <div className="flex flex-wrap items-end gap-4 mb-6">
                         {/* Mes */}
                         <div className="flex-1 min-w-[150px] sm:flex-none">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Mes</label>
+                            <label htmlFor="auditoria-field-131" className="block text-sm font-medium text-gray-700 mb-2">Mes</label>
                             <div className="relative">
-                                <select
+                                <select id="auditoria-field-131"
                                     value={selectedMonth}
                                     onChange={(e) => setSelectedMonth(Number(e.target.value))}
                                     className="appearance-none bg-white border border-gray-300 rounded-lg px-4 py-2.5 pr-10 focus:ring-2 focus:ring-[#F76C6C]/20 focus:border-[#F76C6C]"
                                 >
                                     {MESES.map((mes, idx) => (
-                                        <option key={idx} value={idx + 1}>{mes}</option>
+                                        <option key={mes} value={idx + 1}>{mes}</option>
                                     ))}
                                 </select>
                                 <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
@@ -147,9 +147,9 @@ const Auditoria = () => {
 
                         {/* Año */}
                         <div className="flex-1 min-w-[100px] sm:flex-none">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Año</label>
+                            <label htmlFor="auditoria-field-150" className="block text-sm font-medium text-gray-700 mb-2">Año</label>
                             <div className="relative">
-                                <select
+                                <select id="auditoria-field-150"
                                     value={selectedYear}
                                     onChange={(e) => setSelectedYear(Number(e.target.value))}
                                     className="appearance-none bg-white border border-gray-300 rounded-lg px-4 py-2.5 pr-10 focus:ring-2 focus:ring-[#F76C6C]/20 focus:border-[#F76C6C]"

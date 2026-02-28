@@ -63,10 +63,10 @@ const CrearPacienteModal = ({ isOpen, onClose, onSuccess }) => {
                     <div className="space-y-4">
                         {/* Identificación */}
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                            <label htmlFor="crearpacientemodal-field-66" className="block text-sm font-medium text-gray-700 mb-1">
                                 Documento de Identidad <span className="text-red-500">*</span>
                             </label>
-                            <input
+                            <input id="crearpacientemodal-field-66"
                                 type="text"
                                 value={formData.identificacion}
                                 onChange={(e) => setFormData({ ...formData, identificacion: e.target.value })}
@@ -78,10 +78,10 @@ const CrearPacienteModal = ({ isOpen, onClose, onSuccess }) => {
                         {/* Nombre y Apellido */}
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                <label htmlFor="crearpacientemodal-field-81" className="block text-sm font-medium text-gray-700 mb-1">
                                     Nombre <span className="text-red-500">*</span>
                                 </label>
-                                <input
+                                <input id="crearpacientemodal-field-81"
                                     type="text"
                                     value={formData.nombre}
                                     onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
@@ -90,10 +90,10 @@ const CrearPacienteModal = ({ isOpen, onClose, onSuccess }) => {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                <label htmlFor="crearpacientemodal-field-93" className="block text-sm font-medium text-gray-700 mb-1">
                                     Apellido
                                 </label>
-                                <input
+                                <input id="crearpacientemodal-field-93"
                                     type="text"
                                     value={formData.apellido}
                                     onChange={(e) => setFormData({ ...formData, apellido: e.target.value })}
@@ -105,10 +105,10 @@ const CrearPacienteModal = ({ isOpen, onClose, onSuccess }) => {
 
                         {/* Edad */}
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                            <label htmlFor="crearpacientemodal-field-108" className="block text-sm font-medium text-gray-700 mb-1">
                                 Edad <span className="text-red-500">*</span>
                             </label>
-                            <input
+                            <input id="crearpacientemodal-field-108"
                                 type="number"
                                 value={formData.edad}
                                 onChange={(e) => setFormData({ ...formData, edad: e.target.value })}
@@ -122,10 +122,10 @@ const CrearPacienteModal = ({ isOpen, onClose, onSuccess }) => {
 
                         {/* Diagnóstico */}
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                            <label htmlFor="crearpacientemodal-field-125" className="block text-sm font-medium text-gray-700 mb-1">
                                 Diagnóstico / Condición <span className="text-red-500">*</span>
                             </label>
-                            <textarea
+                            <textarea id="crearpacientemodal-field-125"
                                 value={formData.condicion}
                                 onChange={(e) => setFormData({ ...formData, condicion: e.target.value })}
                                 placeholder="Describa el diagnóstico clínico..."

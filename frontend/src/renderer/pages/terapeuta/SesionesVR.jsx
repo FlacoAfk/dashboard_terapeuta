@@ -304,17 +304,16 @@ const SesionesVR = () => {
         return result;
     }, [sessions, filterEstado, filterPaciente, filterActividad, searchTerm, sortOrder]);
 
-    // Paginación
-    const totalPages = Math.ceil(filteredSessions.length / sessionsPerPage);
+    // Paginación — derive a safe page clamped to the valid range
+    const totalPages = Math.max(1, Math.ceil(filteredSessions.length / sessionsPerPage));
+    const safeCurrentPage = Math.min(currentPage, totalPages);
     const paginatedSessions = filteredSessions.slice(
-        (currentPage - 1) * sessionsPerPage,
-        currentPage * sessionsPerPage
+        (safeCurrentPage - 1) * sessionsPerPage,
+        safeCurrentPage * sessionsPerPage
     );
 
-    // Reset de página al cambiar filtros
-    useEffect(() => {
-        setCurrentPage(1);
-    }, [filterEstado, filterPaciente, filterActividad, searchTerm, sortOrder]);
+
+
 
     const handleSessionUpdated = (updatedSession) => {
         setSessions(prev =>
@@ -626,13 +625,13 @@ const SesionesVR = () => {
                                 {totalPages > 1 && (
                                     <div className="mt-6 pt-4 border-t border-gray-200 flex items-center justify-between">
                                         <p className="text-sm text-gray-500">
-                                            Mostrando {((currentPage - 1) * sessionsPerPage) + 1}-
-                                            {Math.min(currentPage * sessionsPerPage, filteredSessions.length)} de {filteredSessions.length}
+                                            Mostrando {((safeCurrentPage - 1) * sessionsPerPage) + 1}-
+                                            {Math.min(safeCurrentPage * sessionsPerPage, filteredSessions.length)} de {filteredSessions.length}
                                         </p>
                                         <div className="flex items-center gap-1">
                                             <button
                                                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                                                disabled={currentPage === 1}
+                                                disabled={safeCurrentPage === 1}
                                                 className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-40 disabled:hover:bg-transparent transition-colors"
                                             >
                                                 <Icons.ChevronLeft />
@@ -643,7 +642,7 @@ const SesionesVR = () => {
                                                 .filter(page => {
                                                     if (totalPages <= 7) return true;
                                                     if (page === 1 || page === totalPages) return true;
-                                                    if (Math.abs(page - currentPage) <= 1) return true;
+                                                    if (Math.abs(page - safeCurrentPage) <= 1) return true;
                                                     return false;
                                                 })
                                                 .map((page, idx, arr) => (
@@ -653,7 +652,7 @@ const SesionesVR = () => {
                                                         )}
                                                         <button
                                                             onClick={() => setCurrentPage(page)}
-                                                            className={`w-9 h-9 rounded-lg text-sm font-medium transition-colors ${currentPage === page
+                                                            className={`w-9 h-9 rounded-lg text-sm font-medium transition-colors ${safeCurrentPage === page
                                                                 ? 'bg-[#2AA87E] text-white'
                                                                 : 'hover:bg-gray-100 text-gray-700'
                                                                 }`}
@@ -666,7 +665,7 @@ const SesionesVR = () => {
 
                                             <button
                                                 onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                                                disabled={currentPage === totalPages}
+                                                disabled={safeCurrentPage === totalPages}
                                                 className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-40 disabled:hover:bg-transparent transition-colors"
                                             >
                                                 <Icons.ChevronRight />

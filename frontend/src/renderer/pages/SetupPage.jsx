@@ -33,6 +33,8 @@ const SetupPage = () => {
                 const result = await authService.checkSetup();
                 if (result.configured) {
                     setSetupComplete(true);
+                    forceSetupConfigured();
+                    navigate('/login', { replace: true });
                 }
             } catch (error) {
                 console.error('Error checking setup:', error);
@@ -41,15 +43,7 @@ const SetupPage = () => {
             }
         };
         checkSetup();
-    }, []);
-
-    // Auto-redirigir al login cuando se detecta que el setup ya está completo
-    useEffect(() => {
-        if (setupComplete) {
-            forceSetupConfigured();
-            navigate('/login', { replace: true });
-        }
-    }, [setupComplete, navigate, forceSetupConfigured]);
+    }, [navigate, forceSetupConfigured]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -229,10 +223,10 @@ const SetupPage = () => {
                     <form onSubmit={handleSubmit} className="space-y-5">
                         {/* Nombre completo */}
                         <div className="space-y-1.5">
-                            <label className="block text-sm font-medium text-gray-700">
+                            <label htmlFor="setuppage-field-232" className="block text-sm font-medium text-gray-700">
                                 Nombre Completo <span className="text-red-500">*</span>
                             </label>
-                            <input
+                            <input id="setuppage-field-232"
                                 type="text"
                                 name="nombre"
                                 value={formData.nombre}
@@ -249,10 +243,10 @@ const SetupPage = () => {
 
                         {/* Correo */}
                         <div className="space-y-1.5">
-                            <label className="block text-sm font-medium text-gray-700">
+                            <label htmlFor="setuppage-field-252" className="block text-sm font-medium text-gray-700">
                                 Correo Electrónico <span className="text-red-500">*</span>
                             </label>
-                            <input
+                            <input id="setuppage-field-252"
                                 type="email"
                                 name="correo"
                                 value={formData.correo}
@@ -269,11 +263,11 @@ const SetupPage = () => {
 
                         {/* Contraseña */}
                         <div className="space-y-1.5">
-                            <label className="block text-sm font-medium text-gray-700">
+                            <label htmlFor="setuppage-field-272" className="block text-sm font-medium text-gray-700">
                                 Contraseña <span className="text-red-500">*</span>
                             </label>
                             <div className="relative">
-                                <input
+                                <input id="setuppage-field-272"
                                     type={showPassword ? 'text' : 'password'}
                                     name="password"
                                     value={formData.password}
@@ -308,11 +302,11 @@ const SetupPage = () => {
 
                         {/* Confirmar contraseña */}
                         <div className="space-y-1.5">
-                            <label className="block text-sm font-medium text-gray-700">
+                            <label htmlFor="setuppage-field-311" className="block text-sm font-medium text-gray-700">
                                 Confirmar Contraseña <span className="text-red-500">*</span>
                             </label>
                             <div className="relative">
-                                <input
+                                <input id="setuppage-field-311"
                                     type={showConfirmPassword ? 'text' : 'password'}
                                     name="confirmPassword"
                                     value={formData.confirmPassword}

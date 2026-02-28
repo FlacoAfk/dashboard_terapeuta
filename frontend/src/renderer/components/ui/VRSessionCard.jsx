@@ -69,7 +69,10 @@ const VRSessionCard = ({ session, onSessionUpdated }) => {
     return (
         <>
             <div
+                role="button"
+                tabIndex={0}
                 onClick={() => setShowModal(true)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowModal(true); } }}
                 className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-lg hover:border-[#2AA87E] transition-all cursor-pointer group"
             >
                 <div className="flex items-center justify-between">

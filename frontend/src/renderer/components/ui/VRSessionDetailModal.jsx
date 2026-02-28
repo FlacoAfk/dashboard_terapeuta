@@ -225,10 +225,13 @@ const VRSessionDetailModal = ({ session, onClose, onSessionUpdated }) => {
     ];
 
     return (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={onClose}>
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" role="button" tabIndex={-1} aria-label="Cerrar modal" onClick={onClose} onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}>
             <div
                 className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[94vh] overflow-hidden flex flex-col"
+                role="dialog"
+                aria-modal="true"
                 onClick={(event) => event.stopPropagation()}
+                onKeyDown={(event) => event.stopPropagation()}
             >
                 <div className="bg-gradient-to-r from-[#2AA87E] to-[#35C99A] p-5 text-white flex-shrink-0">
                     <div className="flex justify-between items-start">

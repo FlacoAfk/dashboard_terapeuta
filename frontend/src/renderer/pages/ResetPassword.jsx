@@ -26,15 +26,8 @@ const ResetPassword = () => {
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-    // Mantener el código sincronizado si llega token por query string
-    useEffect(() => {
-        if (tokenFromUrl) {
-            setFormData((prev) => ({
-                ...prev,
-                verificationCode: tokenFromUrl
-            }));
-        }
-    }, [tokenFromUrl]);
+
+
 
     /**
      * Manejar cambios en los inputs
@@ -171,7 +164,7 @@ const ResetPassword = () => {
                         {/* Código de verificación (flujo por correo) */}
                         {requiresVerificationCode && (
                             <div className="space-y-1.5">
-                                <label className="block text-sm font-medium text-gray-700">
+                                <label htmlFor="resetpassword-field-174" className="block text-sm font-medium text-gray-700">
                                     Código de Verificación
                                 </label>
                                 <div className="relative">
@@ -180,7 +173,7 @@ const ResetPassword = () => {
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M9 3h6a2 2 0 012 2v1H7V5a2 2 0 012-2zm-2 4h10a2 2 0 012 2v10a2 2 0 01-2 2H7a2 2 0 01-2-2V9a2 2 0 012-2z" />
                                         </svg>
                                     </div>
-                                    <input
+                                    <input id="resetpassword-field-174"
                                         type="text"
                                         name="verificationCode"
                                         value={formData.verificationCode}
@@ -196,7 +189,7 @@ const ResetPassword = () => {
 
                         {/* Campo Nueva Contraseña */}
                         <div className="space-y-1.5">
-                            <label className="block text-sm font-medium text-gray-700">
+                            <label htmlFor="resetpassword-field-199" className="block text-sm font-medium text-gray-700">
                                 Nueva Contraseña
                             </label>
                             <div className="relative">
@@ -205,7 +198,7 @@ const ResetPassword = () => {
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                                     </svg>
                                 </div>
-                                <input
+                                <input id="resetpassword-field-199"
                                     type={showPassword ? "text" : "password"}
                                     name="password"
                                     value={formData.password}
@@ -234,7 +227,7 @@ const ResetPassword = () => {
 
                         {/* Campo Confirmar Contraseña */}
                         <div className="space-y-1.5">
-                            <label className="block text-sm font-medium text-gray-700">
+                            <label htmlFor="resetpassword-field-237" className="block text-sm font-medium text-gray-700">
                                 Confirmar Contraseña
                             </label>
                             <div className="relative">
@@ -243,7 +236,7 @@ const ResetPassword = () => {
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                     </svg>
                                 </div>
-                                <input
+                                <input id="resetpassword-field-237"
                                     type={showConfirmPassword ? "text" : "password"}
                                     name="confirmPassword"
                                     value={formData.confirmPassword}

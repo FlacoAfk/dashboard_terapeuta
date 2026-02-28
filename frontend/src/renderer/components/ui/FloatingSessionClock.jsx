@@ -28,14 +28,15 @@ const FloatingSessionClock = () => {
 
     useEffect(() => {
         if (!activeSession) {
+            // Batch reset
             setElapsed(0);
             setMinimized(false);
             return;
         }
 
-        const tick = () => setElapsed(Date.now() - activeSession.started_at);
-        tick();
-        const timer = setInterval(tick, 1000);
+        // Initialize and start timer
+        setElapsed(Date.now() - activeSession.started_at);
+        const timer = setInterval(() => setElapsed(Date.now() - activeSession.started_at), 1000);
         return () => clearInterval(timer);
     }, [activeSession]);
 
