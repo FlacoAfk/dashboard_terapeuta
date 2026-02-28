@@ -33,8 +33,6 @@ const SetupPage = () => {
                 const result = await authService.checkSetup();
                 if (result.configured) {
                     setSetupComplete(true);
-                    forceSetupConfigured();
-                    navigate('/login', { replace: true });
                 }
             } catch (error) {
                 console.error('Error checking setup:', error);
@@ -43,7 +41,15 @@ const SetupPage = () => {
             }
         };
         checkSetup();
-    }, [navigate, forceSetupConfigured]);
+    }, []);
+
+    // Auto-redirigir al login cuando se detecta que el setup ya está completo
+    useEffect(() => {
+        if (setupComplete) {
+            forceSetupConfigured();
+            navigate('/login', { replace: true });
+        }
+    }, [setupComplete, navigate, forceSetupConfigured]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;

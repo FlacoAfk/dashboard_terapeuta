@@ -236,7 +236,7 @@ export const TabErrores = ({ analytics, session }) => {
                     <div className="bg-gray-50 rounded-xl p-4">
                         <div className="relative pl-6 border-l-2 border-red-200 space-y-3">
                             {errorTimeline.map((err, idx) => (
-                                <div key={`${err.code}-${err.time || idx}`} className="relative">
+                                <div key={idx} className="relative">
                                     <div className="absolute -left-[1.85rem] w-3 h-3 bg-red-400 rounded-full border-2 border-white"></div>
                                     <div className="bg-white rounded-lg p-3 border border-gray-200">
                                         <div className="flex items-center justify-between">
@@ -276,7 +276,7 @@ export const TabMotricidad = ({ analytics, session }) => {
                         {sets.map((set, idx) => {
                             const totalInteractions = (set.drops_count || 0) + (set.releases_count || 0) + (set.blocked_count || 0);
                             return (
-                                <div key={set.id || set.set_name || idx} className="bg-white border border-gray-200 rounded-xl p-4">
+                                <div key={idx} className="bg-white border border-gray-200 rounded-xl p-4">
                                     <div className="flex items-center justify-between mb-2">
                                         <h4 className="font-semibold text-gray-800">{getSetNameSpanish(set.set_name)}</h4>
                                         <span className="text-xs text-gray-400">{totalInteractions} interacciones</span>
@@ -431,7 +431,7 @@ const SessionTimeline = ({ session }) => {
                     ];
                     return (
                         <div
-                            key={set.id || set.set_name || idx}
+                            key={idx}
                             className={`${colors[idx % 4]} h-full rounded transition-all relative group cursor-default`}
                             style={{ width: `${Math.max(width, 5)}%` }}
                             title={`${getSetNameSpanish(set.set_name)}: ${vrResultsService.formatDuration(set.duration_seconds)} — ${(set.errors?.length || set.errors_count || 0)} errores`}

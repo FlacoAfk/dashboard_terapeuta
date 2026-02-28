@@ -26,8 +26,15 @@ const ResetPassword = () => {
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-
-
+    // Mantener el código sincronizado si llega token por query string
+    useEffect(() => {
+        if (tokenFromUrl) {
+            setFormData((prev) => ({
+                ...prev,
+                verificationCode: tokenFromUrl
+            }));
+        }
+    }, [tokenFromUrl]);
 
     /**
      * Manejar cambios en los inputs
