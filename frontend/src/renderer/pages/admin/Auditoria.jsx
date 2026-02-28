@@ -52,9 +52,8 @@ const EventTypeBadge = ({ type, label }) => {
  * Vista de Auditoría del Sistema
  */
 const Auditoria = () => {
-    const currentDate = new Date();
-    const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth() + 1); // 1-12
-    const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
+    const [selectedMonth, setSelectedMonth] = useState(() => new Date().getMonth() + 1); // 1-12
+    const [selectedYear, setSelectedYear] = useState(() => new Date().getFullYear());
     const [events, setEvents] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');

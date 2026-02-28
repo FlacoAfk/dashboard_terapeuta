@@ -422,16 +422,16 @@ const GestionTerapeutas = () => {
                             >
                                 <Icons.ChevronLeft />
                             </button>
-                            {[...Array(totalPages)].map((_, i) => (
+                            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
                                 <button
-                                    key={i + 1}
-                                    onClick={() => setCurrentPage(i + 1)}
-                                    className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg text-sm font-medium transition-colors ${currentPage === i + 1
+                                    key={page}
+                                    onClick={() => setCurrentPage(page)}
+                                    className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg text-sm font-medium transition-colors ${currentPage === page
                                         ? 'bg-[#F76C6C] text-white'
                                         : 'text-gray-600 hover:bg-gray-100'
                                         }`}
                                 >
-                                    {i + 1}
+                                    {page}
                                 </button>
                             ))}
                             <button

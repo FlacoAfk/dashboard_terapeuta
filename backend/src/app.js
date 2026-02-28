@@ -40,11 +40,12 @@ function createApp() {
         next();
     });
 
+    app.use(cors(buildCorsOptions()));
+
     for (const middleware of buildSecurityMiddleware()) {
         app.use(middleware);
     }
 
-    app.use(cors(buildCorsOptions()));
     app.use(express.json({ limit: process.env.JSON_BODY_LIMIT || '2mb' }));
     app.use(express.urlencoded({ extended: true }));
 

@@ -20,7 +20,9 @@ const VRSessionDetailModal = ({ session, onClose, onSessionUpdated }) => {
     const [observaciones, setObservaciones] = useState(session.observaciones_terapeuta || '');
     const [saving, setSaving] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
-    const [localSession, setLocalSession] = useState(session);
+    // localSession tracks local mutations (e.g. after saving evaluation).
+    // Initialized from prop; kept in sync intentionally only on save.
+    const [localSession, setLocalSession] = useState(() => session);
     const [activeTab, setActiveTab] = useState('resumen');
     const isNeverStarted = isSessionNeverStarted(localSession);
 

@@ -11,14 +11,17 @@ function getVercelProjectSuffix() {
 
 function getAllowedOrigins() {
     const configured = process.env.CORS_ALLOWED_ORIGINS;
-    if (!configured || !configured.trim()) {
-        return DEFAULT_ALLOWED_ORIGINS;
+    const origins = [...DEFAULT_ALLOWED_ORIGINS];
+
+    if (configured && configured.trim()) {
+        const customOrigins = configured
+            .split(',')
+            .map((value) => value.trim())
+            .filter(Boolean);
+        origins.push(...customOrigins);
     }
 
-    return configured
-        .split(',')
-        .map((value) => value.trim())
-        .filter(Boolean);
+    return origins;
 }
 
 function buildCorsOptions() {
@@ -33,7 +36,9 @@ function buildCorsOptions() {
         return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin);
     };
 
-    const isElectronNullOrigin = (origin) => origin === 'null';
+    const isElectronOrigin = (origin) => {
+        return origin === 'null' || origin === 'file://' || (typeof origin === 'string' && origin.startsWith('file://'));
+    };
     const isAllowedVercelPreview = (origin) => {
         if (!origin || !vercelProjectSuffix) {
             return false;
@@ -61,7 +66,7 @@ function buildCorsOptions() {
             if (
                 allowedOrigins.has(origin) ||
                 isLoopbackOrigin(origin) ||
-                isElectronNullOrigin(origin) ||
+                isElectronOrigin(origin) ||
                 isAllowedVercelPreview(origin)
             ) {
                 callback(null, true);

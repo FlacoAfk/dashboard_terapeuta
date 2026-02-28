@@ -156,7 +156,7 @@ const api = {
                     ? 'Parece que no tienes conexión a internet.'
                     : 'Puede ser un problema de red, CORS u origen no permitido.';
                 const networkError = new Error(`No se pudo completar la conexión con ${API_URL}. ${detail}`);
-                console.error('[API] Red:', networkError.message);
+                console.error('[API] Red:', networkError.message, error);
                 throw networkError;
             }
 

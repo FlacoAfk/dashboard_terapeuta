@@ -466,8 +466,9 @@ const SesionesVR = () => {
                         <div className="flex flex-wrap items-center gap-3">
                             {/* Filtro por Paciente */}
                             <div className="flex items-center gap-2">
-                                <label className="text-xs text-gray-500 font-medium uppercase tracking-wider">Paciente:</label>
+                                <label htmlFor="filter-paciente" className="text-xs text-gray-500 font-medium uppercase tracking-wider">Paciente:</label>
                                 <select
+                                    id="filter-paciente"
                                     value={filterPaciente}
                                     onChange={(e) => setFilterPaciente(e.target.value)}
                                     className="border border-gray-300 rounded-lg py-1.5 px-3 text-sm focus:ring-2 focus:ring-[#2AA87E]/20 focus:border-[#2AA87E] bg-white"
@@ -481,8 +482,9 @@ const SesionesVR = () => {
 
                             {/* Filtro por Actividad */}
                             <div className="flex items-center gap-2">
-                                <label className="text-xs text-gray-500 font-medium uppercase tracking-wider">Actividad:</label>
+                                <label htmlFor="filter-actividad" className="text-xs text-gray-500 font-medium uppercase tracking-wider">Actividad:</label>
                                 <select
+                                    id="filter-actividad"
                                     value={filterActividad}
                                     onChange={(e) => setFilterActividad(e.target.value)}
                                     className="border border-gray-300 rounded-lg py-1.5 px-3 text-sm focus:ring-2 focus:ring-[#2AA87E]/20 focus:border-[#2AA87E] bg-white"
@@ -496,8 +498,9 @@ const SesionesVR = () => {
 
                             {/* Ordenamiento */}
                             <div className="flex items-center gap-2">
-                                <label className="text-xs text-gray-500 font-medium uppercase tracking-wider">Orden:</label>
+                                <label htmlFor="filter-orden" className="text-xs text-gray-500 font-medium uppercase tracking-wider">Orden:</label>
                                 <select
+                                    id="filter-orden"
                                     value={sortOrder}
                                     onChange={(e) => setSortOrder(e.target.value)}
                                     className="border border-gray-300 rounded-lg py-1.5 px-3 text-sm focus:ring-2 focus:ring-[#2AA87E]/20 focus:border-[#2AA87E] bg-white"

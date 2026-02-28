@@ -418,6 +418,7 @@ const DashboardTerapeuta = () => {
             {/* Modals */}
             {showCreateModal && (
                 <CrearPacienteModal
+                    isOpen={true}
                     onClose={() => setShowCreateModal(false)}
                     onSuccess={() => { setShowCreateModal(false); fetchData(); }}
                 />

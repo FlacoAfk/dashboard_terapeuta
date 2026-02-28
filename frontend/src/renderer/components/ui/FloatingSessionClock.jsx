@@ -26,13 +26,17 @@ const FloatingSessionClock = () => {
     const [minimized, setMinimized] = useState(false);
     const [closing, setClosing] = useState(false);
 
+    // Reset state when session ends
     useEffect(() => {
         if (!activeSession) {
             setElapsed(0);
             setMinimized(false);
-            return;
         }
+    }, [activeSession]);
 
+    // Tick timer when session is active
+    useEffect(() => {
+        if (!activeSession) return;
         const tick = () => setElapsed(Date.now() - activeSession.started_at);
         tick();
         const timer = setInterval(tick, 1000);
