@@ -15,6 +15,13 @@ const { auditFromRequest, AUDIT_TYPES } = require('../../utils/auditHelper');
 const { validatePatient, validatePatientAssign } = require('../../validators/patientValidator');
 const { buildCacheKey, getCachedJson, setCachedJson } = require('../../utils/cache');
 const { invalidatePatientCaches } = require('../../utils/cacheInvalidation');
+const {
+    parsePagination,
+    parseSearch,
+    parseSort,
+    applySortClauses,
+    buildPaginationMetadata
+} = require('../../utils/queryOptions');
 
 // ========================================
 // ESTADO DE LA API
@@ -92,6 +99,17 @@ router.get('/db-status', async (req, res) => {
  *     description: RF-SEG-03 - Los terapeutas solo ven sus pacientes asignados.
  *     parameters:
  *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 200
+ *       - in: query
  *         name: activo
  *         schema:
  *           type: boolean
@@ -106,6 +124,21 @@ router.get('/db-status', async (req, res) => {
  *         schema:
  *           type: string
  *         description: Buscar por identificación (parcial)
+ *       - in: query
+ *         name: id_terapeuta
+ *         schema:
+ *           type: integer
+ *         description: Filtrar por terapeuta (uso Superadmin)
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Búsqueda textual global (nombre, identificación, diagnóstico)
+ *       - in: query
+ *         name: sort
+ *         schema:
+ *           type: string
+ *         description: Orden multi-criterio (ej. fecha_registro:desc,nombre:asc)
  *     responses:
  *       200:
  *         description: Lista de pacientes
@@ -113,11 +146,18 @@ router.get('/db-status', async (req, res) => {
  *         description: No autenticado
  */
 router.get('/patients', authenticateToken, requireTerapeuta, async (req, res) => {
-    const { activo, nombre, identificacion } = req.query;
-    const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
-    const limit = Math.min(200, Math.max(1, Number.parseInt(req.query.limit, 10) || 50));
-    const from = (page - 1) * limit;
-    const to = from + limit - 1;
+    const { activo, nombre, identificacion, id_terapeuta: therapistFilter } = req.query;
+    const pagination = parsePagination(req.query, {
+        page: 1,
+        limit: 25,
+        maxLimit: 200
+    });
+    const search = parseSearch(req.query);
+    const sortClauses = parseSort(
+        req.query,
+        ['fecha_registro', 'nombre', 'edad', 'identificacion', 'activo'],
+        [{ field: 'fecha_registro', ascending: false }]
+    );
 
     try {
         const cacheKey = buildCacheKey('api:patients:list', {
@@ -126,8 +166,11 @@ router.get('/patients', authenticateToken, requireTerapeuta, async (req, res) =>
             activo: activo ?? null,
             nombre: nombre || null,
             identificacion: identificacion || null,
-            page,
-            limit
+            search,
+            id_terapeuta: therapistFilter || null,
+            sort: sortClauses,
+            page: pagination.page,
+            limit: pagination.limit
         });
 
         const cachedPayload = await getCachedJson(cacheKey);
@@ -151,11 +194,48 @@ router.get('/patients', authenticateToken, requireTerapeuta, async (req, res) =>
                 const payload = {
                     success: true,
                     data: [],
+                    count: 0,
                     pagination: {
-                        page,
-                        limit,
-                        total: 0,
-                        totalPages: 0
+                        ...buildPaginationMetadata({
+                            page: pagination.page,
+                            limit: pagination.limit,
+                            total: 0
+                        })
+                    }
+                };
+                await setCachedJson(cacheKey, payload, 20);
+                return res.json(payload);
+            }
+        }
+
+        if (therapistFilter) {
+            const { data: assignmentsByTherapist, error: filterError } = await supabase
+                .from('terapeuta_paciente')
+                .select('id_paciente')
+                .eq('id_terapeuta', therapistFilter);
+
+            if (filterError) throw filterError;
+
+            const filteredPatientIds = (assignmentsByTherapist || []).map((item) => item.id_paciente);
+
+            if (patientIds) {
+                const allowedSet = new Set(patientIds);
+                patientIds = filteredPatientIds.filter((id) => allowedSet.has(id));
+            } else {
+                patientIds = filteredPatientIds;
+            }
+
+            if (patientIds.length === 0) {
+                const payload = {
+                    success: true,
+                    data: [],
+                    count: 0,
+                    pagination: {
+                        ...buildPaginationMetadata({
+                            page: pagination.page,
+                            limit: pagination.limit,
+                            total: 0
+                        })
                     }
                 };
                 await setCachedJson(cacheKey, payload, 20);
@@ -166,9 +246,7 @@ router.get('/patients', authenticateToken, requireTerapeuta, async (req, res) =>
         // Construir query de pacientes
         let query = supabase
             .from('pacientes')
-            .select('*', { count: 'exact' })
-            .order('fecha_registro', { ascending: false })
-            .range(from, to);
+            .select('*', { count: 'exact' });
 
         // Filtrar por pacientes asignados si es terapeuta
         if (patientIds) {
@@ -190,18 +268,41 @@ router.get('/patients', authenticateToken, requireTerapeuta, async (req, res) =>
             query = query.ilike('identificacion', `%${identificacion}%`);
         }
 
+        if (search) {
+            query = query.or(`nombre.ilike.%${search}%,identificacion.ilike.%${search}%,diagnostico.ilike.%${search}%`);
+        }
+
+        query = applySortClauses(query, sortClauses).range(pagination.from, pagination.to);
+
         const { data: patients, count: totalPatients, error } = await query;
         if (error) throw error;
 
-        // Obtener asignaciones de terapeutas
-        const { data: allAssignments, error: assigError } = await supabase
-            .from('terapeuta_paciente')
-            .select('id_paciente, id_terapeuta, terapeutas(nombre)');
+        const patientIdsForPage = (patients || []).map((patient) => patient.id);
+        if (patientIdsForPage.length === 0) {
+            const total = totalPatients || 0;
+            const payload = {
+                success: true,
+                data: [],
+                count: 0,
+                pagination: buildPaginationMetadata({
+                    page: pagination.page,
+                    limit: pagination.limit,
+                    total
+                })
+            };
+            await setCachedJson(cacheKey, payload, 20);
+            return res.json(payload);
+        }
 
-        if (assigError) throw assigError;
+        const { data: assignmentsByPage, error: pageAssignError } = await supabase
+            .from('terapeuta_paciente')
+            .select('id_paciente, id_terapeuta, terapeutas(nombre)')
+            .in('id_paciente', patientIdsForPage);
+
+        if (pageAssignError) throw pageAssignError;
 
         const assignmentsByPatientId = new Map(
-            (allAssignments || []).map((assignment) => [assignment.id_paciente, assignment])
+            (assignmentsByPage || []).map((assignment) => [assignment.id_paciente, assignment])
         );
 
         // Mapear terapeutas a pacientes en O(n)
@@ -218,12 +319,12 @@ router.get('/patients', authenticateToken, requireTerapeuta, async (req, res) =>
         const payload = {
             success: true,
             data: patientsWithTherapist,
-            pagination: {
-                page,
-                limit,
-                total,
-                totalPages: Math.ceil(total / limit)
-            }
+            count: patientsWithTherapist.length,
+            pagination: buildPaginationMetadata({
+                page: pagination.page,
+                limit: pagination.limit,
+                total
+            })
         };
         await setCachedJson(cacheKey, payload, 20);
         res.json(payload);

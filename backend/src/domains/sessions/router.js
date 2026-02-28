@@ -18,6 +18,14 @@ const { supabase } = require('../../config/supabase');
 const { authenticateToken, requireTerapeuta, validateUnityApiKey } = require('../../middleware/authMiddleware');
 const { auditFromRequest, AUDIT_TYPES } = require('../../utils/auditHelper');
 const { buildCacheKey, getCachedJson, setCachedJson, invalidateCacheByPattern } = require('../../utils/cache');
+const { cacheGetResponse } = require('../../middleware/cacheMiddleware');
+const {
+    parsePagination,
+    parseSearch,
+    parseSort,
+    applySortClauses,
+    buildPaginationMetadata
+} = require('../../utils/queryOptions');
 const { VALID_RECIPES, VALID_RECIPE_IDS } = require('../../constants/recipes');
 const SESSION_WAIT_TIMEOUT_MINUTES = 30;
 
@@ -615,28 +623,68 @@ router.put('/:id/close', authenticateToken, requireTerapeuta, async (req, res) =
  *         schema:
  *           type: string
  *         description: Filtrar por código de participante
+ *       - in: query
+ *         name: recipe_id
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 200
+ *       - in: query
+ *         name: sort
+ *         schema:
+ *           type: string
+ *         description: Orden multi-criterio (ej. created_at:desc,status:asc)
+ *       - in: query
+ *         name: refresh
+ *         schema:
+ *           type: boolean
+ *         description: Fuerza bypass del cache para la petición actual
  *     responses:
  *       200:
  *         description: Lista de sesiones de receta
  */
-router.get('/recipe-sessions', authenticateToken, requireTerapeuta, async (req, res) => {
+router.get('/recipe-sessions', authenticateToken, requireTerapeuta, cacheGetResponse({
+    prefix: 'sessions:recipe-sessions',
+    ttlSeconds: 20,
+    shouldBypass: (req) => String(req.query.refresh || '').toLowerCase() === 'true',
+    payloadBuilder: (req) => ({
+        role: req.user.rol,
+        therapistId: req.user.id_terapeuta || null,
+        status: req.query.status || null,
+        participant_code: req.query.participant_code || null,
+        recipe_id: req.query.recipe_id || null,
+        search: req.query.search || null,
+        page: req.query.page || null,
+        limit: req.query.limit || null,
+        sort: req.query.sort || null
+    })
+}), async (req, res) => {
     try {
-        const { status, participant_code, refresh } = req.query;
-        const forceRefresh = String(refresh || '').toLowerCase() === 'true';
-
-        const cacheKey = buildCacheKey('sessions:recipe-sessions', {
-            role: req.user.rol,
-            therapistId: req.user.id_terapeuta || null,
-            status: status || null,
-            participant_code: participant_code || null
+        const { status, participant_code, recipe_id } = req.query;
+        const pagination = parsePagination(req.query, {
+            page: 1,
+            limit: 25,
+            maxLimit: 200
         });
-
-        if (!forceRefresh) {
-            const cachedPayload = await getCachedJson(cacheKey);
-            if (cachedPayload) {
-                return res.json(cachedPayload);
-            }
-        }
+        const search = parseSearch(req.query);
+        const sortClauses = parseSort(
+            req.query,
+            ['created_at', 'status', 'participant_code', 'recipe_id'],
+            [{ field: 'created_at', ascending: false }]
+        );
 
         if (req.user.id_terapeuta) {
             await closeExpiredCreatedSessions(req.user.id_terapeuta);
@@ -644,8 +692,7 @@ router.get('/recipe-sessions', authenticateToken, requireTerapeuta, async (req, 
 
         let query = supabase
             .from('sessions')
-            .select('id, participant_code, recipe_id, status, start_token, created_by, created_at')
-            .order('created_at', { ascending: false });
+            .select('id, participant_code, recipe_id, status, start_token, created_by, created_at', { count: 'exact' });
 
         // TERAPEUTA solo ve sus sesiones; SUPERADMIN ve todas
         if (req.user.rol === 'TERAPEUTA' && req.user.id_terapeuta) {
@@ -660,18 +707,30 @@ router.get('/recipe-sessions', authenticateToken, requireTerapeuta, async (req, 
             query = query.eq('participant_code', participant_code.trim());
         }
 
-        const { data: sessions, error } = await query;
+        if (recipe_id) {
+            query = query.eq('recipe_id', recipe_id.trim());
+        }
+
+        if (search) {
+            query = query.or(`participant_code.ilike.%${search}%,recipe_id.ilike.%${search}%,start_token.ilike.%${search}%`);
+        }
+
+        query = applySortClauses(query, sortClauses).range(pagination.from, pagination.to);
+
+        const { data: sessions, count: total, error } = await query;
 
         if (error) throw error;
 
-        const payload = {
+        res.json({
             success: true,
             data: sessions || [],
-            count: (sessions || []).length
-        };
-
-        await setCachedJson(cacheKey, payload, 20);
-        res.json(payload);
+            count: (sessions || []).length,
+            pagination: buildPaginationMetadata({
+                page: pagination.page,
+                limit: pagination.limit,
+                total: total || 0
+            })
+        });
 
     } catch (error) {
         console.error('Error en GET /sessions/recipe-sessions:', error);

@@ -91,6 +91,16 @@ const DashboardTerapeuta = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [filter, setFilter] = useState('todos'); // todos, activos, inactivos
     const [stats, setStats] = useState({ activos: 0, hoy: 0, semana: 0, rendimiento: 0 });
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(10);
+    const [patientsPagination, setPatientsPagination] = useState({
+        page: 1,
+        limit: 10,
+        total: 0,
+        totalPages: 0,
+        hasNextPage: false,
+        hasPrevPage: false
+    });
 
     // Modal states
     const [showCreateModal, setShowCreateModal] = useState(false);
@@ -99,15 +109,36 @@ const DashboardTerapeuta = () => {
 
     useEffect(() => {
         fetchData();
-    }, []);
+    }, [currentPage, itemsPerPage, searchTerm, filter]);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, filter, itemsPerPage]);
 
     const fetchData = async () => {
         setLoading(true);
         try {
             // Fetch patients
-            const patientsResult = await patientService.getAll();
+            const activoFilter = filter === 'todos'
+                ? undefined
+                : filter === 'activos';
+
+            const patientsResult = await patientService.getAll({
+                page: currentPage,
+                limit: itemsPerPage,
+                search: searchTerm || undefined,
+                activo: activoFilter
+            });
             if (patientsResult.success) {
                 setPatients(patientsResult.data);
+                setPatientsPagination(patientsResult.pagination || {
+                    page: currentPage,
+                    limit: itemsPerPage,
+                    total: patientsResult.count || 0,
+                    totalPages: 0,
+                    hasNextPage: false,
+                    hasPrevPage: currentPage > 1
+                });
             } else {
                 setError(patientsResult.error);
             }
@@ -124,7 +155,7 @@ const DashboardTerapeuta = () => {
             const activePatients = patientStats.success ? patientStats.data.activos : 0;
 
             // Solo buscar sesiones si el terapeuta tiene pacientes asignados
-            if (patientsResult.success && patientsResult.data && patientsResult.data.length > 0) {
+            if (patientStats.success && patientStats.data && patientStats.data.total > 0) {
                 const today = new Date();
                 today.setHours(0, 0, 0, 0);
                 const weekAgo = new Date();
@@ -165,16 +196,6 @@ const DashboardTerapeuta = () => {
             setLoading(false);
         }
     };
-
-    // Filter patients
-    const filteredPatients = patients.filter(p => {
-        const matchesSearch = p.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            p.identificacion?.includes(searchTerm);
-        const matchesFilter = filter === 'todos' ||
-            (filter === 'activos' && p.activo !== false) ||
-            (filter === 'inactivos' && p.activo === false);
-        return matchesSearch && matchesFilter;
-    });
 
     const handleViewPatient = (patient) => {
         navigate(`/terapeuta/paciente/${patient.id}`);
@@ -347,14 +368,14 @@ const DashboardTerapeuta = () => {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
-                                    {filteredPatients.length === 0 ? (
+                                    {patients.length === 0 ? (
                                         <tr>
                                             <td colSpan="6" className="px-6 py-12 text-center text-gray-500">
                                                 No se encontraron pacientes
                                             </td>
                                         </tr>
                                     ) : (
-                                        filteredPatients.map((patient) => (
+                                        patients.map((patient) => (
                                             <tr key={patient.id} className="hover:bg-gray-50">
                                                 <td className="px-6 py-4">
                                                     <div className="flex items-center gap-3">
@@ -410,6 +431,46 @@ const DashboardTerapeuta = () => {
                                     )}
                                 </tbody>
                             </table>
+                        </div>
+                    )}
+
+                    {!loading && (
+                        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 border-t border-gray-200">
+                            <div className="flex items-center gap-3 text-sm text-gray-500">
+                                <span>
+                                    Mostrando {patients.length === 0 ? 0 : ((patientsPagination.page - 1) * patientsPagination.limit) + 1}-
+                                    {Math.min(patientsPagination.page * patientsPagination.limit, patientsPagination.total)} de {patientsPagination.total}
+                                </span>
+                                <select
+                                    value={itemsPerPage}
+                                    onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                                    className="text-sm border-gray-300 rounded-lg focus:ring-[#2AA87E] focus:border-[#2AA87E] p-1.5 bg-white"
+                                >
+                                    <option value={10}>10 por página</option>
+                                    <option value={20}>20 por página</option>
+                                    <option value={50}>50 por página</option>
+                                </select>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                                    disabled={!patientsPagination.hasPrevPage}
+                                    className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                                >
+                                    Anterior
+                                </button>
+                                <span className="text-sm text-gray-600">
+                                    Página {patientsPagination.page} de {Math.max(1, patientsPagination.totalPages)}
+                                </span>
+                                <button
+                                    onClick={() => setCurrentPage((prev) => Math.min(Math.max(1, patientsPagination.totalPages), prev + 1))}
+                                    disabled={!patientsPagination.hasNextPage}
+                                    className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                                >
+                                    Siguiente
+                                </button>
+                            </div>
                         </div>
                     )}
                 </div>

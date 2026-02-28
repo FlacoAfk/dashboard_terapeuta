@@ -17,7 +17,15 @@ const express = require('express');
 const router = express.Router();
 const { supabase } = require('../../config/supabase');
 const { authenticateToken, requireTerapeuta, validateUnityApiKey } = require('../../middleware/authMiddleware');
+const { cacheGetResponse } = require('../../middleware/cacheMiddleware');
 const { buildCacheKey, getCachedJson, setCachedJson, invalidateCacheByPattern } = require('../../utils/cache');
+const {
+    parsePagination,
+    parseSearch,
+    parseSort,
+    applySortClauses,
+    buildPaginationMetadata
+} = require('../../utils/queryOptions');
 
 async function invalidateVrResultsCache(sessionId = null) {
     await Promise.all([
@@ -287,30 +295,71 @@ router.post('/session-results', validateUnityApiKey, async (req, res) => {
  *         schema:
  *           type: string
  *         description: Filtrar por actividad
+ *       - in: query
+ *         name: estado_revision
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: id_paciente
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 200
+ *       - in: query
+ *         name: sort
+ *         schema:
+ *           type: string
+ *         description: Orden multi-criterio (ej. created_at:desc,participant_id:asc)
  *     responses:
  *       200:
  *         description: Lista de sesiones
  */
-router.get('/session-results', authenticateToken, requireTerapeuta, async (req, res) => {
+router.get('/session-results', authenticateToken, requireTerapeuta, cacheGetResponse({
+    prefix: 'vr:session-results:list',
+    ttlSeconds: 20,
+    payloadBuilder: (req) => ({
+        role: req.user.rol,
+        therapistId: req.user.id_terapeuta || null,
+        participantId: req.query.participantId || null,
+        activityId: req.query.activityId || null,
+        estado_revision: req.query.estado_revision || null,
+        id_paciente: req.query.id_paciente || null,
+        page: req.query.page || null,
+        limit: req.query.limit || null,
+        search: req.query.search || null,
+        sort: req.query.sort || null
+    })
+}), async (req, res) => {
     try {
-        const { participantId, activityId } = req.query;
-
-        const cacheKey = buildCacheKey('vr:session-results:list', {
-            role: req.user.rol,
-            therapistId: req.user.id_terapeuta || null,
-            participantId: participantId || null,
-            activityId: activityId || null
+        const { participantId, activityId, estado_revision, id_paciente } = req.query;
+        const pagination = parsePagination(req.query, {
+            page: 1,
+            limit: 25,
+            maxLimit: 200
         });
-
-        const cachedPayload = await getCachedJson(cacheKey);
-        if (cachedPayload) {
-            return res.json(cachedPayload);
-        }
+        const search = parseSearch(req.query);
+        const sortClauses = parseSort(
+            req.query,
+            ['created_at', 'started_at', 'ended_at', 'total_seconds', 'summary_total_errors', 'summary_total_drops', 'summary_total_releases', 'participant_id', 'activity_id'],
+            [{ field: 'created_at', ascending: false }]
+        );
 
         let query = supabase
             .from('vr_session_results')
-            .select('*')
-            .order('created_at', { ascending: false });
+            .select('*', { count: 'exact' });
 
         if (participantId) {
             query = query.eq('participant_id', participantId);
@@ -320,7 +369,21 @@ router.get('/session-results', authenticateToken, requireTerapeuta, async (req, 
             query = query.eq('activity_id', activityId);
         }
 
-        const { data, error } = await query;
+        if (estado_revision) {
+            query = query.eq('estado_revision', estado_revision);
+        }
+
+        if (id_paciente) {
+            query = query.eq('id_paciente_vinculado', id_paciente);
+        }
+
+        if (search) {
+            query = query.or(`participant_id.ilike.%${search}%,activity_id.ilike.%${search}%`);
+        }
+
+        query = applySortClauses(query, sortClauses).range(pagination.from, pagination.to);
+
+        const { data, count: total, error } = await query;
 
         if (error) {
             return res.status(500).json({
@@ -331,10 +394,14 @@ router.get('/session-results', authenticateToken, requireTerapeuta, async (req, 
         const payload = {
             success: true,
             data: data,
-            count: data.length
+            count: data.length,
+            pagination: buildPaginationMetadata({
+                page: pagination.page,
+                limit: pagination.limit,
+                total: total || 0
+            })
         };
 
-        await setCachedJson(cacheKey, payload, 20);
         res.json(payload);
 
     } catch (error) {

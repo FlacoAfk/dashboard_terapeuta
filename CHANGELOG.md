@@ -2,6 +2,35 @@
 
 Todos los cambios notables de este proyecto serán documentados en este archivo.
 
+## [1.8.4] - 2026-02-27
+
+### ✨ Nuevas Funcionalidades
+
+- Backend: paginación/filtros/sort/búsqueda avanzada en listados de pacientes, usuarios, sesiones VR y sesiones de receta.
+- Backend: middleware reutilizable de caché para GET e invalidación automática en mutaciones.
+- Frontend: cache en memoria + deduplicación de peticiones GET para endpoints de tablas/listados.
+- Frontend: soporte de bypass explícito de caché con `forceRefresh` / `skipCache` y compatibilidad con `refresh=true`.
+
+### ⚡ Rendimiento
+
+- Reducción de fan-out de peticiones GET al cambiar de vista (reutilización por TTL y dedupe en vuelo).
+- Migración de tablas críticas del frontend a paginación server-side para reducir payloads y consultas redundantes.
+
+### 📝 Documentación
+
+- `README.md` y `backend/API_ENDPOINTS.md` actualizados con variables Redis y nuevos parámetros de listados paginados.
+- `frontend/.env.example` y guía de deploy actualizados con `VITE_API_GET_CACHE_TTL_MS` / `API_GET_CACHE_TTL_MS`.
+
+### 🧪 Testing
+
+- Nuevas pruebas backend para utilidades de paginación/sort/search y middleware de caché.
+
+### 🔄 Versionamiento
+
+- Root: `1.8.3` → `1.8.4`
+- Backend: `1.8.3` → `1.8.4`
+- Frontend: `1.8.3` → `1.8.4`
+
 ## [1.8.3] - 2026-02-27
 
 ### 🚀 Deploy y Operación

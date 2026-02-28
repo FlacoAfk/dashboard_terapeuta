@@ -20,9 +20,16 @@ const {
  *       - bearerAuth: []
  *     parameters:
  *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *       - in: query
  *         name: limit
  *         schema:
  *           type: integer
+ *           minimum: 1
+ *           maximum: 200
  *       - in: query
  *         name: estado_revision
  *         schema:
@@ -36,6 +43,19 @@ const {
  *         name: id_paciente
  *         schema:
  *           type: integer
+ *       - in: query
+ *         name: activity_id
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: sort
+ *         schema:
+ *           type: string
+ *         description: Orden multi-criterio (ej. created_at:desc,total_seconds:asc)
  *     responses:
  *       200:
  *         description: Lista de sesiones para revisión

@@ -2,8 +2,8 @@
 
 Este documento detalla todos los endpoints disponibles en el backend del Dashboard Terapeuta.
 
-**Versión:** 1.8.2  
-**Última auditoría:** 2026-02-23  
+**Versión:** 1.8.4  
+**Última auditoría:** 2026-02-27  
 **Total endpoints:** 35  
 URL Base: `/api` (excepto VR Results que usa `/api/v1`)
 
@@ -225,7 +225,9 @@ Solicita código de verificación por email (alternativo al link).
 ### `GET /api/usuarios`
 Lista todos los usuarios con datos de terapeuta asociado y conteo de pacientes.
 - **Seguridad:** 🔴 JWT + `requireSuperAdmin`
-- **Entradas:** Ninguna
+- **Entradas (Query):** `page`, `limit`, `search`, `rol`, `activo`, `sort`
+  - `sort` multi-criterio: `campo:asc|desc,campo2:asc|desc`
+  - Campos permitidos en `sort`: `fecha_creacion`, `email`, `rol`, `activo`, `ultimo_login`
 - **Salidas (200):**
   ```json
   {
@@ -245,7 +247,16 @@ Lista todos los usuarios con datos de terapeuta asociado y conteo de pacientes.
         "telefono": "3001234567",
         "total_pacientes": 3
       }
-    ]
+    ],
+    "count": 1,
+    "pagination": {
+      "page": 1,
+      "limit": 25,
+      "total": 1,
+      "totalPages": 1,
+      "hasNextPage": false,
+      "hasPrevPage": false
+    }
   }
   ```
 - **Errores:** 401, 403
@@ -330,7 +341,9 @@ Resetea la contraseña de un usuario por parte del SuperAdmin.
 Lista pacientes. Filtrado automático por terapeuta.
 - **Seguridad:** 🟡 JWT + `requireTerapeuta` + filtro por rol
 - **Regla de acceso:** TERAPEUTA solo ve sus pacientes asignados. SUPERADMIN ve todos.
-- **Entradas (Query):** `activo` (bool), `nombre` (string para búsqueda), `identificacion` (string)
+- **Entradas (Query):** `page`, `limit`, `activo`, `nombre`, `identificacion`, `id_terapeuta`, `search`, `sort`
+  - `search`: búsqueda textual sobre `nombre`, `identificacion`, `diagnostico`
+  - `sort` multi-criterio sobre: `fecha_registro`, `nombre`, `edad`, `identificacion`, `activo`
 - **Salidas (200):**
   ```json
   {
@@ -347,7 +360,16 @@ Lista pacientes. Filtrado automático por terapeuta.
         "id_terapeuta": 2,
         "terapeuta_nombre": "Dr. Alejandro Restrepo"
       }
-    ]
+    ],
+    "count": 1,
+    "pagination": {
+      "page": 1,
+      "limit": 25,
+      "total": 1,
+      "totalPages": 1,
+      "hasNextPage": false,
+      "hasPrevPage": false
+    }
   }
   ```
 - **Errores:** 401
@@ -474,7 +496,9 @@ Lista sesiones VR para revisión en el dashboard. Filtrado automático por terap
   - `estado_revision` — `PENDIENTE_REVISION` | `REVISADA`
   - `pendientes` — `true` (solo sesiones sin paciente vinculado)
   - `id_paciente` — int (filtrar por paciente específico)
-  - `limit` — int (default: 50)
+  - `activity_id` — string
+  - `page`, `limit`, `search`, `sort`
+  - `sort` multi-criterio sobre: `created_at`, `started_at`, `ended_at`, `total_seconds`, `summary_total_errors`, `summary_total_releases`, `estado_revision`
 - **Salidas (200):**
   ```json
   {
@@ -499,7 +523,15 @@ Lista sesiones VR para revisión en el dashboard. Filtrado automático por terap
         "paciente_nombre": "Paciente Test"
       }
     ],
-    "count": 1
+    "count": 1,
+    "pagination": {
+      "page": 1,
+      "limit": 25,
+      "total": 1,
+      "totalPages": 1,
+      "hasNextPage": false,
+      "hasPrevPage": false
+    }
   }
   ```
 - **Errores:** 401
@@ -636,7 +668,9 @@ Finaliza una sesión manualmente desde el dashboard.
 Lista sesiones de receta creadas por el terapeuta.
 - **Seguridad:** 🟡 JWT + `requireTerapeuta`
 - **Regla de acceso:** TERAPEUTA solo ve sus sesiones. SUPERADMIN ve todas.
-- **Entradas (Query):** `status` (CREATED|ACTIVE|FINISHED), `participant_code` (string)
+- **Entradas (Query):** `status`, `participant_code`, `recipe_id`, `search`, `page`, `limit`, `sort`, `refresh=true`
+  - `sort` multi-criterio sobre: `created_at`, `status`, `participant_code`, `recipe_id`
+  - `refresh=true` fuerza bypass del cache para esa solicitud
 - **Salidas (200):**
   ```json
   {
@@ -652,7 +686,15 @@ Lista sesiones de receta creadas por el terapeuta.
         "created_at": "2026-02-14T..."
       }
     ],
-    "count": 1
+    "count": 1,
+    "pagination": {
+      "page": 1,
+      "limit": 25,
+      "total": 1,
+      "totalPages": 1,
+      "hasNextPage": false,
+      "hasPrevPage": false
+    }
   }
   ```
 - **Errores:** 401
@@ -701,7 +743,8 @@ Recibe y persiste el resultado completo de una sesión VR desde Unity.
 ### `GET /api/v1/session-results`
 Lista todas las sesiones VR (vista raw/técnica, distinta al dashboard).
 - **Seguridad:** 🟡 JWT + `requireTerapeuta`
-- **Entradas (Query):** `participantId` (string), `activityId` (string)
+- **Entradas (Query):** `participantId`, `activityId`, `estado_revision`, `id_paciente`, `search`, `page`, `limit`, `sort`
+  - `sort` multi-criterio sobre: `created_at`, `started_at`, `ended_at`, `total_seconds`, `summary_total_errors`, `summary_total_drops`, `summary_total_releases`, `participant_id`, `activity_id`
 - **Salidas (200):**
   ```json
   {
@@ -724,7 +767,15 @@ Lista todas las sesiones VR (vista raw/técnica, distinta al dashboard).
         "created_at": "..."
       }
     ],
-    "count": 10
+    "count": 10,
+    "pagination": {
+      "page": 1,
+      "limit": 25,
+      "total": 10,
+      "totalPages": 1,
+      "hasNextPage": false,
+      "hasPrevPage": false
+    }
   }
   ```
 - **Errores:** 401

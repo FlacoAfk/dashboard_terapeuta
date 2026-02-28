@@ -15,6 +15,9 @@ Este proyecto se despliega manualmente. GitHub Actions no se usa.
 ### Variables de entorno (Vercel)
 - `VITE_API_URL=https://cerebro-al-fuego-image-482550109792.us-central1.run.app`
 - `VITE_API_TIMEOUT_MS=15000`
+- `VITE_API_GET_CACHE_TTL_MS=20000`
+
+> Para builds Electron, el equivalente en runtime es `API_GET_CACHE_TTL_MS`.
 
 ### Deploy con CLI (PowerShell)
 ```powershell

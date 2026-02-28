@@ -45,16 +45,24 @@ const GestionTerapeutas = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [filter, setFilter] = useState('todos'); // 'todos', 'activos', 'inactivos'
     const [therapists, setTherapists] = useState([]);
+    const [therapistsCatalog, setTherapistsCatalog] = useState([]);
     const [currentPage, setCurrentPage] = useState(1);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [actionLoading, setActionLoading] = useState(false);
     const [itemsPerPage, setItemsPerPage] = useState(10);
+    const [pagination, setPagination] = useState({
+        page: 1,
+        limit: 10,
+        total: 0,
+        totalPages: 0,
+        hasNextPage: false,
+        hasPrevPage: false
+    });
 
-    // Reset pagination when items per page changes
     useEffect(() => {
         setCurrentPage(1);
-    }, [itemsPerPage]);
+    }, [itemsPerPage, searchTerm, filter]);
 
     // Estados de los modales
     const [showCrearModal, setShowCrearModal] = useState(false);
@@ -64,21 +72,45 @@ const GestionTerapeutas = () => {
     const [selectedTherapist, setSelectedTherapist] = useState(null);
     const [therapistPatients, setTherapistPatients] = useState([]);
 
-    // Cargar terapeutas al montar
     useEffect(() => {
         fetchTherapists();
-    }, []);
+    }, [currentPage, itemsPerPage, searchTerm, filter]);
 
-    const fetchTherapists = async () => {
+    const fetchTherapists = async ({ forceRefresh = false } = {}) => {
         setLoading(true);
         setError('');
         try {
-            const result = await therapistService.getAll();
+            const activeFilter = filter === 'todos' ? undefined : filter === 'activos';
+
+            const [result, catalogResult] = await Promise.all([
+                therapistService.getAll({
+                    page: currentPage,
+                    limit: itemsPerPage,
+                    search: searchTerm || undefined,
+                    activo: activeFilter,
+                    forceRefresh
+                }),
+                therapistService.getAll({ fetchAll: true, forceRefresh })
+            ]);
+
             if (result.success) {
                 setTherapists(result.data);
+                setPagination(result.pagination || {
+                    page: currentPage,
+                    limit: itemsPerPage,
+                    total: result.count || 0,
+                    totalPages: 0,
+                    hasNextPage: false,
+                    hasPrevPage: currentPage > 1
+                });
+
+                if (catalogResult.success) {
+                    setTherapistsCatalog(catalogResult.data || []);
+                }
 
                 // RF-SEG-02 (Safety): Check for inactive therapists with patients
-                const inconsistent = result.data.find(t => !t.activo && t.pacientes > 0);
+                const sourceForSafety = catalogResult.success ? (catalogResult.data || []) : result.data;
+                const inconsistent = sourceForSafety.find(t => !t.activo && t.pacientes > 0);
                 if (inconsistent) {
                     // Trigger reassignment flow immediately
                     try {
@@ -103,27 +135,8 @@ const GestionTerapeutas = () => {
         }
     };
 
-    // Filtrar terapeutas
-    const filteredTherapists = therapists.filter(t => {
-        const matchesSearch =
-            (t.usuario || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (t.nombre || '').toLowerCase().includes(searchTerm.toLowerCase());
-
-        const matchesFilter =
-            filter === 'todos' ||
-            (filter === 'activos' && t.activo) ||
-            (filter === 'inactivos' && !t.activo);
-
-        return matchesSearch && matchesFilter;
-    });
-
-    // Paginación
-    const totalPages = Math.ceil(filteredTherapists.length / itemsPerPage) || 1;
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const paginatedTherapists = filteredTherapists.slice(startIndex, startIndex + itemsPerPage);
-
     // Terapeutas activos para reasignación (excluyendo el que se va a desactivar)
-    const availableTherapists = therapists
+    const availableTherapists = therapistsCatalog
         .filter(t => t.activo && t.id !== selectedTherapist?.id)
         .map(t => ({ ...t }));
 
@@ -307,9 +320,9 @@ const GestionTerapeutas = () => {
                             </div>
                             {/* Refresh Button */}
                             <button
-                                onClick={fetchTherapists}
+                                onClick={() => fetchTherapists({ forceRefresh: true })}
                                 disabled={loading}
-                                className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-50 flex-shrink-0"
+                                className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-50 shrink-0"
                                 title="Recargar"
                             >
                                 <Icons.Refresh />
@@ -345,7 +358,7 @@ const GestionTerapeutas = () => {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
-                                    {paginatedTherapists.map((therapist) => (
+                                    {therapists.map((therapist) => (
                                         <tr key={therapist.id} className="hover:bg-gray-50">
                                             <td className="py-4 pr-4 text-gray-700">
                                                 {therapist.nombre}
@@ -402,7 +415,7 @@ const GestionTerapeutas = () => {
                     <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t border-gray-200">
                         <div className="flex flex-col sm:flex-row items-center gap-4">
                             <span className="text-sm text-gray-500">
-                                Mostrando {Math.min(startIndex + 1, filteredTherapists.length)} - {Math.min(startIndex + itemsPerPage, filteredTherapists.length)} de {filteredTherapists.length}
+                                Mostrando {therapists.length === 0 ? 0 : ((pagination.page - 1) * pagination.limit) + 1} - {Math.min(pagination.page * pagination.limit, pagination.total)} de {pagination.total}
                             </span>
                             <select
                                 value={itemsPerPage}
@@ -417,26 +430,17 @@ const GestionTerapeutas = () => {
                         <div className="flex items-center gap-1 sm:gap-2 flex-wrap justify-center">
                             <button
                                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                                disabled={currentPage === 1}
+                                disabled={!pagination.hasPrevPage}
                                 className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 <Icons.ChevronLeft />
                             </button>
-                            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                                <button
-                                    key={page}
-                                    onClick={() => setCurrentPage(page)}
-                                    className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg text-sm font-medium transition-colors ${currentPage === page
-                                        ? 'bg-[#F76C6C] text-white'
-                                        : 'text-gray-600 hover:bg-gray-100'
-                                        }`}
-                                >
-                                    {page}
-                                </button>
-                            ))}
+                            <span className="px-2 text-sm text-gray-600">
+                                Página {pagination.page} de {Math.max(1, pagination.totalPages)}
+                            </span>
                             <button
-                                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                                disabled={currentPage === totalPages}
+                                onClick={() => setCurrentPage(p => Math.min(Math.max(1, pagination.totalPages), p + 1))}
+                                disabled={!pagination.hasNextPage}
                                 className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 <Icons.ChevronRight />

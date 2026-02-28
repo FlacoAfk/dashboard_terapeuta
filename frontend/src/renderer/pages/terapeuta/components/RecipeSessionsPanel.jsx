@@ -14,6 +14,7 @@ const RecipeSessionsPanel = ({
     getSessionStatusLabel,
     formatDateTime,
     totalRecipePages,
+    totalRecipeItems,
     recipeCurrentPage,
     setRecipeCurrentPage,
     recipeSessionsPerPage
@@ -37,7 +38,7 @@ const RecipeSessionsPanel = ({
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
             </button>
-            <span className="text-xs text-gray-500">{recipeSessions.length} total</span>
+            <span className="text-xs text-gray-500">{totalRecipeItems ?? recipeSessions.length} total</span>
         </div>
 
         {recipeExpanded ? (
@@ -111,7 +112,7 @@ const RecipeSessionsPanel = ({
                             <div className="pt-2 flex items-center justify-between text-xs text-gray-500">
                                 <span>
                                     Mostrando {((recipeCurrentPage - 1) * recipeSessionsPerPage) + 1}-
-                                    {Math.min(recipeCurrentPage * recipeSessionsPerPage, recipeSessions.length)} de {recipeSessions.length}
+                                    {Math.min(recipeCurrentPage * recipeSessionsPerPage, totalRecipeItems ?? recipeSessions.length)} de {totalRecipeItems ?? recipeSessions.length}
                                 </span>
                                 <div className="flex items-center gap-1">
                                     <button

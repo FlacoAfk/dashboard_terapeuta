@@ -15,6 +15,14 @@ const { authenticateToken, requireSuperAdmin } = require('../../middleware/authM
 const { validateUserCreate, validateUserUpdate } = require('../../validators/userValidator');
 const { AUDIT_TYPES, auditFromRequest } = require('../../utils/auditHelper');
 const { isValidPassword, getPasswordPolicyMessage } = require('../../utils/passwordPolicy');
+const { cacheGetResponse, invalidateCacheOnMutation } = require('../../middleware/cacheMiddleware');
+const {
+    parsePagination,
+    parseSearch,
+    parseSort,
+    applySortClauses,
+    buildPaginationMetadata
+} = require('../../utils/queryOptions');
 
 /**
  * @swagger
@@ -24,21 +32,108 @@ const { isValidPassword, getPasswordPolicyMessage } = require('../../utils/passw
  *     tags: [Usuarios]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 200
+ *       - in: query
+ *         name: rol
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: activo
+ *         schema:
+ *           type: boolean
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: sort
+ *         schema:
+ *           type: string
+ *         description: Orden multi-criterio (ej. fecha_creacion:desc,rol:asc)
  *     responses:
  *       200:
  *         description: Lista de usuarios
  *       403:
  *         description: Acceso denegado
  */
-router.get('/', authenticateToken, requireSuperAdmin, async (req, res) => {
+router.get(
+    '/',
+    authenticateToken,
+    requireSuperAdmin,
+    cacheGetResponse({
+        prefix: 'api:users:list',
+        ttlSeconds: 20,
+        payloadBuilder: (req) => ({
+            role: req.user.rol,
+            page: req.query.page || null,
+            limit: req.query.limit || null,
+            search: req.query.search || null,
+            rol: req.query.rol || null,
+            activo: req.query.activo || null,
+            sort: req.query.sort || null
+        })
+    }),
+    async (req, res) => {
     try {
-        // Obtener usuarios
-        const { data: usuarios, error: userError } = await supabase
+        const pagination = parsePagination(req.query, {
+            page: 1,
+            limit: 25,
+            maxLimit: 200
+        });
+        const search = parseSearch(req.query);
+        const sortClauses = parseSort(
+            req.query,
+            ['fecha_creacion', 'email', 'rol', 'activo', 'ultimo_login'],
+            [{ field: 'fecha_creacion', ascending: false }]
+        );
+
+        let usersQuery = supabase
             .from('usuarios')
-            .select('id, email, rol, activo, fecha_creacion, ultimo_login')
-            .order('fecha_creacion', { ascending: false });
+            .select('id, email, rol, activo, fecha_creacion, ultimo_login', { count: 'exact' });
+
+        if (req.query.rol) {
+            usersQuery = usersQuery.eq('rol', req.query.rol);
+        }
+
+        if (req.query.activo === 'true' || req.query.activo === 'false') {
+            usersQuery = usersQuery.eq('activo', req.query.activo === 'true');
+        }
+
+        if (search) {
+            usersQuery = usersQuery.or(`email.ilike.%${search}%,rol.ilike.%${search}%`);
+        }
+
+        usersQuery = applySortClauses(usersQuery, sortClauses).range(pagination.from, pagination.to);
+
+        const { data: usuarios, count: totalUsers, error: userError } = await usersQuery;
 
         if (userError) throw userError;
+
+        const userIds = (usuarios || []).map((user) => user.id);
+
+        if (userIds.length === 0) {
+            return res.json({
+                success: true,
+                data: [],
+                count: 0,
+                pagination: buildPaginationMetadata({
+                    page: pagination.page,
+                    limit: pagination.limit,
+                    total: totalUsers || 0
+                })
+            });
+        }
 
         // Obtener terapeutas para hacer join manual
         const { data: terapeutas, error: terapError } = await supabase
@@ -54,6 +149,8 @@ router.get('/', authenticateToken, requireSuperAdmin, async (req, res) => {
 
         if (aggError) throw aggError;
 
+        const therapistByUserId = new Map((terapeutas || []).map((item) => [item.id_usuario, item]));
+
         const counts = {};
         if (assignments) {
             assignments.forEach(a => {
@@ -63,7 +160,7 @@ router.get('/', authenticateToken, requireSuperAdmin, async (req, res) => {
 
         // Combinar datos
         const result = usuarios.map(user => {
-            const terapeuta = terapeutas.find(t => t.id_usuario === user.id);
+            const terapeuta = therapistByUserId.get(user.id);
             return {
                 id: user.id,
                 username: user.email,
@@ -80,7 +177,16 @@ router.get('/', authenticateToken, requireSuperAdmin, async (req, res) => {
             };
         });
 
-        res.json({ success: true, data: result });
+        res.json({
+            success: true,
+            data: result,
+            count: result.length,
+            pagination: buildPaginationMetadata({
+                page: pagination.page,
+                limit: pagination.limit,
+                total: totalUsers || 0
+            })
+        });
 
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
@@ -117,7 +223,7 @@ router.get('/', authenticateToken, requireSuperAdmin, async (req, res) => {
  *       403:
  *         description: Acceso denegado
  */
-router.post('/terapeuta', authenticateToken, requireSuperAdmin, validateUserCreate, async (req, res) => {
+router.post('/terapeuta', authenticateToken, requireSuperAdmin, validateUserCreate, invalidateCacheOnMutation(['api:users:list:*', 'api:therapists:list:*', 'api:dashboard:stats:*']), async (req, res) => {
     const { nombre, correo, password, especialidad, telefono } = req.body;
 
     // Validar campos requeridos (correo es el identificador de login)
@@ -234,7 +340,7 @@ router.post('/terapeuta', authenticateToken, requireSuperAdmin, validateUserCrea
  *       200:
  *         description: Usuario actualizado
  */
-router.put('/:id', authenticateToken, requireSuperAdmin, validateUserUpdate, async (req, res) => {
+router.put('/:id', authenticateToken, requireSuperAdmin, validateUserUpdate, invalidateCacheOnMutation(['api:users:list:*', 'api:therapists:list:*', 'api:dashboard:stats:*']), async (req, res) => {
     const { id } = req.params;
     const { nombre, correo, especialidad, telefono } = req.body;
 
@@ -305,7 +411,7 @@ router.put('/:id', authenticateToken, requireSuperAdmin, validateUserUpdate, asy
  *       200:
  *         description: Estado actualizado
  */
-router.put('/:id/toggle-estado', authenticateToken, requireSuperAdmin, async (req, res) => {
+router.put('/:id/toggle-estado', authenticateToken, requireSuperAdmin, invalidateCacheOnMutation(['api:users:list:*', 'api:therapists:list:*', 'api:dashboard:stats:*']), async (req, res) => {
     const { id } = req.params;
 
     try {
@@ -417,7 +523,7 @@ router.put('/:id/toggle-estado', authenticateToken, requireSuperAdmin, async (re
  *       200:
  *         description: Contraseña reseteada
  */
-router.post('/:id/reset-password', authenticateToken, requireSuperAdmin, async (req, res) => {
+router.post('/:id/reset-password', authenticateToken, requireSuperAdmin, invalidateCacheOnMutation(['api:users:list:*']), async (req, res) => {
     const { id } = req.params;
     const { newPassword } = req.body;
 

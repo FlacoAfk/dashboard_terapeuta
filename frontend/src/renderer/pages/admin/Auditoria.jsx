@@ -55,14 +55,21 @@ const Auditoria = () => {
     const [selectedMonth, setSelectedMonth] = useState(() => new Date().getMonth() + 1); // 1-12
     const [selectedYear, setSelectedYear] = useState(() => new Date().getFullYear());
     const [events, setEvents] = useState([]);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(50);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [isDownloading, setIsDownloading] = useState(false);
+    const [pagination, setPagination] = useState({ total: 0, limit: 50, offset: 0 });
 
     // Cargar eventos al montar y cuando cambian los filtros
     useEffect(() => {
+        setCurrentPage(1);
+    }, [selectedMonth, selectedYear, itemsPerPage]);
+
+    useEffect(() => {
         fetchEvents();
-    }, [selectedMonth, selectedYear]);
+    }, [selectedMonth, selectedYear, currentPage, itemsPerPage]);
 
     const fetchEvents = async () => {
         setLoading(true);
@@ -71,11 +78,13 @@ const Auditoria = () => {
             const result = await auditService.getEvents({
                 mes: selectedMonth,
                 anio: selectedYear,
-                limit: 100
+                limit: itemsPerPage,
+                offset: (currentPage - 1) * itemsPerPage
             });
 
             if (result.success) {
                 setEvents(result.data);
+                setPagination(result.pagination || { total: result.data.length, limit: itemsPerPage, offset: (currentPage - 1) * itemsPerPage });
             } else {
                 setError(result.error || 'Error al cargar eventos');
             }
@@ -109,6 +118,10 @@ const Auditoria = () => {
         });
     };
 
+    const totalPages = Math.max(1, Math.ceil((pagination.total || 0) / itemsPerPage));
+    const hasPrevPage = currentPage > 1;
+    const hasNextPage = currentPage < totalPages;
+
     return (
         <AdminLayout>
             <div className="space-y-6">
@@ -126,7 +139,7 @@ const Auditoria = () => {
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 lg:p-6">
                     <div className="flex flex-wrap items-end gap-4 mb-6">
                         {/* Mes */}
-                        <div className="flex-1 min-w-[150px] sm:flex-none">
+                        <div className="flex-1 min-w-37.5 sm:flex-none">
                             <label className="block text-sm font-medium text-gray-700 mb-2">Mes</label>
                             <div className="relative">
                                 <select
@@ -145,7 +158,7 @@ const Auditoria = () => {
                         </div>
 
                         {/* Año */}
-                        <div className="flex-1 min-w-[100px] sm:flex-none">
+                        <div className="flex-1 min-w-25 sm:flex-none">
                             <label className="block text-sm font-medium text-gray-700 mb-2">Año</label>
                             <div className="relative">
                                 <select
@@ -252,8 +265,39 @@ const Auditoria = () => {
 
                     {/* Total */}
                     {!loading && events.length > 0 && (
-                        <div className="mt-4 pt-4 border-t border-gray-200 text-sm text-gray-500">
-                            Total: {events.length} eventos
+                        <div className="mt-4 pt-4 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-3">
+                            <div className="flex items-center gap-3 text-sm text-gray-500">
+                                <span>
+                                    Mostrando {((currentPage - 1) * itemsPerPage) + 1}-{Math.min(currentPage * itemsPerPage, pagination.total)} de {pagination.total} eventos
+                                </span>
+                                <select
+                                    value={itemsPerPage}
+                                    onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                                    className="text-sm border-gray-300 rounded-lg p-1.5"
+                                >
+                                    <option value={25}>25 por página</option>
+                                    <option value={50}>50 por página</option>
+                                    <option value={100}>100 por página</option>
+                                </select>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                                    disabled={!hasPrevPage}
+                                    className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                                >
+                                    Anterior
+                                </button>
+                                <span className="text-sm text-gray-600">Página {currentPage} de {totalPages}</span>
+                                <button
+                                    onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                                    disabled={!hasNextPage}
+                                    className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                                >
+                                    Siguiente
+                                </button>
+                            </div>
                         </div>
                     )}
                 </div>

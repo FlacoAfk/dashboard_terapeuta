@@ -34,3 +34,15 @@ export function getApiTimeoutMs() {
 
     return Number(value);
 }
+
+export function getApiGetCacheTtlMs() {
+    const webEnv = getWebEnv();
+    const windowEnv = typeof window !== 'undefined' ? window.env : undefined;
+
+    const value =
+        windowEnv?.apiGetCacheTtlMs ||
+        webEnv.VITE_API_GET_CACHE_TTL_MS ||
+        20000;
+
+    return Number(value);
+}

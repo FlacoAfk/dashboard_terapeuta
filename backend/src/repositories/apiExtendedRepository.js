@@ -10,8 +10,8 @@ async function getAssignedPatientIdsForTherapist(therapistId) {
     return (data || []).map((item) => item.id_paciente);
 }
 
-function buildVrSessionsQuery(limit) {
-    return supabase
+function buildVrSessionsQuery({ from, to, sortClauses = [] } = {}) {
+    let query = supabase
         .from('vr_session_results')
         .select(`
             id,
@@ -29,15 +29,30 @@ function buildVrSessionsQuery(limit) {
             observaciones_terapeuta,
             estado_revision,
             created_at
-        `)
-        .order('created_at', { ascending: false })
-        .limit(limit);
+        `, { count: 'exact' });
+
+    if (sortClauses.length > 0) {
+        for (const clause of sortClauses) {
+            query = query.order(clause.field, { ascending: clause.ascending });
+        }
+    } else {
+        query = query.order('created_at', { ascending: false });
+    }
+
+    if (Number.isInteger(from) && Number.isInteger(to)) {
+        query = query.range(from, to);
+    }
+
+    return query;
 }
 
 async function runQuery(query) {
-    const { data, error } = await query;
+    const { data, count, error } = await query;
     if (error) throw error;
-    return data;
+    return {
+        data: data || [],
+        count: count || 0
+    };
 }
 
 async function getPatientsByIds(patientIds) {

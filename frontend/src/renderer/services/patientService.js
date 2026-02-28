@@ -12,28 +12,37 @@
 import api from './api';
 
 const patientService = {
+    buildQueryString(filters = {}) {
+        const params = new URLSearchParams();
+
+        if (filters.page) params.append('page', String(filters.page));
+        if (filters.limit) params.append('limit', String(filters.limit));
+        if (filters.activo !== undefined && filters.activo !== '') params.append('activo', String(filters.activo));
+        if (filters.nombre) params.append('nombre', String(filters.nombre));
+        if (filters.identificacion) params.append('identificacion', String(filters.identificacion));
+        if (filters.id_terapeuta) params.append('id_terapeuta', String(filters.id_terapeuta));
+        if (filters.search) params.append('search', String(filters.search));
+        if (filters.sort) params.append('sort', String(filters.sort));
+
+        const serialized = params.toString();
+        return serialized ? `?${serialized}` : '';
+    },
+
     /**
      * Obtener lista de pacientes
      * GET /api/patients
      */
     async getAll(filters = {}) {
         try {
-            let endpoint = '/api/patients';
-            const params = [];
-
-            if (filters.activo !== undefined && filters.activo !== '') {
-                params.push(`activo=${filters.activo}`);
-            }
-            if (filters.nombre) {
-                params.push(`nombre=${encodeURIComponent(filters.nombre)}`);
-            }
-
-            if (params.length > 0) {
-                endpoint += '?' + params.join('&');
-            }
-
-            const response = await api.get(endpoint);
-            return { success: true, data: response.data || [] };
+            const { skipCache = false, forceRefresh = false, ...queryFilters } = filters;
+            const endpoint = `/api/patients${this.buildQueryString(queryFilters)}`;
+            const response = await api.get(endpoint, { skipCache, forceRefresh });
+            return {
+                success: true,
+                data: response?.data || [],
+                count: response?.count ?? (response?.data || []).length,
+                pagination: response?.pagination || null
+            };
         } catch (error) {
             return { success: false, error: error.message };
         }
@@ -115,20 +124,26 @@ const patientService = {
      */
     async getStats() {
         try {
-            const patientsResult = await this.getAll();
-            if (!patientsResult.success) {
-                return { success: false, error: patientsResult.error };
+            const [totalResult, activeResult, inactiveResult] = await Promise.all([
+                this.getAll({ page: 1, limit: 1 }),
+                this.getAll({ page: 1, limit: 1, activo: true }),
+                this.getAll({ page: 1, limit: 1, activo: false })
+            ]);
+
+            if (!totalResult.success || !activeResult.success || !inactiveResult.success) {
+                return { success: false, error: totalResult.error || activeResult.error || inactiveResult.error };
             }
 
-            const patients = patientsResult.data || [];
-            const activePatients = patients.filter(p => p.activo !== false);
+            const total = totalResult.pagination?.total ?? totalResult.count ?? 0;
+            const activos = activeResult.pagination?.total ?? activeResult.count ?? 0;
+            const inactivos = inactiveResult.pagination?.total ?? inactiveResult.count ?? Math.max(0, total - activos);
 
             return {
                 success: true,
                 data: {
-                    total: patients.length,
-                    activos: activePatients.length,
-                    inactivos: patients.length - activePatients.length
+                    total,
+                    activos,
+                    inactivos
                 }
             };
         } catch (error) {

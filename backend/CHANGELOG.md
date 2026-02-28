@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.8.4] - 2026-02-27
+
+### Added
+- **Query options reutilizables**: nuevas utilidades para paginación, búsqueda y orden multi-criterio (`queryOptions`).
+- **Cache middleware genérico**: `cacheGetResponse` e `invalidateCacheOnMutation` para reducir repetición en rutas.
+- **Cobertura de pruebas**: tests unitarios para utilidades de query y middleware de cache.
+
+### Changed
+- **Listados paginados** en rutas clave:
+	- `GET /api/patients`
+	- `GET /api/usuarios`
+	- `GET /api/sessions`
+	- `GET /api/sessions/recipe-sessions`
+	- `GET /api/v1/session-results`
+- **Metadatos de respuesta**: estándar con `count` y `pagination` (`page`, `limit`, `total`, `totalPages`, `hasNextPage`, `hasPrevPage`).
+- **Cache invalidation** ampliada para cubrir patrones de usuarios, terapeutas y sesiones.
+
+### Documentation
+- Swagger inline y `API_ENDPOINTS.md` sincronizados con nuevos parámetros (`search`, `sort`, `page`, `limit`, filtros adicionales).
+
 ## [1.8.3] - 2026-02-27
 
 ### Added

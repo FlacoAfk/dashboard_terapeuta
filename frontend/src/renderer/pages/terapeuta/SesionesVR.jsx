@@ -56,11 +56,23 @@ const SesionesVR = () => {
     const sessionsPerPage = 10;
     const [recipeCurrentPage, setRecipeCurrentPage] = useState(1);
     const recipeSessionsPerPage = 4;
+    const [recipePagination, setRecipePagination] = useState({
+        page: 1,
+        limit: recipeSessionsPerPage,
+        total: 0,
+        totalPages: 0,
+        hasNextPage: false,
+        hasPrevPage: false
+    });
     const RECIPE_SESSION_POLL_MS = 10000;
 
     useEffect(() => {
         fetchData();
     }, []);
+
+    useEffect(() => {
+        fetchRecipeSessionsPage();
+    }, [recipeCurrentPage]);
 
     const formatDateTime = (value) => {
         if (!value) return '—';
@@ -103,16 +115,38 @@ const SesionesVR = () => {
         }
     };
 
+    const fetchRecipeSessionsPage = async ({ forceRefresh = false } = {}) => {
+        const recipeSessionsResult = await sessionService.getRecipeSessions({
+            page: recipeCurrentPage,
+            limit: recipeSessionsPerPage,
+            refresh: forceRefresh,
+            forceRefresh,
+            fetchAll: false,
+            sort: 'created_at:desc'
+        });
+
+        if (recipeSessionsResult.success) {
+            syncRecipeSessionState(recipeSessionsResult.data || []);
+            setRecipePagination(recipeSessionsResult.pagination || {
+                page: recipeCurrentPage,
+                limit: recipeSessionsPerPage,
+                total: recipeSessionsResult.count || 0,
+                totalPages: 0,
+                hasNextPage: false,
+                hasPrevPage: recipeCurrentPage > 1
+            });
+        }
+    };
+
     const fetchData = async (options = {}) => {
         const forceRefresh = options.forceRefresh === true;
         setLoading(true);
         setError('');
         try {
             // Cargar sesiones y pacientes en paralelo
-            const [sessionsResult, patientsResult, recipeSessionsResult, recipesResult] = await Promise.all([
-                vrResultsService.getDashboardSessions({ limit: 500 }),
-                patientService.getAll(),
-                sessionService.getRecipeSessions({ refresh: forceRefresh }),
+            const [sessionsResult, patientsResult, recipesResult] = await Promise.all([
+                vrResultsService.getDashboardSessions({ limit: 500, forceRefresh }),
+                patientService.getAll({ forceRefresh }),
                 sessionService.loadAvailableRecipes({ forceRefresh })
             ]);
 
@@ -139,9 +173,7 @@ const SesionesVR = () => {
                 setPatients(patientsResult.data || []);
             }
 
-            if (recipeSessionsResult.success) {
-                syncRecipeSessionState(recipeSessionsResult.data || []);
-            }
+            await fetchRecipeSessionsPage({ forceRefresh });
 
             if (Array.isArray(recipesResult) && recipesResult.length > 0) {
                 setRecipes(recipesResult);
@@ -166,9 +198,17 @@ const SesionesVR = () => {
 
         const pollRecipeSessions = async () => {
             try {
-                const recipeSessionsResult = await sessionService.getRecipeSessions({ refresh: true });
+                const recipeSessionsResult = await sessionService.getRecipeSessions({
+                    page: recipeCurrentPage,
+                    limit: recipeSessionsPerPage,
+                    refresh: true,
+                    forceRefresh: true,
+                    fetchAll: false,
+                    sort: 'created_at:desc'
+                });
                 if (!cancelled && recipeSessionsResult.success) {
                     syncRecipeSessionState(recipeSessionsResult.data || []);
+                    setRecipePagination(recipeSessionsResult.pagination || recipePagination);
                 }
             } catch (pollError) {
                 console.error('[SesionesVR] Poll recipe sessions error:', pollError);
@@ -181,19 +221,7 @@ const SesionesVR = () => {
             cancelled = true;
             clearInterval(timerId);
         };
-    }, [inProgressRecipeSession, RECIPE_SESSION_POLL_MS]);
-
-    const totalRecipePages = Math.max(1, Math.ceil(recipeSessions.length / recipeSessionsPerPage));
-    const paginatedRecipeSessions = recipeSessions.slice(
-        (recipeCurrentPage - 1) * recipeSessionsPerPage,
-        recipeCurrentPage * recipeSessionsPerPage
-    );
-
-    useEffect(() => {
-        if (recipeCurrentPage > totalRecipePages) {
-            setRecipeCurrentPage(totalRecipePages);
-        }
-    }, [recipeCurrentPage, totalRecipePages]);
+    }, [inProgressRecipeSession, RECIPE_SESSION_POLL_MS, recipeCurrentPage]);
 
     const handleCloseRecipeSession = async (sessionId) => {
         try {
@@ -337,7 +365,7 @@ const SesionesVR = () => {
     const handleRefreshAll = async () => {
         setCurrentPage(1);
         setRecipeCurrentPage(1);
-        await fetchData();
+        await fetchData({ forceRefresh: true });
     };
 
     const hasActiveFilters = filterEstado !== 'todos' || filterPaciente !== 'todos' ||
@@ -405,12 +433,13 @@ const SesionesVR = () => {
                     inProgressRecipeSession={inProgressRecipeSession}
                     getRemainingMinutes={getRemainingMinutes}
                     handleCloseRecipeSession={handleCloseRecipeSession}
-                    paginatedRecipeSessions={paginatedRecipeSessions}
+                    paginatedRecipeSessions={recipeSessions}
                     getRecipeName={getRecipeName}
                     getSessionStatusBadge={getSessionStatusBadge}
                     getSessionStatusLabel={getSessionStatusLabel}
                     formatDateTime={formatDateTime}
-                    totalRecipePages={totalRecipePages}
+                    totalRecipePages={Math.max(1, recipePagination.totalPages)}
+                    totalRecipeItems={recipePagination.total}
                     recipeCurrentPage={recipeCurrentPage}
                     setRecipeCurrentPage={setRecipeCurrentPage}
                     recipeSessionsPerPage={recipeSessionsPerPage}

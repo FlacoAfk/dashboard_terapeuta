@@ -7,15 +7,93 @@
  * Maneja tokens de autenticación automáticamente.
  */
 
-import { getApiUrl, getApiTimeoutMs, isElectronRuntime } from '../config/runtime';
+import { getApiUrl, getApiTimeoutMs, getApiGetCacheTtlMs, isElectronRuntime } from '../config/runtime';
 
 const API_URL = getApiUrl();
 const API_TIMEOUT_MS = getApiTimeoutMs();
+const API_GET_CACHE_TTL_MS = getApiGetCacheTtlMs();
+
+const getResponseCache = new Map();
+const inFlightGetRequests = new Map();
+
+const LIST_GET_CACHEABLE_PATTERNS = [
+    /^\/api\/patients(?:\?|$)/,
+    /^\/api\/usuarios(?:\?|$)/,
+    /^\/api\/audit(?:\?|$)/,
+    /^\/api\/sessions(?:\?|$)/,
+    /^\/api\/sessions\/recipe-sessions(?:\?|$)/,
+    /^\/api\/v1\/session-results(?:\?|$)/
+];
 
 /**
  * Cliente API con métodos para GET, POST, PUT, DELETE
  */
 const api = {
+    normalizeEndpoint(endpoint) {
+        const url = new URL(endpoint, API_URL);
+        const entries = Array.from(url.searchParams.entries()).sort((a, b) => {
+            if (a[0] === b[0]) {
+                return String(a[1]).localeCompare(String(b[1]));
+            }
+            return String(a[0]).localeCompare(String(b[0]));
+        });
+
+        const normalizedParams = new URLSearchParams();
+        entries.forEach(([key, value]) => normalizedParams.append(key, value));
+
+        const query = normalizedParams.toString();
+        return query ? `${url.pathname}?${query}` : url.pathname;
+    },
+
+    getCacheKey(method, endpoint) {
+        const normalizedEndpoint = this.normalizeEndpoint(endpoint);
+        const token = this.getToken() || 'anonymous';
+        return `${method}:${normalizedEndpoint}:${token}`;
+    },
+
+    isCacheableGetEndpoint(endpoint) {
+        const normalizedEndpoint = this.normalizeEndpoint(endpoint);
+        return LIST_GET_CACHEABLE_PATTERNS.some((pattern) => pattern.test(normalizedEndpoint));
+    },
+
+    hasRefreshBypass(endpoint) {
+        const url = new URL(endpoint, API_URL);
+        const refreshValue = String(url.searchParams.get('refresh') || '').toLowerCase();
+        return refreshValue === 'true';
+    },
+
+    cleanupExpiredGetCache() {
+        const now = Date.now();
+        for (const [cacheKey, entry] of getResponseCache.entries()) {
+            if (!entry || entry.expiresAt <= now) {
+                getResponseCache.delete(cacheKey);
+            }
+        }
+    },
+
+    getCachedResponse(cacheKey) {
+        this.cleanupExpiredGetCache();
+        const entry = getResponseCache.get(cacheKey);
+        if (!entry) return null;
+        return entry.data;
+    },
+
+    setCachedResponse(cacheKey, data) {
+        if (API_GET_CACHE_TTL_MS <= 0) {
+            return;
+        }
+
+        getResponseCache.set(cacheKey, {
+            data,
+            expiresAt: Date.now() + API_GET_CACHE_TTL_MS
+        });
+    },
+
+    clearGetCache() {
+        getResponseCache.clear();
+        inFlightGetRequests.clear();
+    },
+
     /**
      * Obtener el token de autenticación
      */
@@ -39,6 +117,7 @@ const api = {
      * Guardar token
      */
     setToken(token) {
+        this.clearGetCache();
         if (isElectronRuntime() && window.electronAPI?.setToken) {
             window.electronAPI.setToken(token);
         } else {
@@ -50,6 +129,7 @@ const api = {
      * Eliminar token
      */
     removeToken() {
+        this.clearGetCache();
         if (isElectronRuntime() && window.electronAPI?.removeToken) {
             window.electronAPI.removeToken();
         } else {
@@ -61,8 +141,41 @@ const api = {
      * Petición GET
      * @param {string} endpoint - Ruta del endpoint
      */
-    async get(endpoint) {
-        return this._request(endpoint, { method: 'GET' });
+    async get(endpoint, options = {}) {
+        const { skipCache = false, forceRefresh = false, ...requestOptions } = options;
+        const shouldBypass =
+            skipCache ||
+            forceRefresh ||
+            this.hasRefreshBypass(endpoint) ||
+            !this.isCacheableGetEndpoint(endpoint) ||
+            API_GET_CACHE_TTL_MS <= 0;
+
+        if (shouldBypass) {
+            return this._request(endpoint, { method: 'GET', ...requestOptions });
+        }
+
+        const cacheKey = this.getCacheKey('GET', endpoint);
+        const cachedData = this.getCachedResponse(cacheKey);
+        if (cachedData) {
+            return cachedData;
+        }
+
+        const inFlightRequest = inFlightGetRequests.get(cacheKey);
+        if (inFlightRequest) {
+            return inFlightRequest;
+        }
+
+        const requestPromise = this._request(endpoint, { method: 'GET', ...requestOptions })
+            .then((data) => {
+                this.setCachedResponse(cacheKey, data);
+                return data;
+            })
+            .finally(() => {
+                inFlightGetRequests.delete(cacheKey);
+            });
+
+        inFlightGetRequests.set(cacheKey, requestPromise);
+        return requestPromise;
     },
 
     /**
@@ -102,6 +215,7 @@ const api = {
      */
     async _request(endpoint, options = {}) {
         const url = `${API_URL}${endpoint}`;
+        const method = String(options.method || 'GET').toUpperCase();
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
 
@@ -140,6 +254,10 @@ const api = {
                 }
 
                 throw new Error(data.error || data.message || `Error ${response.status}`);
+            }
+
+            if (method !== 'GET') {
+                this.clearGetCache();
             }
 
             return data;

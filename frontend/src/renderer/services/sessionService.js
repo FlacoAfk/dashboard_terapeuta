@@ -13,6 +13,21 @@ import { DEFAULT_RECIPES, normalizeRecipes } from '../constants/recipes';
 let cachedRecipes = [...DEFAULT_RECIPES];
 
 const sessionService = {
+    buildRecipeParams(filters = {}) {
+        const params = new URLSearchParams();
+
+        if (filters.status) params.append('status', String(filters.status));
+        if (filters.participant_code) params.append('participant_code', String(filters.participant_code));
+        if (filters.recipe_id) params.append('recipe_id', String(filters.recipe_id));
+        if (filters.search) params.append('search', String(filters.search));
+        if (filters.sort) params.append('sort', String(filters.sort));
+        if (filters.page) params.append('page', String(filters.page));
+        if (filters.limit) params.append('limit', String(filters.limit));
+        if (filters.refresh) params.append('refresh', 'true');
+
+        return params;
+    },
+
     /**
      * Crear una nueva sesión de receta
      * @param {object} data - { participant_code, recipe_id }
@@ -31,24 +46,46 @@ const sessionService = {
      * @returns {Promise<object>} - { success, data, count }
      */
     async getRecipeSessions(filters = {}) {
-        let endpoint = '/api/sessions/recipe-sessions';
-        const params = new URLSearchParams();
+        const skipCache = filters.skipCache === true;
+        const forceRefresh = filters.forceRefresh === true;
+        const fetchAll = filters.fetchAll !== false;
 
-        if (filters.status) {
-            params.append('status', filters.status);
-        }
-        if (filters.participant_code) {
-            params.append('participant_code', filters.participant_code);
-        }
-        if (filters.refresh) {
-            params.append('refresh', 'true');
+        if (!fetchAll) {
+            const params = this.buildRecipeParams(filters);
+            const endpoint = params.toString()
+                ? `/api/sessions/recipe-sessions?${params.toString()}`
+                : '/api/sessions/recipe-sessions';
+            const response = await api.get(endpoint, { skipCache, forceRefresh });
+
+            return {
+                success: true,
+                data: response?.data || [],
+                count: response?.count ?? (response?.data || []).length,
+                pagination: response?.pagination || null
+            };
         }
 
-        if (params.toString()) {
-            endpoint += '?' + params.toString();
+        const pageSize = filters.limit || 100;
+        let page = 1;
+        let totalPages = 1;
+        const allData = [];
+
+        while (page <= totalPages) {
+            const params = this.buildRecipeParams({ ...filters, page, limit: pageSize });
+            const endpoint = `/api/sessions/recipe-sessions?${params.toString()}`;
+            const response = await api.get(endpoint, { skipCache, forceRefresh });
+            const currentData = response?.data || [];
+            allData.push(...currentData);
+
+            totalPages = response?.pagination?.totalPages || 1;
+            page += 1;
         }
 
-        return api.get(endpoint);
+        return {
+            success: true,
+            data: allData,
+            count: allData.length
+        };
     },
 
     /**

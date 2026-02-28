@@ -1,6 +1,6 @@
 {
   "name": "dashboard-terapeuta",
-  "version": "1.8.3",
+  "version": "1.8.4",
   "description": "Dashboard para terapeuta con Express backend y Electron + React frontend",
   "private": true,
   "workspaces": [

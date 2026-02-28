@@ -2,7 +2,7 @@
 
 Sistema de gestión clínica para el proyecto de realidad virtual "Cerebro al Fuego". Permite la administración de terapeutas, pacientes, sesiones VR con evaluación del desempeño, y auditoría del sistema.
 
-**Versión:** 1.8.3  
+**Versión:** 1.8.4  
 **Última actualización:** 2026-02-27
 
 ---
@@ -265,6 +265,28 @@ UNITY_API_KEY=tu_api_key_para_unity
 | `SMTP_USER` | ✅ | Email para envío de correos |
 | `SMTP_PASS` | ✅ | Contraseña de aplicación SMTP |
 | `UNITY_API_KEY` | ✅ | API Key para autenticación de Unity |
+| `REDIS_CACHE_ENABLED` | No | Habilita/deshabilita caché Redis (`true` por defecto) |
+| `REDIS_URL` | No | URL completa de Redis (ej: `redis://localhost:6379/0`) |
+| `REDIS_HOST` | No | Host de Redis (si no usas `REDIS_URL`) |
+| `REDIS_PORT` | No | Puerto Redis (default `6379`) |
+| `REDIS_DB` | No | Índice de DB Redis (default `0`) |
+| `REDIS_PASSWORD` | No | Password Redis (si aplica) |
+| `REDIS_CONNECT_TIMEOUT_MS` | No | Timeout de conexión a Redis en milisegundos |
+
+### Redis cache (local y producción)
+
+- Local (Docker Compose raíz): `docker compose up -d redis backend`
+- Local (solo backend): `cd backend && docker compose up -d redis backend`
+- Producción: configurar `REDIS_URL` apuntando a tu instancia administrada (ej. `redis://:<password>@host:6379/0`)
+- Fallback seguro: si Redis no está disponible, el backend sigue funcionando sin caché distribuida
+
+### Variables Frontend (`frontend/.env` o Vercel)
+
+| Variable | Requerida | Descripción |
+|----------|-----------|-------------|
+| `VITE_API_URL` | ✅ | URL pública del backend |
+| `VITE_API_TIMEOUT_MS` | No | Timeout HTTP global en ms (default `15000`) |
+| `VITE_API_GET_CACHE_TTL_MS` | No | TTL del caché GET en frontend para listados (default `20000`) |
 
 ---
 

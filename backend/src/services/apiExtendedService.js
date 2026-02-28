@@ -1,16 +1,18 @@
 const repository = require('../repositories/apiExtendedRepository');
 const { buildCacheKey, getCachedJson, setCachedJson } = require('../utils/cache');
+const {
+    parsePagination,
+    parseSearch,
+    parseSort,
+    buildPaginationMetadata,
+    toPositiveInteger
+} = require('../utils/queryOptions');
 
 function createHttpError(status, message, code) {
     const error = new Error(message);
     error.status = status;
     if (code) error.code = code;
     return error;
-}
-
-function toPositiveInteger(value, fallback) {
-    const parsed = Number.parseInt(value, 10);
-    return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
 function buildSessionFilters(query, baseQuery) {
@@ -28,11 +30,30 @@ function buildSessionFilters(query, baseQuery) {
         currentQuery = currentQuery.eq('id_paciente_vinculado', toPositiveInteger(query.id_paciente, 0));
     }
 
+    if (query.activity_id) {
+        currentQuery = currentQuery.eq('activity_id', query.activity_id);
+    }
+
+    const search = parseSearch(query);
+    if (search) {
+        currentQuery = currentQuery.or(`participant_id.ilike.%${search}%,activity_id.ilike.%${search}%`);
+    }
+
     return currentQuery;
 }
 
 async function listSessions({ user, query }) {
-    const limit = Math.min(toPositiveInteger(query.limit, 50), 200);
+    const pagination = parsePagination(query, {
+        page: 1,
+        limit: 25,
+        maxLimit: 200
+    });
+
+    const sortClauses = parseSort(
+        query,
+        ['created_at', 'started_at', 'ended_at', 'total_seconds', 'summary_total_errors', 'summary_total_releases', 'estado_revision'],
+        [{ field: 'created_at', ascending: false }]
+    );
 
     let allowedPatientIds = null;
     if (user.rol === 'TERAPEUTA' && user.id_terapeuta) {
@@ -41,18 +62,45 @@ async function listSessions({ user, query }) {
             return {
                 success: true,
                 data: [],
-                count: 0
+                count: 0,
+                pagination: buildPaginationMetadata({
+                    page: pagination.page,
+                    limit: pagination.limit,
+                    total: 0
+                })
             };
         }
     }
 
-    let sessionsQuery = repository.buildVrSessionsQuery(limit);
+    const cacheKey = buildCacheKey('api:sessions:list', {
+        role: user.rol,
+        therapistId: user.id_terapeuta || null,
+        page: pagination.page,
+        limit: pagination.limit,
+        estado_revision: query.estado_revision || null,
+        pendientes: query.pendientes || null,
+        id_paciente: query.id_paciente || null,
+        activity_id: query.activity_id || null,
+        search: parseSearch(query),
+        sort: sortClauses
+    });
+
+    const cachedPayload = await getCachedJson(cacheKey);
+    if (cachedPayload) {
+        return cachedPayload;
+    }
+
+    let sessionsQuery = repository.buildVrSessionsQuery({
+        from: pagination.from,
+        to: pagination.to,
+        sortClauses
+    });
     if (allowedPatientIds) {
         sessionsQuery = sessionsQuery.in('id_paciente_vinculado', allowedPatientIds);
     }
     sessionsQuery = buildSessionFilters(query, sessionsQuery);
 
-    const sessions = await repository.runQuery(sessionsQuery);
+    const { data: sessions, count: total } = await repository.runQuery(sessionsQuery);
 
     const patientIds = Array.from(
         new Set(
@@ -72,11 +120,19 @@ async function listSessions({ user, query }) {
             : null
     }));
 
-    return {
+    const payload = {
         success: true,
         data: sessionsWithPatients,
-        count: sessionsWithPatients.length
+        count: sessionsWithPatients.length,
+        pagination: buildPaginationMetadata({
+            page: pagination.page,
+            limit: pagination.limit,
+            total
+        })
     };
+
+    await setCachedJson(cacheKey, payload, 20);
+    return payload;
 }
 
 function validateSessionUpdateInput(sessionId, observaciones, idPaciente) {

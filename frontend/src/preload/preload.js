@@ -32,5 +32,6 @@ contextBridge.exposeInMainWorld('env', {
     isDevelopment: process.env.NODE_ENV === 'development',
     apiUrl: process.env.API_URL || DEFAULT_API_URL,
     apiTimeoutMs: Number(process.env.API_TIMEOUT_MS || 15000),
+    apiGetCacheTtlMs: Number(process.env.API_GET_CACHE_TTL_MS || 20000),
     appVersion: require('../../package.json').version
 });
