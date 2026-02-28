@@ -120,8 +120,8 @@ const VerificarCorreoModal = ({ isOpen, onClose, email }) => {
                         </div>
 
                         <div>
-                            <label htmlFor="verificarcorreomodal-field-123" className="block text-sm font-medium text-gray-700 mb-1">Código de Verificación</label>
-                            <input id="verificarcorreomodal-field-123"
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Código de Verificación</label>
+                            <input
                                 type="text"
                                 value={code}
                                 onChange={(e) => setCode(e.target.value)}
@@ -133,9 +133,9 @@ const VerificarCorreoModal = ({ isOpen, onClose, email }) => {
                         </div>
 
                         <div>
-                            <label htmlFor="verificarcorreomodal-field-136" className="block text-sm font-medium text-gray-700 mb-1">Nueva Contraseña</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Nueva Contraseña</label>
                             <div className="relative">
-                                <input id="verificarcorreomodal-field-136"
+                                <input
                                     type={showPassword ? 'text' : 'password'}
                                     value={newPassword}
                                     onChange={(e) => setNewPassword(e.target.value)}
@@ -154,9 +154,9 @@ const VerificarCorreoModal = ({ isOpen, onClose, email }) => {
                         </div>
 
                         <div>
-                            <label htmlFor="verificarcorreomodal-field-157" className="block text-sm font-medium text-gray-700 mb-1">Confirmar Contraseña</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Confirmar Contraseña</label>
                             <div className="relative">
-                                <input id="verificarcorreomodal-field-157"
+                                <input
                                     type={showPassword ? 'text' : 'password'}
                                     value={confirmPassword}
                                     onChange={(e) => setConfirmPassword(e.target.value)}

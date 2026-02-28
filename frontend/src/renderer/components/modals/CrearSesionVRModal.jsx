@@ -60,9 +60,7 @@ const RecipeCard = ({ recipe, isSelected, onClick }) => {
 /**
  * Modal para crear una sesión de receta VR
  */
-const EMPTY_PATIENTS = [];
-
-const CrearSesionVRModal = ({ isOpen, onClose, onSuccess, patients = EMPTY_PATIENTS, blockedSession = null }) => {
+const CrearSesionVRModal = ({ isOpen, onClose, onSuccess, patients = [], blockedSession = null }) => {
     const { startSession } = useSession();
     const [recipes, setRecipes] = useState(DEFAULT_RECIPES);
     const [selectedRecipe, setSelectedRecipe] = useState('');
@@ -270,10 +268,10 @@ const CrearSesionVRModal = ({ isOpen, onClose, onSuccess, patients = EMPTY_PATIE
                         )}
 
                         <div>
-                            <label htmlFor="crearsesionvrmodal-field-271" className="block text-sm font-medium text-gray-700 mb-1">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
                                 Paciente <span className="text-red-500">*</span>
                             </label>
-                            <select id="crearsesionvrmodal-field-271"
+                            <select
                                 value={participantCode}
                                 onChange={(e) => { setParticipantCode(e.target.value); setError(''); }}
                                 className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-shadow outline-none bg-white"
@@ -292,7 +290,7 @@ const CrearSesionVRModal = ({ isOpen, onClose, onSuccess, patients = EMPTY_PATIE
 
                         {/* Filtro de dificultad */}
                         <div>
-                            <label htmlFor="crearsesionvrmodal-field-293" className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
                                 Receta <span className="text-red-500">*</span>
                             </label>
                             <div className="flex bg-gray-100 rounded-lg p-1 gap-0.5 mb-3">

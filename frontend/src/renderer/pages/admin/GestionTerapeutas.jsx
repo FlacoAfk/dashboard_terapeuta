@@ -51,8 +51,10 @@ const GestionTerapeutas = () => {
     const [actionLoading, setActionLoading] = useState(false);
     const [itemsPerPage, setItemsPerPage] = useState(10);
 
-
-
+    // Reset pagination when items per page changes
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [itemsPerPage]);
 
     // Estados de los modales
     const [showCrearModal, setShowCrearModal] = useState(false);
@@ -404,7 +406,7 @@ const GestionTerapeutas = () => {
                             </span>
                             <select
                                 value={itemsPerPage}
-                                onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }}
+                                onChange={(e) => setItemsPerPage(Number(e.target.value))}
                                 className="text-sm border-gray-300 rounded-lg focus:ring-[#F76C6C] focus:border-[#F76C6C] p-1.5 bg-white shadow-sm"
                             >
                                 <option value={10}>10 por página</option>

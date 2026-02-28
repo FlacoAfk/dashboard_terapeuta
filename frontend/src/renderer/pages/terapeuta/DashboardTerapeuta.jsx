@@ -294,10 +294,10 @@ const DashboardTerapeuta = () => {
                         {/* Filters */}
                         <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 mt-4 items-start sm:items-center justify-between">
                             <div className="flex flex-wrap gap-2 sm:gap-4 items-center">
-                                <label htmlFor="dashboardterapeuta-field-297" className="text-sm text-gray-500">Filtros:</label>
+                                <label className="text-sm text-gray-500">Filtros:</label>
                                 {['todos', 'activos', 'inactivos'].map((f) => (
                                     <label key={f} className="flex items-center gap-2 cursor-pointer">
-                                        <input id="dashboardterapeuta-field-297"
+                                        <input
                                             type="radio"
                                             name="filter"
                                             checked={filter === f}

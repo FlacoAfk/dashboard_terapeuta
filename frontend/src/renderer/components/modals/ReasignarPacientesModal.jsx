@@ -156,16 +156,13 @@ const PatientRow = ({ patient, assignment, onAssign, therapists, isExpanded, onE
  * Modal para reasignar pacientes antes de desactivar terapeuta
  * Cumple con RF-SEG-02: No se puede eliminar terapeuta con pacientes activos
  */
-const EMPTY_PATIENTS = [];
-const EMPTY_THERAPISTS = [];
-
 const ReasignarPacientesModal = ({
     isOpen,
     onClose,
     onSubmit,
     therapist,
-    patients = EMPTY_PATIENTS,
-    availableTherapists = EMPTY_THERAPISTS
+    patients = [],
+    availableTherapists = []
 }) => {
     const [manualAssignments, setManualAssignments] = useState({});
     const [isSubmitting, setIsSubmitting] = useState(false);

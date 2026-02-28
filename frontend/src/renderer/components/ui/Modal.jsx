@@ -19,11 +19,7 @@ const Modal = ({ isOpen, onClose, children, size = 'md', contentClassName = '' }
             {/* Overlay */}
             <div 
                 className="fixed inset-0 bg-black/55 transition-opacity"
-                role="button"
-                tabIndex={-1}
-                aria-label="Cerrar modal"
                 onClick={onClose}
-                onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
             />
 
             {/* Modal Content */}

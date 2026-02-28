@@ -10,7 +10,7 @@ export const DEFAULT_RECIPES = [
     { id: 'sancocho_de_res', name: 'Sancocho de res', difficulty: 'dificil', ingredients_range: '11-15' }
 ];
 
-const RECIPE_EMOJIS = {
+export const RECIPE_EMOJIS = {
     tinto: '☕',
     cafe_con_leche: '☕',
     macchiato: '☕',
@@ -41,7 +41,7 @@ const LEGACY_LABELS = {
     agua_panela_hard: 'Agua de Panela - Difícil'
 };
 
-function normalizeRecipes(payload) {
+export function normalizeRecipes(payload) {
     const list = Array.isArray(payload?.data) ? payload.data : payload;
     if (!Array.isArray(list) || list.length === 0) return DEFAULT_RECIPES;
 

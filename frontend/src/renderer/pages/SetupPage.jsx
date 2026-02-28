@@ -229,10 +229,10 @@ const SetupPage = () => {
                     <form onSubmit={handleSubmit} className="space-y-5">
                         {/* Nombre completo */}
                         <div className="space-y-1.5">
-                            <label htmlFor="setuppage-field-232" className="block text-sm font-medium text-gray-700">
+                            <label className="block text-sm font-medium text-gray-700">
                                 Nombre Completo <span className="text-red-500">*</span>
                             </label>
-                            <input id="setuppage-field-232"
+                            <input
                                 type="text"
                                 name="nombre"
                                 value={formData.nombre}
@@ -249,10 +249,10 @@ const SetupPage = () => {
 
                         {/* Correo */}
                         <div className="space-y-1.5">
-                            <label htmlFor="setuppage-field-252" className="block text-sm font-medium text-gray-700">
+                            <label className="block text-sm font-medium text-gray-700">
                                 Correo Electrónico <span className="text-red-500">*</span>
                             </label>
-                            <input id="setuppage-field-252"
+                            <input
                                 type="email"
                                 name="correo"
                                 value={formData.correo}
@@ -269,11 +269,11 @@ const SetupPage = () => {
 
                         {/* Contraseña */}
                         <div className="space-y-1.5">
-                            <label htmlFor="setuppage-field-272" className="block text-sm font-medium text-gray-700">
+                            <label className="block text-sm font-medium text-gray-700">
                                 Contraseña <span className="text-red-500">*</span>
                             </label>
                             <div className="relative">
-                                <input id="setuppage-field-272"
+                                <input
                                     type={showPassword ? 'text' : 'password'}
                                     name="password"
                                     value={formData.password}
@@ -308,11 +308,11 @@ const SetupPage = () => {
 
                         {/* Confirmar contraseña */}
                         <div className="space-y-1.5">
-                            <label htmlFor="setuppage-field-311" className="block text-sm font-medium text-gray-700">
+                            <label className="block text-sm font-medium text-gray-700">
                                 Confirmar Contraseña <span className="text-red-500">*</span>
                             </label>
                             <div className="relative">
-                                <input id="setuppage-field-311"
+                                <input
                                     type={showConfirmPassword ? 'text' : 'password'}
                                     name="confirmPassword"
                                     value={formData.confirmPassword}

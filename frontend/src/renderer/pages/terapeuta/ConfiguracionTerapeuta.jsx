@@ -81,21 +81,21 @@ const ConfiguracionTerapeuta = () => {
                     
                     <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
-                            <label htmlFor="configuracionterapeuta-field-84" className="block text-sm font-medium text-gray-500 mb-1">Nombre Completo</label>
+                            <label className="block text-sm font-medium text-gray-500 mb-1">Nombre Completo</label>
                             <p className="text-gray-900 font-medium">{user?.nombre}</p>
                         </div>
                         <div>
-                            <label htmlFor="configuracionterapeuta-field-88" className="block text-sm font-medium text-gray-500 mb-1">Correo Electrónico</label>
+                            <label className="block text-sm font-medium text-gray-500 mb-1">Correo Electrónico</label>
                             <p className="text-gray-900 font-medium">{user?.email}</p>
                         </div>
                         <div>
-                            <label htmlFor="configuracionterapeuta-field-92" className="block text-sm font-medium text-gray-500 mb-1">Rol</label>
+                            <label className="block text-sm font-medium text-gray-500 mb-1">Rol</label>
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                                 {user?.rol}
                             </span>
                         </div>
                         <div>
-                            <label htmlFor="configuracionterapeuta-field-98" className="block text-sm font-medium text-gray-500 mb-1">Estado</label>
+                            <label className="block text-sm font-medium text-gray-500 mb-1">Estado</label>
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                                 Activo
                             </span>
