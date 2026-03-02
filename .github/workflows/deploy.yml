@@ -1,5 +1,5 @@
 name: Deploy Production
-run-name: Deploy • ${{ github.ref_name }} • #${{ github.run_number }}
+run-name: "Deploy • ${{ github.ref_name }} • #${{ github.run_number }}"
 
 on:
   push:
