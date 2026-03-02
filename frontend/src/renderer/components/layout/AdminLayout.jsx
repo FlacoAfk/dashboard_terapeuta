@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { showConfirm } from '../../utils/alertUtils';
 import { Icons } from '../ui/Icons';
@@ -29,8 +29,10 @@ const NavItem = ({ to, icon: Icon, label, collapsed }) => (
  */
 const AdminLayout = ({ children }) => {
     const navigate = useNavigate();
+    const location = useLocation();
     const { user, logout } = useAuth();
     const [showUserMenu, setShowUserMenu] = useState(false);
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
     // Initialize from localStorage if available, default to false (expanded)
     const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
@@ -42,6 +44,10 @@ const AdminLayout = ({ children }) => {
     useEffect(() => {
         localStorage.setItem('admin_sidebar_collapsed', sidebarCollapsed);
     }, [sidebarCollapsed]);
+
+    useEffect(() => {
+        setMobileMenuOpen(false);
+    }, [location.pathname]);
 
     const handleLogout = async () => {
         const confirmed = await showConfirm(
@@ -64,9 +70,9 @@ const AdminLayout = ({ children }) => {
                     {/* Logo y toggle sidebar */}
                     <div className="flex items-center gap-3">
                         <button
-                            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                            onClick={() => setMobileMenuOpen((prev) => !prev)}
                             className="p-2 text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-colors lg:hidden"
-                            title={sidebarCollapsed ? 'Expandir menú' : 'Colapsar menú'}
+                            title={mobileMenuOpen ? 'Cerrar menú' : 'Abrir menú'}
                         >
                             <Icons.Menu />
                         </button>
@@ -99,7 +105,9 @@ const AdminLayout = ({ children }) => {
                         {/* Dropdown */}
                         {showUserMenu && (
                             <>
-                                <div
+                                <button
+                                    type="button"
+                                    aria-label="Cerrar menú de usuario"
                                     className="fixed inset-0 z-10"
                                     onClick={() => setShowUserMenu(false)}
                                 />
@@ -127,10 +135,20 @@ const AdminLayout = ({ children }) => {
             </header>
 
             <div className="flex flex-1 pt-16">
+                {/* Overlay mobile/tablet */}
+                {mobileMenuOpen && (
+                    <button
+                        type="button"
+                        aria-label="Cerrar menú"
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="fixed inset-0 top-16 bg-black/40 z-10 lg:hidden"
+                    />
+                )}
+
                 {/* Sidebar - Responsivo */}
                 <aside
-                    className={`bg-white border-r border-gray-200 fixed left-0 top-16 bottom-0 z-10 transition-all duration-300 ${sidebarCollapsed ? 'w-16' : 'w-56'
-                        }`}
+                    className={`bg-white border-r border-gray-200 fixed left-0 top-16 bottom-0 z-20 transition-all duration-300 w-56 lg:w-auto ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+                        } lg:translate-x-0 ${sidebarCollapsed ? 'lg:w-16' : 'lg:w-56'}`}
                 >
                     <nav className="p-2 lg:p-4 flex flex-col h-full">
                         {/* Toggle button for desktop */}
@@ -172,7 +190,7 @@ const AdminLayout = ({ children }) => {
 
                 {/* Main Content - Responsivo */}
                 <main
-                    className={`flex-1 p-4 lg:p-6 xl:p-8 transition-all duration-300 ${sidebarCollapsed ? 'ml-16' : 'ml-56'
+                    className={`flex-1 p-4 lg:p-6 xl:p-8 transition-all duration-300 ml-0 ${sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-56'
                         }`}
                 >
                     {children}
