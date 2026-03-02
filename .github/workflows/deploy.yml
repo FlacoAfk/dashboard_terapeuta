@@ -110,7 +110,9 @@ jobs:
 
       - name: Validate backend credentials
         run: |
-          if [ -z "${{ secrets.GCP_SA_KEY }}" ]; then
+          GCP_SA_KEY_JSON='${{ secrets.GCP_SA_KEY }}'
+
+          if [ -z "$GCP_SA_KEY_JSON" ]; then
             echo "Missing secret: GCP_SA_KEY"
             exit 1
           fi
