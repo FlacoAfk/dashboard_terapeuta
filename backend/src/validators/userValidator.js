@@ -14,6 +14,7 @@ const validateUserCreate = [
         .isLength({ min: 3 }).withMessage('El nombre debe tener al menos 3 caracteres'),
     body('correo')
         .trim()
+        .toLowerCase()
         .notEmpty().withMessage('El correo es requerido')
         .isEmail().withMessage('Debe ser un correo válido'),
     body('password')
@@ -41,6 +42,7 @@ const validateUserUpdate = [
     body('correo')
         .optional()
         .trim()
+        .toLowerCase()
         .isEmail().withMessage('Debe ser un correo válido'),
     body('password')
         .optional()

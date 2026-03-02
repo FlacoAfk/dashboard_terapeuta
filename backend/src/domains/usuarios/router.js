@@ -225,9 +225,10 @@ router.get(
  */
 router.post('/terapeuta', authenticateToken, requireSuperAdmin, validateUserCreate, invalidateCacheOnMutation(['api:users:list:*', 'api:therapists:list:*', 'api:dashboard:stats:*']), async (req, res) => {
     const { nombre, correo, password, especialidad, telefono } = req.body;
+    const normalizedCorreo = String(correo || '').trim().toLowerCase();
 
     // Validar campos requeridos (correo es el identificador de login)
-    if (!nombre || !correo || !password) {
+    if (!nombre || !normalizedCorreo || !password) {
         return res.status(400).json({
             success: false,
             error: 'Campos requeridos: nombre, correo, password'
@@ -247,8 +248,8 @@ router.post('/terapeuta', authenticateToken, requireSuperAdmin, validateUserCrea
         const { data: existingUser } = await supabase
             .from('usuarios')
             .select('id')
-            .eq('email', correo)
-            .single();
+            .ilike('email', normalizedCorreo)
+            .maybeSingle();
 
         if (existingUser) {
             return res.status(400).json({
@@ -265,7 +266,7 @@ router.post('/terapeuta', authenticateToken, requireSuperAdmin, validateUserCrea
         const { data: newUser, error: userError } = await supabase
             .from('usuarios')
             .insert({
-                email: correo,
+                email: normalizedCorreo,
                 password_hash: passwordHash,
                 rol: 'TERAPEUTA',
                 activo: true
@@ -280,7 +281,7 @@ router.post('/terapeuta', authenticateToken, requireSuperAdmin, validateUserCrea
             .from('terapeutas')
             .insert({
                 nombre,
-                correo,
+                correo: normalizedCorreo,
                 especialidad: especialidad || 'General',
                 telefono: telefono || null,
                 id_usuario: newUser.id
@@ -292,7 +293,7 @@ router.post('/terapeuta', authenticateToken, requireSuperAdmin, validateUserCrea
 
         // Auditoría
         await auditFromRequest(req, AUDIT_TYPES.TERAPEUTA_CREATED, {
-            correo,
+            correo: normalizedCorreo,
             nombre,
             especialidad: especialidad || 'General'
         });

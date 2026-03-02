@@ -51,8 +51,9 @@ const ADMIN_SETUP_ROLES = ['SUPERADMIN', 'ROOT', 'ADMIN'];
  */
 router.post('/login', validateLogin, async (req, res) => {
     const { email, password } = req.body;
+    const normalizedEmail = String(email || '').trim().toLowerCase();
 
-    if (!email || !password) {
+    if (!normalizedEmail || !password) {
         return res.status(400).json({
             success: false,
             error: 'Email y password son requeridos'
@@ -61,9 +62,9 @@ router.post('/login', validateLogin, async (req, res) => {
 
     try {
         // Verificar si la cuenta está bloqueada
-        if (await isAccountLocked(email)) {
-            const remainingMinutes = await getLockTimeRemaining(email);
-            await auditLogin(req, AUDIT_TYPES.LOGIN_FAILED, email, { reason: 'Cuenta bloqueada', remainingMinutes });
+        if (await isAccountLocked(normalizedEmail)) {
+            const remainingMinutes = await getLockTimeRemaining(normalizedEmail);
+            await auditLogin(req, AUDIT_TYPES.LOGIN_FAILED, normalizedEmail, { reason: 'Cuenta bloqueada', remainingMinutes });
             return res.status(423).json({
                 success: false,
                 error: `Cuenta bloqueada por demasiados intentos fallidos. Intente nuevamente en ${remainingMinutes} minutos.`,
@@ -76,12 +77,12 @@ router.post('/login', validateLogin, async (req, res) => {
         const { data: userData, error: userError } = await supabase
             .from('usuarios')
             .select('*')
-            .eq('email', email)
-            .single();
+            .ilike('email', normalizedEmail)
+            .maybeSingle();
 
         if (userError || !userData) {
-            await recordFailedAttempt(email);
-            await auditLogin(req, AUDIT_TYPES.LOGIN_FAILED, email, { reason: 'Usuario no encontrado' });
+            await recordFailedAttempt(normalizedEmail);
+            await auditLogin(req, AUDIT_TYPES.LOGIN_FAILED, normalizedEmail, { reason: 'Usuario no encontrado' });
             return res.status(401).json({
                 success: false,
                 error: 'Credenciales inválidas'
@@ -103,7 +104,7 @@ router.post('/login', validateLogin, async (req, res) => {
 
         // Verificar que el usuario esté activo
         if (!user.activo) {
-            await auditLogin(req, AUDIT_TYPES.LOGIN_FAILED, email, { reason: 'Usuario inactivo' });
+            await auditLogin(req, AUDIT_TYPES.LOGIN_FAILED, normalizedEmail, { reason: 'Usuario inactivo' });
             return res.status(401).json({
                 success: false,
                 error: 'Usuario desactivado. Contacte al administrador.'
@@ -113,15 +114,15 @@ router.post('/login', validateLogin, async (req, res) => {
         // Verificar contraseña
         const validPassword = await bcrypt.compare(password, user.password_hash);
         if (!validPassword) {
-            const attempt = await recordFailedAttempt(email);
+            const attempt = await recordFailedAttempt(normalizedEmail);
             const attemptsRemaining = attempt.attemptsRemaining;
-            await auditLogin(req, AUDIT_TYPES.LOGIN_FAILED, email, { reason: 'Contraseña incorrecta', attemptsRemaining });
+            await auditLogin(req, AUDIT_TYPES.LOGIN_FAILED, normalizedEmail, { reason: 'Contraseña incorrecta', attemptsRemaining });
 
             let errorMessage = 'Credenciales inválidas';
             if (attemptsRemaining > 0 && attemptsRemaining <= 2) {
                 errorMessage += `. Intentos restantes: ${attemptsRemaining}`;
             } else if (attemptsRemaining <= 0) {
-                const remainingMinutes = await getLockTimeRemaining(email);
+                const remainingMinutes = await getLockTimeRemaining(normalizedEmail);
                 return res.status(423).json({
                     success: false,
                     error: `Cuenta bloqueada por demasiados intentos fallidos. Intente nuevamente en ${remainingMinutes} minutos.`,
@@ -151,10 +152,10 @@ router.post('/login', validateLogin, async (req, res) => {
         });
 
         // Login exitoso: resetear intentos fallidos
-        await resetAttempts(email);
+        await resetAttempts(normalizedEmail);
 
         // Registrar auditoría con usuario autenticado
-        await auditWithUser(req, AUDIT_TYPES.LOGIN_SUCCESS, user, { email });
+        await auditWithUser(req, AUDIT_TYPES.LOGIN_SUCCESS, user, { email: normalizedEmail });
 
         res.json({
             success: true,
@@ -205,9 +206,10 @@ router.post('/login', validateLogin, async (req, res) => {
  */
 router.post('/setup', async (req, res) => {
     const { nombre, correo, password } = req.body;
+    const normalizedCorreo = String(correo || '').trim().toLowerCase();
 
     // Validar campos requeridos
-    if (!nombre || !correo || !password) {
+    if (!nombre || !normalizedCorreo || !password) {
         return res.status(400).json({
             success: false,
             error: 'Todos los campos son requeridos: nombre, correo, password'
@@ -246,7 +248,7 @@ router.post('/setup', async (req, res) => {
         const { data: newUser, error: userError } = await supabase
             .from('usuarios')
             .insert({
-                email: correo,
+                email: normalizedCorreo,
                 password_hash: passwordHash,
                 rol: 'SUPERADMIN',
                 activo: true
@@ -263,14 +265,14 @@ router.post('/setup', async (req, res) => {
             .from('terapeutas')
             .insert({
                 nombre,
-                correo,
+                correo: normalizedCorreo,
                 id_usuario: newUser.id,
                 especialidad: 'Administración'
             });
 
         // Registrar auditoría
         await auditFromRequest(req, AUDIT_TYPES.SUPERADMIN_CREATED, {
-            email: correo,
+            email: normalizedCorreo,
             nombre
         });
 
@@ -506,8 +508,9 @@ router.get('/check-setup', async (req, res) => {
  */
 router.post('/forgot-password', async (req, res) => {
     const { email } = req.body;
+    const normalizedEmail = String(email || '').trim().toLowerCase();
 
-    if (!email) {
+    if (!normalizedEmail) {
         return res.status(400).json({
             success: false,
             error: 'El email es requerido'
@@ -519,8 +522,8 @@ router.post('/forgot-password', async (req, res) => {
         const { data: user } = await supabase
             .from('usuarios')
             .select('id, email')
-            .eq('email', email)
-            .single();
+            .ilike('email', normalizedEmail)
+            .maybeSingle();
 
         if (user) {
             // Generar código de 6 dígitos
@@ -548,19 +551,19 @@ router.post('/forgot-password', async (req, res) => {
                 console.error('Error guardando código:', tokenError.message);
             } else {
                 // Enviar email con el código
-                const emailResult = await sendVerificationCodeEmail(email, code);
+                const emailResult = await sendVerificationCodeEmail(normalizedEmail, code);
 
                 // Registrar en auditoría
                 await auditFromRequest(req, AUDIT_TYPES.PASSWORD_RESET_REQUEST || 'PASSWORD_RESET_REQUEST', {
-                    email,
+                    email: normalizedEmail,
                     message: 'Solicitud de restablecimiento de contraseña (código)',
                     emailSent: emailResult.success
                 });
 
                 if (emailResult.success) {
-                    console.log(`📧 Código de recuperación enviado a: ${email}`);
+                    console.log(`📧 Código de recuperación enviado a: ${normalizedEmail}`);
                 } else {
-                    console.error(`❌ Error enviando email a ${email}: ${emailResult.error}`);
+                    console.error(`❌ Error enviando email a ${normalizedEmail}: ${emailResult.error}`);
                 }
             }
         }
