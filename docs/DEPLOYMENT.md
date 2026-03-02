@@ -1,6 +1,59 @@
 # Deployment Manual (Vercel + Cloud Run)
 
-Este proyecto se despliega manualmente. GitHub Actions no se usa.
+Este proyecto soporta dos modos de despliegue:
+- Manual (CLI local)
+- Automático con GitHub Actions
+
+## GitHub Actions (recomendado)
+
+Se crearon dos workflows:
+
+- `.github/workflows/ci.yml`
+  - Trigger: `push` y `pull_request` a `master`
+  - Ejecuta: `npm ci`, `npm run lint`, `npm run test`, `npm run build:web`
+
+- `.github/workflows/deploy.yml`
+  - Trigger automático: `push` a `master`
+  - Trigger manual: `workflow_dispatch` (permite elegir backend y/o frontend)
+  - Flujo:
+    1. `quality_gate` (lint + tests + build web)
+    2. `deploy_backend` a Cloud Run
+    3. `deploy_frontend` a Vercel
+
+### Secrets requeridos (GitHub Repository Secrets)
+
+- `GCP_SA_KEY`: JSON completo de Service Account con permisos para Artifact Registry + Cloud Run.
+- `VERCEL_TOKEN`: token de despliegue de Vercel.
+
+### Variables requeridas (GitHub Repository Variables)
+
+- `GCP_PROJECT_ID` (ej. `cerebroalfuego`)
+- `GCP_REGION` (ej. `us-central1`)
+- `GCP_ARTIFACT_REPO` (ej. `dashboard-backend`)
+- `CLOUD_RUN_SERVICE` (ej. `cerebro-al-fuego-image`)
+- `VERCEL_ORG_ID`
+- `VERCEL_PROJECT_ID`
+
+### Permisos mínimos sugeridos (Service Account GCP)
+
+- `roles/run.admin`
+- `roles/artifactregistry.writer`
+- `roles/iam.serviceAccountUser`
+- `roles/storage.admin` (si el flujo usa buckets de build auxiliares)
+
+### Cómo ejecutar deploy manual desde Actions
+
+1. GitHub → `Actions` → `Deploy Production`
+2. Click en `Run workflow`
+3. Elegir si desplegar backend/frontend
+4. Ejecutar
+
+### Cómo funciona el deploy automático
+
+Cada push a `master` corre primero pruebas/calidad.
+Si pasan, despliega backend y frontend en paralelo.
+
+---
 
 ## Frontend (Vercel)
 

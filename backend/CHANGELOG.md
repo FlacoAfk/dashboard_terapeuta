@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.8.5] - 2026-03-02
+
+### Added
+- **CI/CD backend en GitHub Actions**: despliegue automatizado a Cloud Run en `.github/workflows/deploy.yml`.
+
+### Changed
+- **Normalización de email**: login, setup, creación de terapeuta y forgot-password convierten correos a minúsculas.
+- **Búsqueda case-insensitive** para correo en autenticación y creación de usuarios (`ilike`) para soportar registros legados con mayúsculas.
+
+### Fixed
+- **Login resiliente** ante diferencias de mayúsculas/minúsculas del correo ingresado por usuario.
+
 ## [1.8.4] - 2026-02-27
 
 ### Added

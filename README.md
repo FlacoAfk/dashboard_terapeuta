@@ -2,7 +2,7 @@
 
 Sistema de gestión clínica para el proyecto de realidad virtual "Cerebro al Fuego". Permite la administración de terapeutas, pacientes, sesiones VR con evaluación del desempeño, y auditoría del sistema.
 
-**Versión:** 1.8.4  
+**Versión:** 1.8.5  
 **Última actualización:** 2026-02-27
 
 ---

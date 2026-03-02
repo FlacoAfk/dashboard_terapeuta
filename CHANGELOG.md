@@ -2,6 +2,30 @@
 
 Todos los cambios notables de este proyecto serán documentados en este archivo.
 
+## [1.8.5] - 2026-03-02
+
+### 🚀 CI/CD
+
+- Se agregan workflows de GitHub Actions para:
+  - Validación continua (`.github/workflows/ci.yml`): lint, tests y build web.
+  - Despliegue de producción (`.github/workflows/deploy.yml`): backend en Cloud Run y frontend en Vercel, con puerta de calidad previa.
+
+### 🐛 Correcciones
+
+- Frontend: corregida pantalla blanca al abrir editar perfil (ícono `Save` faltante en catálogo de íconos).
+- Backend: normalización de correos a minúsculas en login, setup, creación de terapeuta y recuperación de contraseña.
+- Backend: búsquedas de correo robustas con comparación case-insensitive para compatibilidad con datos legados.
+
+### 📝 Documentación
+
+- `docs/DEPLOYMENT.md` actualizado con proceso completo de CI/CD en GitHub Actions, secretos requeridos y variables de entorno.
+
+### 🔄 Versionamiento
+
+- Root: `1.8.4` → `1.8.5`
+- Backend: `1.8.4` → `1.8.5`
+- Frontend: `1.8.4` → `1.8.5`
+
 ## [1.8.4] - 2026-02-27
 
 ### ✨ Nuevas Funcionalidades
