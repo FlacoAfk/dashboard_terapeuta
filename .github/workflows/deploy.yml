@@ -25,6 +25,9 @@ env:
   GCP_REGION: ${{ vars.GCP_REGION }}
   GCP_ARTIFACT_REPO: ${{ vars.GCP_ARTIFACT_REPO }}
   CLOUD_RUN_SERVICE: ${{ vars.CLOUD_RUN_SERVICE }}
+  UNITY_API_KEY_SECRET: ${{ vars.UNITY_API_KEY_SECRET }}
+  UNITY_API_KEY_SECRET_VERSION: ${{ vars.UNITY_API_KEY_SECRET_VERSION }}
+  UNITY_SMOKE_TOKEN: ${{ vars.UNITY_SMOKE_TOKEN }}
 
 jobs:
   quality_gate:
@@ -70,6 +73,23 @@ jobs:
             exit 1
           fi
 
+          if [ -z "${UNITY_API_KEY_SECRET}" ]; then
+            echo "Missing variable: UNITY_API_KEY_SECRET"
+            echo "Set it to your Secret Manager secret name (example: dashboard-unity-api-key)."
+            exit 1
+          fi
+
+          if [ -z "${UNITY_API_KEY_SECRET_VERSION}" ]; then
+            echo "Missing variable: UNITY_API_KEY_SECRET_VERSION"
+            echo "Set a pinned secret version (example: 4). Avoid using latest to prevent drift."
+            exit 1
+          fi
+
+          if [ "${UNITY_API_KEY_SECRET_VERSION}" = "latest" ]; then
+            echo "UNITY_API_KEY_SECRET_VERSION must be pinned (example: 4), not latest."
+            exit 1
+          fi
+
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
@@ -102,12 +122,15 @@ jobs:
           PROJECT_ID="${GCP_PROJECT_ID:-cerebroalfuego}"
           REGION="${GCP_REGION:-us-central1}"
           SERVICE="${CLOUD_RUN_SERVICE:-cerebro-al-fuego-image}"
+          UNITY_SECRET_NAME="${UNITY_API_KEY_SECRET}"
+          UNITY_SECRET_VERSION="${UNITY_API_KEY_SECRET_VERSION}"
 
           gcloud run deploy "$SERVICE" \
             --image "$IMAGE" \
             --region "$REGION" \
             --project "$PROJECT_ID" \
             --platform managed \
+            --update-secrets "UNITY_API_KEY=${UNITY_SECRET_NAME}:${UNITY_SECRET_VERSION}" \
             --quiet
 
           URL=$(gcloud run services describe "$SERVICE" \
@@ -119,6 +142,49 @@ jobs:
           curl -f "$URL/health"
           curl -f "$URL/health/live"
           curl -f "$URL/health/ready"
+
+      - name: Smoke test Unity auth contract
+        run: |
+          PROJECT_ID="${GCP_PROJECT_ID:-cerebroalfuego}"
+          REGION="${GCP_REGION:-us-central1}"
+          SERVICE="${CLOUD_RUN_SERVICE:-cerebro-al-fuego-image}"
+          UNITY_SECRET_NAME="${UNITY_API_KEY_SECRET}"
+          UNITY_SECRET_VERSION="${UNITY_API_KEY_SECRET_VERSION}"
+          TOKEN="${UNITY_SMOKE_TOKEN:-A5G7Z4}"
+
+          URL=$(gcloud run services describe "$SERVICE" \
+            --region "$REGION" \
+            --project "$PROJECT_ID" \
+            --format='value(status.url)')
+
+          API_KEY=$(gcloud secrets versions access "$UNITY_SECRET_VERSION" \
+            --secret="$UNITY_SECRET_NAME" \
+            --project "$PROJECT_ID" | tr -d '\r\n')
+
+          if [ -z "$API_KEY" ]; then
+            echo "Secret ${UNITY_SECRET_NAME}:${UNITY_SECRET_VERSION} is empty or inaccessible"
+            exit 1
+          fi
+
+          NO_AUTH_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+            "$URL/api/sessions/by-token/$TOKEN")
+
+          WITH_AUTH_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "X-API-Key: $API_KEY" \
+            "$URL/api/sessions/by-token/$TOKEN")
+
+          echo "No-auth status: $NO_AUTH_CODE"
+          echo "With-auth status: $WITH_AUTH_CODE"
+
+          if [ "$NO_AUTH_CODE" != "401" ]; then
+            echo "Expected 401 without API key, got $NO_AUTH_CODE"
+            exit 1
+          fi
+
+          if [ "$WITH_AUTH_CODE" = "401" ]; then
+            echo "Expected non-401 with valid API key, got 401"
+            exit 1
+          fi
 
   deploy_frontend:
     name: Deploy Frontend (Vercel)
