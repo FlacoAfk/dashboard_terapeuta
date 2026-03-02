@@ -1,4 +1,5 @@
 name: Deploy Production
+run-name: Deploy • ${{ github.ref_name }} • #${{ github.run_number }}
 
 on:
   push:
@@ -16,9 +17,14 @@ on:
         default: true
         type: boolean
 
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
   id-token: write
+  pull-requests: read
 
 env:
   GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
@@ -27,9 +33,35 @@ env:
   CLOUD_RUN_SERVICE: ${{ vars.CLOUD_RUN_SERVICE }}
 
 jobs:
+  require_pr_for_push:
+    name: Require PR for Push Deploy
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Verify commit is associated with a pull request
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RESPONSE=$(curl -sS \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/pulls")
+
+          PR_COUNT=$(echo "$RESPONSE" | jq 'length')
+
+          if [ "$PR_COUNT" -eq 0 ]; then
+            echo "Direct push detected on deploy branch. Deploys must come from a merged PR."
+            exit 1
+          fi
+
+          echo "PR association verified ($PR_COUNT PR found)."
+
   quality_gate:
     name: Quality Gate
     runs-on: ubuntu-latest
+    needs: [require_pr_for_push]
+    if: github.event_name != 'push' || needs.require_pr_for_push.result == 'success'
 
     steps:
       - name: Checkout

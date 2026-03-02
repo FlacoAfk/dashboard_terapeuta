@@ -1,8 +1,7 @@
 name: CI
+run-name: CI • ${{ github.ref_name }} • #${{ github.run_number }}
 
 on:
-  push:
-    branches: [deploy]
   pull_request:
     branches: [deploy]
 
