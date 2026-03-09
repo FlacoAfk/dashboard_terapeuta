@@ -207,6 +207,8 @@ npm run dev:backend
 npm run dev:frontend
 ```
 
+La app de escritorio crea un archivo `runtime-config.json` en la carpeta `userData` del sistema operativo. Ese archivo define la URL del backend, timeout HTTP y TTL del caché GET para Electron sin necesidad de recompilar.
+
 ### Frontend Web (Vercel / navegador)
 
 ```bash
@@ -287,6 +289,47 @@ UNITY_API_KEY=tu_api_key_para_unity
 | `VITE_API_URL` | ✅ | URL pública del backend |
 | `VITE_API_TIMEOUT_MS` | No | Timeout HTTP global en ms (default `15000`) |
 | `VITE_API_GET_CACHE_TTL_MS` | No | TTL del caché GET en frontend para listados (default `20000`) |
+
+### Runtime Config de Electron
+
+Electron usa este formato para `runtime-config.json`:
+
+```json
+{
+  "apiUrl": "https://cerebro-al-fuego-image-482550109792.us-central1.run.app",
+  "apiTimeoutMs": 15000,
+  "apiGetCacheTtlMs": 20000
+}
+```
+
+Si defines `API_URL`, `API_TIMEOUT_MS` o `API_GET_CACHE_TTL_MS` en el entorno, esos valores tienen prioridad sobre el archivo. Esto sirve para desarrollo, CI y empaquetado.
+
+### Builds Desktop
+
+```bash
+npm run dist:frontend
+npm run dist:frontend:win
+npm run dist:frontend:win:release
+npm run dist:frontend:mac
+npm run dist:frontend:linux
+```
+
+En Windows, el instalador y el ejecutable usan el mismo icono base del frontend web, generado desde el diseño del componente `Logo` hacia `frontend/build/icons/icon.ico`.
+
+### Firma Windows
+
+El workflow de release Windows espera estos secretos para firmar el instalador:
+
+| Secreto | Descripción |
+|---------|-------------|
+| `WINDOWS_CERTIFICATE_BASE64` | Certificado `.pfx` codificado en base64 |
+| `WINDOWS_CERTIFICATE_PASSWORD` | Password del certificado |
+
+Variables opcionales:
+
+| Variable | Descripción |
+|----------|-------------|
+| `WINDOWS_SIGNING_TIMESTAMP_URL` | URL del servidor de timestamp, por ejemplo `http://timestamp.digicert.com` |
 
 ---
 

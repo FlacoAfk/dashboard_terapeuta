@@ -1,0 +1,88 @@
+name: Electron Windows Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: electron-release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows-release:
+    name: Build and Release Windows Installer
+    runs-on: windows-latest
+    env:
+      WINDOWS_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
+      WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+      WINDOWS_SIGNING_TIMESTAMP_URL: ${{ vars.WINDOWS_SIGNING_TIMESTAMP_URL }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Windows icon assets
+        run: npm run assets:frontend:win
+
+      - name: Build unsigned installer
+        run: npm run dist:frontend:win
+
+      - name: Import signing certificate
+        if: env.WINDOWS_CERTIFICATE_BASE64 != '' && env.WINDOWS_CERTIFICATE_PASSWORD != ''
+        shell: pwsh
+        run: |
+          $certificatePath = Join-Path $env:RUNNER_TEMP 'windows-signing-cert.pfx'
+          [System.IO.File]::WriteAllBytes($certificatePath, [System.Convert]::FromBase64String($env:WINDOWS_CERTIFICATE_BASE64))
+          "WINDOWS_CERTIFICATE_PATH=$certificatePath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Sign installer
+        if: env.WINDOWS_CERTIFICATE_PATH != ''
+        shell: pwsh
+        run: |
+          $signtool = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\bin' -Recurse -Filter signtool.exe |
+            Sort-Object FullName -Descending |
+            Select-Object -First 1 -ExpandProperty FullName
+
+          if (-not $signtool) {
+              throw 'signtool.exe not found on runner'
+          }
+
+            $timestampUrl = $env:WINDOWS_SIGNING_TIMESTAMP_URL
+          if ([string]::IsNullOrWhiteSpace($timestampUrl)) {
+              $timestampUrl = 'http://timestamp.digicert.com'
+          }
+
+          $installerPath = Join-Path $PWD 'frontend\release\Sistema Clinico VR Setup 1.8.5.exe'
+
+          & $signtool sign /fd SHA256 /f $env:WINDOWS_CERTIFICATE_PATH /p $env:WINDOWS_CERTIFICATE_PASSWORD /tr $timestampUrl /td SHA256 $installerPath
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: |
+            frontend/release/Sistema Clinico VR Setup 1.8.5.exe
+            frontend/release/Sistema Clinico VR Setup 1.8.5.exe.blockmap
+            frontend/release/builder-effective-config.yaml
+
+      - name: Publish GitHub release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            frontend/release/Sistema Clinico VR Setup 1.8.5.exe
+            frontend/release/Sistema Clinico VR Setup 1.8.5.exe.blockmap

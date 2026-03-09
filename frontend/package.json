@@ -1,13 +1,21 @@
 {
     "name": "sistema-clinico-vr-frontend",
     "version": "1.8.5",
+    "productName": "Sistema Clinico VR",
     "description": "Sistema Clínico VR - Dashboard Terapeuta (Electron + React)",
+    "appId": "com.cerebroalfuego.dashboardterapeuta",
     "main": "dist-electron/main/main.js",
     "scripts": {
+        "assets:win": "powershell -ExecutionPolicy Bypass -File scripts/generate-windows-icon.ps1",
         "dev": "electron-vite dev",
         "dev:web": "vite --config vite.web.config.js",
         "build": "electron-vite build",
         "build:web": "vite build --config vite.web.config.js && node scripts/postbuild-web.js",
+        "dist": "npm run build && electron-builder",
+        "dist:win": "npm run assets:win && npm run build && electron-builder --win nsis",
+        "dist:win:release": "npm run assets:win && npm run build && electron-builder --win nsis --publish always",
+        "dist:mac": "npm run build && electron-builder --mac dmg",
+        "dist:linux": "npm run build && electron-builder --linux AppImage deb",
         "preview": "electron-vite preview",
         "preview:web": "vite preview --config vite.web.config.js",
         "start": "electron-vite preview",
@@ -27,6 +35,7 @@
         "@vitejs/plugin-react": "^4.3.4",
         "autoprefixer": "^10.4.20",
         "electron": "^40.1.0",
+        "electron-builder": "^26.0.12",
         "electron-vite": "^5.0.0",
         "jsdom": "^26.1.0",
         "postcss": "^8.4.49",
@@ -43,5 +52,56 @@
         "terapeuta"
     ],
     "author": "",
-    "license": "ISC"
+    "license": "ISC",
+    "build": {
+        "appId": "com.cerebroalfuego.dashboardterapeuta",
+        "productName": "Sistema Clinico VR",
+        "electronVersion": "40.1.0",
+        "directories": {
+            "buildResources": "build",
+            "output": "release"
+        },
+        "asar": true,
+        "files": [
+            "dist-electron/**/*",
+            "package.json"
+        ],
+        "extraResources": [
+            {
+                "from": "build/icons/icon.ico",
+                "to": "icon.ico"
+            }
+        ],
+        "extraMetadata": {
+            "main": "dist-electron/main/main.js"
+        },
+        "win": {
+            "signAndEditExecutable": false,
+            "icon": "build/icons/icon.ico",
+            "target": [
+                "nsis"
+            ]
+        },
+        "mac": {
+            "target": [
+                "dmg"
+            ],
+            "category": "public.app-category.medical"
+        },
+        "linux": {
+            "target": [
+                "AppImage",
+                "deb"
+            ],
+            "category": "Utility"
+        },
+        "nsis": {
+            "include": "build/installer.nsh",
+            "installerIcon": "build/icons/icon.ico",
+            "uninstallerIcon": "build/icons/icon.ico",
+            "installerHeaderIcon": "build/icons/icon.ico",
+            "oneClick": false,
+            "allowToChangeInstallationDirectory": true
+        }
+    }
 }

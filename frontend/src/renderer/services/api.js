@@ -9,10 +9,6 @@
 
 import { getApiUrl, getApiTimeoutMs, getApiGetCacheTtlMs, isElectronRuntime } from '../config/runtime';
 
-const API_URL = getApiUrl();
-const API_TIMEOUT_MS = getApiTimeoutMs();
-const API_GET_CACHE_TTL_MS = getApiGetCacheTtlMs();
-
 const getResponseCache = new Map();
 const inFlightGetRequests = new Map();
 
@@ -29,8 +25,20 @@ const LIST_GET_CACHEABLE_PATTERNS = [
  * Cliente API con métodos para GET, POST, PUT, DELETE
  */
 const api = {
+    getApiUrl() {
+        return getApiUrl();
+    },
+
+    getApiTimeoutMs() {
+        return getApiTimeoutMs();
+    },
+
+    getApiGetCacheTtlMs() {
+        return getApiGetCacheTtlMs();
+    },
+
     normalizeEndpoint(endpoint) {
-        const url = new URL(endpoint, API_URL);
+        const url = new URL(endpoint, this.getApiUrl());
         const entries = Array.from(url.searchParams.entries()).sort((a, b) => {
             if (a[0] === b[0]) {
                 return String(a[1]).localeCompare(String(b[1]));
@@ -57,7 +65,7 @@ const api = {
     },
 
     hasRefreshBypass(endpoint) {
-        const url = new URL(endpoint, API_URL);
+        const url = new URL(endpoint, this.getApiUrl());
         const refreshValue = String(url.searchParams.get('refresh') || '').toLowerCase();
         return refreshValue === 'true';
     },
@@ -79,13 +87,15 @@ const api = {
     },
 
     setCachedResponse(cacheKey, data) {
-        if (API_GET_CACHE_TTL_MS <= 0) {
+        const cacheTtlMs = this.getApiGetCacheTtlMs();
+
+        if (cacheTtlMs <= 0) {
             return;
         }
 
         getResponseCache.set(cacheKey, {
             data,
-            expiresAt: Date.now() + API_GET_CACHE_TTL_MS
+            expiresAt: Date.now() + cacheTtlMs
         });
     },
 
@@ -148,7 +158,7 @@ const api = {
             forceRefresh ||
             this.hasRefreshBypass(endpoint) ||
             !this.isCacheableGetEndpoint(endpoint) ||
-            API_GET_CACHE_TTL_MS <= 0;
+            this.getApiGetCacheTtlMs() <= 0;
 
         if (shouldBypass) {
             return this._request(endpoint, { method: 'GET', ...requestOptions });
@@ -214,10 +224,12 @@ const api = {
      * Método interno para hacer peticiones
      */
     async _request(endpoint, options = {}) {
-        const url = `${API_URL}${endpoint}`;
+        const apiUrl = this.getApiUrl();
+        const apiTimeoutMs = this.getApiTimeoutMs();
+        const url = `${apiUrl}${endpoint}`;
         const method = String(options.method || 'GET').toUpperCase();
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+        const timeoutId = setTimeout(() => controller.abort(), apiTimeoutMs);
 
         try {
             const response = await fetch(url, {
@@ -263,7 +275,7 @@ const api = {
             return data;
         } catch (error) {
             if (error.name === 'AbortError') {
-                const timeoutError = new Error(`Tiempo de espera agotado (${API_TIMEOUT_MS / 1000}s). Verifica que el backend esté corriendo en ${API_URL}.`);
+                const timeoutError = new Error(`Tiempo de espera agotado (${apiTimeoutMs / 1000}s). Verifica que el backend esté corriendo en ${apiUrl}.`);
                 console.error('[API] Timeout:', timeoutError.message);
                 throw timeoutError;
             }
@@ -273,7 +285,7 @@ const api = {
                 const detail = isOffline
                     ? 'Parece que no tienes conexión a internet.'
                     : 'Puede ser un problema de red, CORS u origen no permitido.';
-                const networkError = new Error(`No se pudo completar la conexión con ${API_URL}. ${detail}`);
+                const networkError = new Error(`No se pudo completar la conexión con ${apiUrl}. ${detail}`);
                 console.error('[API] Red:', networkError.message, error);
                 throw networkError;
             }
