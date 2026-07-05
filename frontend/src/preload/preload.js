@@ -9,7 +9,7 @@
 
 const { contextBridge, ipcRenderer } = require('electron');
 const DEFAULT_RUNTIME_CONFIG = {
-    apiUrl: 'https://cerebro-al-fuego-image-482550109792.us-central1.run.app',
+    apiUrl: 'https://dashboard-terapeuta-backend-858026487030.us-central1.run.app',
     apiTimeoutMs: 15000,
     apiGetCacheTtlMs: 20000,
 };

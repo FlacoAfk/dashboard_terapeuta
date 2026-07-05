@@ -11,9 +11,9 @@ const fs = require('fs');
 const path = require('path');
 
 const DEFAULT_RUNTIME_CONFIG = {
-    apiUrl: 'https://cerebro-al-fuego-image-482550109792.us-central1.run.app',
-    apiTimeoutMs: 15000,
-    apiGetCacheTtlMs: 20000,
+  apiUrl: 'https://dashboard-terapeuta-backend-858026487030.us-central1.run.app',
+  apiTimeoutMs: 15000,
+  apiGetCacheTtlMs: 20000,
 };
 const APP_USER_MODEL_ID = 'com.cerebroalfuego.dashboardterapeuta';
 const RUNTIME_CONFIG_FILE_NAME = 'runtime-config.json';

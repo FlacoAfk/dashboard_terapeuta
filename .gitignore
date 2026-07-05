@@ -67,3 +67,9 @@ backend/scripts/clear_with_sql.js
 
 # Vercel local state
 .vercel/
+
+# Local agent/runtime artifacts
+.atl/
+supabase/.temp/
+backups/
+backup-*.tar.gz

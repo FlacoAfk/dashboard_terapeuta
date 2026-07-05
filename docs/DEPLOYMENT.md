@@ -27,10 +27,10 @@ Se crearon dos workflows:
 
 ### Variables requeridas (GitHub Repository Variables)
 
-- `GCP_PROJECT_ID` (ej. `cerebroalfuego`)
+- `GCP_PROJECT_ID` (ej. `maqagr-143f3`)
 - `GCP_REGION` (ej. `us-central1`)
 - `GCP_ARTIFACT_REPO` (ej. `dashboard-backend`)
-- `CLOUD_RUN_SERVICE` (ej. `cerebro-al-fuego-image`)
+- `CLOUD_RUN_SERVICE` (ej. `dashboard-terapeuta-backend`)
 - `VERCEL_ORG_ID`
 - `VERCEL_PROJECT_ID`
 
@@ -66,7 +66,7 @@ Si pasan, despliega backend y frontend en paralelo.
 6. Install Command: `npm install`
 
 ### Variables de entorno (Vercel)
-- `VITE_API_URL=https://cerebro-al-fuego-image-482550109792.us-central1.run.app`
+- `VITE_API_URL=https://dashboard-terapeuta-backend-858026487030.us-central1.run.app`
 - `VITE_API_TIMEOUT_MS=15000`
 - `VITE_API_GET_CACHE_TTL_MS=20000`
 
@@ -102,7 +102,7 @@ vercel deploy --prod --yes
 - `REDIS_DB=0`
 - `REDIS_CONNECT_TIMEOUT_MS=3000`
 - `CORS_ALLOWED_ORIGINS=<lista_de_origenes_coma_separados>`
-- `CORS_ALLOWED_VERCEL_PROJECT_SUFFIX=flacoafks-projects`
+- `CORS_ALLOWED_VERCEL_PROJECT_SUFFIX=frontend-one-gold-22`
 
 ### Secretos (Secret Manager)
 - `dashboard-supabase-url`
@@ -115,10 +115,10 @@ vercel deploy --prod --yes
 
 ### Build + push + update service (PowerShell)
 ```powershell
-$PROJECT_ID = "cerebroalfuego"
+$PROJECT_ID = "maqagr-143f3"
 $REGION = "us-central1"
 $REPO = "dashboard-backend"
-$SERVICE = "cerebro-al-fuego-image"
+$SERVICE = "dashboard-terapeuta-backend"
 $TAG = "manual-" + (Get-Date -Format "yyyyMMdd-HHmmss")
 $IMAGE = "$REGION-docker.pkg.dev/$PROJECT_ID/$REPO/dashboard-backend:$TAG"
 
@@ -137,20 +137,20 @@ gcloud run services update $SERVICE `
 ### Actualizar CORS para Vercel
 Si quieres permitir varios dominios Vercel puntuales:
 ```powershell
-gcloud run services update cerebro-al-fuego-image `
+gcloud run services update dashboard-terapeuta-backend `
   --region us-central1 `
-  --project cerebroalfuego `
-  --update-env-vars '^##^CORS_ALLOWED_ORIGINS=https://frontend-one-gold-22.vercel.app,https://frontend-eyuloyixl-flacoafks-projects.vercel.app'
+  --project maqagr-143f3 `
+  --update-env-vars '^##^CORS_ALLOWED_ORIGINS=https://frontend-one-gold-22.vercel.app,https://<preview>-frontend-one-gold-22.vercel.app'
 ```
 
-Con `CORS_ALLOWED_VERCEL_PROJECT_SUFFIX=flacoafks-projects`, tambien quedan permitidos previews del tipo:
-`https://<preview>-flacoafks-projects.vercel.app`.
+Con `CORS_ALLOWED_VERCEL_PROJECT_SUFFIX=frontend-one-gold-22`, tambien quedan permitidos previews del tipo:
+`https://<preview>-frontend-one-gold-22.vercel.app`.
 
 ### Smoke checks
 ```powershell
-$URL = gcloud run services describe cerebro-al-fuego-image `
+$URL = gcloud run services describe dashboard-terapeuta-backend `
   --region us-central1 `
-  --project cerebroalfuego `
+  --project maqagr-143f3 `
   --format="value(status.url)"
 
 curl.exe -f "$URL/health"
@@ -161,13 +161,13 @@ curl.exe -f "$URL/health/ready"
 ### Rollback
 ```powershell
 gcloud run revisions list `
-  --service cerebro-al-fuego-image `
+  --service dashboard-terapeuta-backend `
   --region us-central1 `
-  --project cerebroalfuego
+  --project maqagr-143f3
 
-gcloud run services update-traffic cerebro-al-fuego-image `
+gcloud run services update-traffic dashboard-terapeuta-backend `
   --region us-central1 `
-  --project cerebroalfuego `
+  --project maqagr-143f3 `
   --to-revisions <REVISION>=100
 ```
 

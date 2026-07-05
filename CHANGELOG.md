@@ -2,6 +2,35 @@
 
 Todos los cambios notables de este proyecto serán documentados en este archivo.
 
+## [1.8.6] - 2026-07-05
+
+### 🧹 Limpieza
+
+- Se excluyen artefactos locales del repositorio (`.atl/`, `supabase/.temp/`, backups temporales).
+- Se descarta una automatización riesgosa de backups que versionaba dumps de base de datos dentro del repo.
+- Se elimina documentación duplicada fuera de `docs/` para reducir ruido al clonar.
+
+### 📝 Documentación
+
+- `README.md` actualizado con ruta rápida de onboarding para el equipo, bootstrap de base de datos y enlaces a la documentación técnica.
+- `docs/DEPLOYMENT.md` alineado con la infraestructura vigente en GCP/Cloud Run y Vercel.
+- `docs/POSTMAN_API_DOCS.md` y `docs/README.md` sincronizados con la URL backend actual y el estado documental vigente.
+- Se agregan documentos técnicos versionados en `docs/` (arquitectura, modelo de datos, seguridad, integración VR y requerimientos).
+
+### ⚙️ Operación
+
+- Se agregan `backend/migrations/00_create_all_tables.sql` y `backend/scripts/seed_v2.js` para facilitar bootstrap de entornos nuevos.
+- Se agrega `frontend/.vercelignore` para evitar despliegues con artefactos pesados o innecesarios.
+- Se actualiza la configuración runtime del frontend/Electron y Swagger a la URL backend vigente.
+- Se ejecuta `npm audit fix` sin cambios breaking; quedan advisories pendientes que requieren upgrade mayor en `nodemailer` y `vite/vitest`.
+
+### 🔄 Versionamiento
+
+- Root: `1.8.5` → `1.8.6`
+- Backend: `1.8.5` → `1.8.6`
+- Frontend: `1.8.5` → `1.8.6`
+- Swagger: `1.8.0` → `1.8.6`
+
 ## [1.8.5] - 2026-03-02
 
 ### 🚀 CI/CD

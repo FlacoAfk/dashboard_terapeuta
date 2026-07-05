@@ -2,13 +2,14 @@
 
 Sistema de gestión clínica para el proyecto de realidad virtual "Cerebro al Fuego". Permite la administración de terapeutas, pacientes, sesiones VR con evaluación del desempeño, y auditoría del sistema.
 
-**Versión:** 1.8.5  
-**Última actualización:** 2026-02-27
+**Versión:** 1.8.6  
+**Última actualización:** 2026-07-05
 
 ---
 
 ## 📋 Tabla de Contenidos
 
+- [Inicio Rápido para el Equipo](#-inicio-rápido-para-el-equipo)
 - [Requisitos del Sistema](#-requisitos-del-sistema)
 - [Tecnologías](#️-tecnologías)
 - [Estructura del Proyecto](#-estructura-del-proyecto)
@@ -21,6 +22,44 @@ Sistema de gestión clínica para el proyecto de realidad virtual "Cerebro al Fu
 - [Evaluación del Desempeño](#-evaluación-del-desempeño)
 - [Roles y Permisos](#-roles-y-permisos)
 - [Seguridad](#-seguridad)
+
+---
+
+## ✅ Inicio Rápido para el Equipo
+
+Si alguien del equipo clona el proyecto hoy, este es el camino corto:
+
+```bash
+git clone https://github.com/FlacoAfk/dashboard_terapeuta.git
+cd dashboard_terapeuta
+npm install
+copy backend/.env.example backend/.env
+copy frontend/.env.example frontend/.env
+```
+
+Luego:
+
+1. Completa `backend/.env` con credenciales reales.
+2. Ajusta `frontend/.env` solo si vas a correr el frontend web contra otra API.
+3. Inicia backend: `npm run dev:backend`
+4. Inicia frontend web: `npm run dev:web` o desktop: `npm run dev:frontend`
+5. Verifica:
+   - API: `http://localhost:3001/health`
+   - Swagger: `http://localhost:3001/api-docs`
+
+### Bootstrap de base de datos
+
+Si el equipo necesita levantar una base limpia:
+
+- esquema base: `backend/migrations/00_create_all_tables.sql`
+- seed inicial: `node backend/scripts/seed_v2.js`
+
+### Documentación técnica
+
+- Índice maestro: [`docs/README.md`](docs/README.md)
+- Requisitos: [`docs/REQUERIMIENTOS.md`](docs/REQUERIMIENTOS.md)
+- Arquitectura: [`docs/ARQUITECTURA.md`](docs/ARQUITECTURA.md)
+- Seguridad: [`docs/SEGURIDAD.md`](docs/SEGURIDAD.md)
 
 ---
 
@@ -296,7 +335,7 @@ Electron usa este formato para `runtime-config.json`:
 
 ```json
 {
-  "apiUrl": "https://cerebro-al-fuego-image-482550109792.us-central1.run.app",
+  "apiUrl": "https://dashboard-terapeuta-backend-858026487030.us-central1.run.app",
   "apiTimeoutMs": 15000,
   "apiGetCacheTtlMs": 20000
 }

@@ -1,7 +1,7 @@
 # 📬 Cerebro al Fuego - Documentación de API para Postman
 
-> **Versión:** 1.8.0  
-> **Base URL (Cloud Run):** `https://cerebro-al-fuego-image-482550109792.us-central1.run.app`  
+> **Versión:** 1.8.6  
+> **Base URL (Cloud Run):** `https://dashboard-terapeuta-backend-858026487030.us-central1.run.app`  
 > **Base URL (Local):** `http://localhost:3001`  
 > **Swagger UI:** `{BASE_URL}/api-docs`  
 > **Swagger JSON:** `{BASE_URL}/api-docs.json`
@@ -33,7 +33,7 @@ Crea un Environment en Postman con estas variables:
 
 | Variable | Valor Inicial | Descripción |
 |---|---|---|
-| `base_url` | `https://cerebro-al-fuego-image-482550109792.us-central1.run.app` | URL base de la API |
+| `base_url` | `https://dashboard-terapeuta-backend-858026487030.us-central1.run.app` | URL base de la API |
 | `token_admin` | *(se obtiene al hacer login)* | JWT del Superadmin |
 | `token_terapeuta` | *(se obtiene al hacer login)* | JWT del Terapeuta |
 | `unity_api_key` | `YOUR_UNITY_API_KEY` | API Key para endpoints de Unity |
@@ -1618,6 +1618,6 @@ Value:    YOUR_UNITY_API_KEY
 
 ---
 
-*Generado el 8 de febrero de 2026 — Versión 1.7.1*
+*Actualizado el 5 de julio de 2026 — Versión 1.8.6*
 
 

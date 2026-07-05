@@ -14,7 +14,7 @@ const options = {
         openapi: '3.0.0',
         info: {
             title: 'Dashboard Terapeuta - API',
-            version: '1.8.0',
+            version: '1.8.6',
             description: `
 ## API para el Dashboard de Terapeutas - Cerebro al Fuego
 
@@ -53,7 +53,7 @@ El backend utiliza: PORT, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, JWT_SECRET, J
         },
         servers: [
             {
-                url: 'https://cerebro-al-fuego-image-482550109792.us-central1.run.app',
+                url: 'https://dashboard-terapeuta-backend-858026487030.us-central1.run.app',
                 description: 'Producción - Google Cloud Run'
             },
             {
