@@ -11,7 +11,7 @@ const fs = require('fs');
 const path = require('path');
 
 const DEFAULT_RUNTIME_CONFIG = {
-  apiUrl: 'https://dashboard-terapeuta-backend-858026487030.us-central1.run.app',
+  apiUrl: 'https://backend-production-94b2c.up.railway.app',
   apiTimeoutMs: 15000,
   apiGetCacheTtlMs: 20000,
 };

@@ -53,8 +53,8 @@ El backend utiliza: PORT, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, JWT_SECRET, J
         },
         servers: [
             {
-                url: 'https://dashboard-terapeuta-backend-858026487030.us-central1.run.app',
-                description: 'Producción - Google Cloud Run'
+                url: 'https://backend-production-94b2c.up.railway.app',
+                description: 'Producción - Railway'
             },
             {
                 url: 'http://localhost:3001',
