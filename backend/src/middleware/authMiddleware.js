@@ -169,18 +169,32 @@ const optionalAuth = (req, res, next) => {
  * Middleware para validar API Key de Unity (VR)
  * Usado por endpoints que reciben datos del videojuego
  */
+const resolveUnityApiKey = () => {
+    const key = process.env.UNITY_API_KEY
+        || process.env.API_KEY
+        || process.env.X_API_KEY
+        || process.env.AUTH_API_KEY
+        || process.env.SESSION_API_KEY;
+
+    if (key) {
+        process.env.UNITY_API_KEY = key;
+    }
+
+    return key;
+};
+
 const validateUnityApiKey = (req, res, next) => {
-    const apiKey = req.headers['x-api-key'];
-    const expectedKey = process.env.UNITY_API_KEY;
+    const apiKeyHeader = req.headers['x-api-key'] || req.headers['api-key'];
+    const expectedKey = resolveUnityApiKey();
 
     if (!expectedKey) {
-        console.error('[Security] UNITY_API_KEY no está configurada en .env');
+        console.error('[Security] Ninguna variable de API Key está configurada (UNITY_API_KEY, API_KEY, X_API_KEY, AUTH_API_KEY o SESSION_API_KEY).');
         return res.status(500).json({
             error: { code: 'CONFIG_ERROR', message: 'API Key no configurada en el servidor' }
         });
     }
 
-    if (!apiKey || apiKey !== expectedKey) {
+    if (!apiKeyHeader || apiKeyHeader !== expectedKey) {
         return res.status(401).json({
             error: { code: 'UNAUTHORIZED', message: 'API Key inválida o no proporcionada' }
         });

@@ -267,6 +267,7 @@ jobs:
       - name: Install Vercel CLI
         run: npm i -g vercel@latest
 
+<<<<<<< HEAD
       - name: Pull Vercel project settings
         working-directory: frontend
         env:
@@ -274,6 +275,12 @@ jobs:
           VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
         run: vercel pull --yes --environment=production --token "$VERCEL_TOKEN"
+=======
+      - name: Deploy frontend-web service
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: railway up ./frontend --path-as-root --service frontend-web --detach
+>>>>>>> 959e069 (fix(railway): use service root for backend/frontend deploys)
 
       - name: Build frontend artifacts
         working-directory: frontend
