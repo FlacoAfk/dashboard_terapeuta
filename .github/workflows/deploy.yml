@@ -76,10 +76,9 @@ jobs:
         run: npm i -g @railway/cli@latest
 
       - name: Deploy backend service
-        working-directory: backend
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-        run: railway up --service backend --detach
+        run: railway up ./backend --path-as-root --service backend --detach
 
       - name: Verify deployment
         run: |
@@ -113,10 +112,9 @@ jobs:
         run: npm i -g @railway/cli@latest
 
       - name: Deploy frontend-web service
-        working-directory: frontend
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-        run: railway up --service frontend-web --detach
+        run: railway up ./frontend --path-as-root --service frontend-web --detach
 
       - name: Verify deployment
         run: curl -f "${RAILWAY_FRONTEND_URL}/health"

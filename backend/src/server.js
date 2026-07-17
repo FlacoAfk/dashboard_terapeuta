@@ -6,6 +6,22 @@
 
 require('dotenv').config();
 
+const resolveUnityApiKeyEnv = () => {
+    const key = process.env.UNITY_API_KEY
+        || process.env.API_KEY
+        || process.env.X_API_KEY
+        || process.env.AUTH_API_KEY
+        || process.env.SESSION_API_KEY;
+
+    if (key) {
+        process.env.UNITY_API_KEY = key;
+    }
+
+    return key;
+};
+
+resolveUnityApiKeyEnv();
+
 const { createApp } = require('./app');
 const { testConnection } = require('./config/supabase');
 const { initializeRedis } = require('./utils/cache');
